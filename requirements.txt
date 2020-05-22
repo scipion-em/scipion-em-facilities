@@ -1,3 +1,4 @@
 scipion-pyworkflow
-biopython
 nvidia-ml-py3
+pytz
+paramiko

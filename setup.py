@@ -6,9 +6,7 @@ https://github.com/pypa/sampleproject
 """
 
 # Always prefer setuptools over distutils
-from pwem import EM_PROGRAM_ENTRY_POINT, CHIMERA_ENTRY_POINT, \
-    CONVERT_ENTRY_POINT
-from pwem.constants import URL
+from scipion4facilities.constants import URL
 from setuptools import setup, find_packages
 # To use a consistent encoding
 from codecs import open
@@ -29,26 +27,50 @@ with open('requirements.txt') as f:
 # Fields marked as "Optional" may be commented out.
 
 setup(
-    name='scipion-em',  # Required
-    version='1.0.1',  # Required
-    description='This modules contains classes related with EM',  # Required
+    # This is the name of your project. The first time you publish this
+    # package, this name will be registered for you. It will determine how
+    # users can install this project, e.g.:
+    #
+    # $ pip install sampleproject
+    #
+    # And where it will live on PyPI: https://pypi.org/project/sampleproject/
+    #
+    # There are some restrictions on what makes a valid project name
+    # specification here:
+    # https://packaging.python.org/specifications/core-metadata/#name
+    name='scipion-em-facilities',  # Required
+
+    # Versions should comply with PEP 440:
+    # https://www.python.org/dev/peps/pep-0440/
+    #
+    # For a discussion on single-sourcing the version across setup.py and the
+    # project code, see
+    # https://packaging.python.org/en/latest/single_source_version.html
+    version='0.0.1',  # Required
+
+    # This is a one-line description or tagline of what your project does. This
+    # corresponds to the "Summary" metadata field:
+    # https://packaging.python.org/specifications/core-metadata/#summary
+    description='Plugin for Cryo-EM facilities to be used within Scipion framework',  # Required
+
+    # This is an optional longer description of your project that represents
+    # the body of text which users will see when they visit PyPI.
+    #
+    # Often, this is the same as your README, so you can just read it in from
+    # that file directly (as we have already done above)
+    #
+    # This field corresponds to the "Description" metadata field:
+    # https://packaging.python.org/specifications/core-metadata/#description-optional
     long_description=long_description,  # Optional
-    url= URL,  # Optional
+    url=URL,  # Optional
     author='J.M. De la Rosa Trevin, '
            'Roberto Marabini, '
-           'Grigory Sharov, '
-           'Josue Gomez Blanco, '
-           'Pablo Conesa, '
-           'Yunior Fonseca Reyna',  # Optional
+           'David Maluenda',  # Optional
 
     # This should be a valid email address corresponding to the author listed
     # above.
-    author_email='delarosatrevin@scilifelab.se, '
-                 'roberto@cnb.csic.es, '
-                 'gsharov@mrc-lmb.cam.ac.uk, '
-                 'josue.gomez-blanco@mcgill.ca, '
-                 'pconesa@cnb.csic.es, '
-                 'fonsecareyna@cnb.csic.es',  # Optional
+    author_email='scipion@cnb.csic.es, '
+                 'dmaluenda@cnb.csic.es, ',  # Optional
 
     # Classifiers help users find your project by categorizing it.
     #
@@ -75,14 +97,9 @@ setup(
     packages=find_packages(),
     install_requires=[requirements],
     entry_points={
-        'console_scripts': [
-            '%s = pwem.cmd.program:main' % EM_PROGRAM_ENTRY_POINT,
-            '%s = pwem.cmd.chimera_client:main' % CHIMERA_ENTRY_POINT,
-            '%s = pwem.cmd.convert:main' % CONVERT_ENTRY_POINT,
-        ],
-        'pyworkflow.plugin': 'pwem = pwem'
+        'pyworkflow.plugin': 'scipion4facilities = scipion4facilities'
     },
     package_data={
-      'pwem':['templates/*']
+      'scipion4facilities': ['templates/*', 'scipion_icon.gif', 'protocols.conf'],
     }
 )
