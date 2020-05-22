@@ -1,5 +1,5 @@
 ================================
-Scipion Em Facilities
+Scipion-em-Facilities
 ================================
 
 There is a type of protocols called monitors which are used to produce live analysis plots, 
