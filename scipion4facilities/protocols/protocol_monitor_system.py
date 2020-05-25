@@ -51,7 +51,7 @@ from pynvml import (nvmlInit, nvmlDeviceGetHandleByIndex,
                     nvmlDeviceGetComputeRunningProcesses)
 
 from .protocol_monitor import ProtMonitor, Monitor
-
+from .secrets import timeZone
 
 SYSTEM_LOG_SQLITE = 'system_log.sqlite'
 
@@ -398,7 +398,7 @@ class MonitorSystem(Monitor):
         # represents a row of the table
         listOfDictionaries = self.cur.fetchall()
         for item in listOfDictionaries:
-            local = pytz.timezone(secrets.timeZone)
+            local = pytz.timezone(timeZone)
             # convert dates from scipion to datetime.datetime
             for d in listOfDictionaries:
                 datum = d['timestamp']
