@@ -1,4 +1,6 @@
 scipion-pyworkflow
+scipion-em
 nvidia-ml-py3
 pytz
 paramiko
+influxdb

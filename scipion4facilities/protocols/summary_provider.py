@@ -31,6 +31,7 @@ from pyworkflow.protocol import getUpdatedProtocol
 
 from pwem.protocols import ProtImportImages
 
+
 class SummaryProvider(TreeProvider):
     """Create the tree elements for a Protocol run"""
     def __init__(self, protocol):

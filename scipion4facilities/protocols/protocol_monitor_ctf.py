@@ -29,7 +29,6 @@ import sys
 from math import isinf
 import sqlite3 as lite
 import datetime
-import time
 import math
 import pytz
 
@@ -37,6 +36,7 @@ import pyworkflow.protocol.params as params
 from pyworkflow import VERSION_1_1
 from pyworkflow.protocol.constants import STATUS_RUNNING
 from pyworkflow.protocol import getUpdatedProtocol
+
 from .secrets import timeZone
 from .protocol_monitor import ProtMonitor, Monitor
 
@@ -59,11 +59,10 @@ class ProtMonitorCTF(ProtMonitor):
 
         form.addParam('inputProtocol', params.PointerParam,
                       label="Input protocols", important=True,
-                      pointerClass='CistemProtCTFFind, XmippProtCTFMicrographs',
+                      pointerClass='ProtCTFMicrographs',
                       help="this protocol will be monitorized")
         form.addParam('samplingInterval', params.IntParam, default=60,
                       label="Sampling Interval (sec)",
-                      pointerClass='EMProtocol',
                       help="Take one sample each SamplinInteval seconds")
 
         form.addParam('maxDefocus', params.FloatParam, default=40000,

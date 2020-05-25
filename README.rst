@@ -1,42 +1,49 @@
-====
-scipion4facilities
-====
+=================
+Scipion4facilities plugin
+=================
 
-**scipion4facilities** is a Python module of Scipion framework for cryo-EM facilities
+This plugin allows to use different utils for cryo-EM facilities (like monitors)
+within the Scipion framework.
+
++------------------+------------------+
+| stable: |stable| | devel: | |devel| |
++------------------+------------------+
+
+.. |stable| image:: http://scipion-test.cnb.csic.es:9980/badges/facilities_prod.svg
+.. |devel| image:: http://scipion-test.cnb.csic.es:9980/badges/facilities_sdevel.svg
 
 
-The entire collection is licensed under the terms of the GNU Public License,
-version 3 (GPLv3).
+Installation
+------------
 
--------------
-Development
--------------
+You will need to use `Scipion 3.0 <https://github.com/I2PC/scipion/releases/tag/V3.0.0>`_
+to be able to run these protocols. To install the plugin, you have two options:
 
-To install **scipion4facilities** for development purposes, one can do:
+a) Stable version
 
-::
+.. code-block::
 
-    # Create a clean virtual environment
-    python -m venv ~/myenv
-    source ~/myenv/bin/activate
-    git clone git@github.com:scipion-em/scipion-em-facilities.git
-    cd scipion-em
-    python -m pip install -e .  # Install in the environment as development
+   scipion installp -p scipion-em-facilities
 
--------------
-Running tests
--------------
+b) Developer's version
 
-First make sure that **scipion4facilities** is available as a Python module in your
-current Python environment. During development, I tend to set the PYTHONPATH:
+   * download repository
 
-::
+   .. code-block::
 
-    cd scipion-em
-    # Either you have installed as mentioned above, or modify the PYTHONPATH
-    export PYTHONPATH=$PYTHONPATH:$PWD
-    # After pyworkflow is accesible as a module, then:
-    cd scipion4facilities/tests
+      git clone https://github.com/scipion-em/scipion-em-facilities.git
 
-    python -m unittest discover
+   * install
 
+   .. code-block::
+
+      scipion installp -p /path/to/scipion-em-facilities --devel
+
+Testing
+-------
+
+To check the installation, simply run the following Scipion test:
+
+``scipion test --grep scipion4facilities --mode modules --run``
+
+If '--run' is not passed, it only shows the available tests to check.

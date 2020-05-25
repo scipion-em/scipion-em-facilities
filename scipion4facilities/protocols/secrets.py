@@ -9,13 +9,13 @@
 # influx: information needed to acces to the "host"
 # running influxdb. If you are not encrypting your
 # communications set ssl = False
-usernameInflux='aW5mbHV4dXNlcm5hbWU='
-passwordInflux='aW5mbHV4cGFzc3dk'
-dataBase='scipion'
-hostinflux='influx-server.cnb.csic.es'
-port=8086
-ssl=True
-verify_ssl=False
+usernameInflux = 'aW5mbHV4dXNlcm5hbWU='
+passwordInflux = 'aW5mbHV4cGFzc3dk'
+dataBase = 'scipion'
+hostinflux = 'influx-server.cnb.csic.es'
+port = 8086
+ssl = True
+verify_ssl = False
 timeZone = "Europe/Madrid"
 
 # paramiko,  is a ssh client for python we use it to implement
@@ -31,13 +31,3 @@ keyfilepath = 'L2hvbWUvcm9iZXJ0by8uc3NoL2lkX3JzYQ=='
 keyfiletype = 'UlNB'
 remote_path = '/home/scipionbox/public_html/'
 hostparamiko = 'paramiko-erver.cnb.csic.es'
-
-import base64
-def enCrypt(message):
-    """Totally naive encription routine that will not
-    stop a hacker. Use it to encrypt usernames and password.
-    Ussage: enCrypt("myusername")"""
-
-    message_bytes = message.encode('ascii')
-    base64_bytes = base64.b64encode(message_bytes)
-    return base64_bytes.decode('ascii')

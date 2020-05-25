@@ -28,6 +28,7 @@ import time
 
 import pyworkflow.object as pwobj
 import pyworkflow.protocol.params as params
+from pyworkflow.project import Manager
 
 from .protocol_monitor import ProtMonitor
 
@@ -127,7 +128,6 @@ class ProtMonitor2dStreamer(ProtMonitor):
         self._store(subset)
         subset.close()
 
-        from pyworkflow.project import Manager
         manager = Manager()
         project = manager.loadProject(self.getProject().getName())
         input2D = self.input2dProtocol.get()

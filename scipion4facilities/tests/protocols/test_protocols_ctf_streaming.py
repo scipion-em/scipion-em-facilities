@@ -29,11 +29,13 @@ import pyworkflow.protocol as pwprot
 
 import pwem.objects as emobj
 import pwem.protocols as emprot
-
-# Load the number of movies for the simulation, by default equal 5, but
-# can be modified in the environment
 from pwem import Domain
 
+from scipion4facilities.protocols import pynvml
+
+
+# Load the number of movies for the simulation, by default equal 6, but
+# can be modified in the environment
 MICS = os.environ.get('SCIPION_TEST_MICS', 6)
 CTF_SQLITE = "ctfs.sqlite"
 
@@ -141,7 +143,7 @@ class TestCtfStreaming(pwtests.BaseTest):
         protCTF3 = None
         try:
             # check if box has nvidia cuda libs.
-            emprot.nvmlInit()  # fails if not GPU attached
+            pynvml.nvmlInit()  # fails if not GPU attached
             ProtGctf = Domain.importFromPlugin('gctf.protocols', 'ProtGctf',
                                                doRaise=True)
             protCTF3 = ProtGctf()
@@ -150,7 +152,7 @@ class TestCtfStreaming(pwtests.BaseTest):
             protCTF3.ctfDownFactor.set(2)
             self.proj.scheduleProtocol(protCTF3)
 
-        except emprot.NVMLError as err:
+        except pynvml.NVMLError as err:
             print("Cannot find GPU."
                   "I assume that no GPU is connected to this machine")
 

@@ -28,13 +28,17 @@
 import os
 from os.path import basename
 from datetime import datetime, timedelta
-import pyworkflow.utils as pwutils
-
-from pwem.emlib.image import ImageHandler
-from .summary_provider import SummaryProvider
 from configparser import ConfigParser
 import urllib3
 import base64
+import time
+from .transport import Connect
+
+import pyworkflow.utils as pwutils
+from pwem.emlib.image import ImageHandler
+
+from .summary_provider import SummaryProvider
+
 
 # --------------------- CONSTANTS -----------------------------------
 # These constants are the keys used in the ctfMonitor function
@@ -48,8 +52,6 @@ SHIFT_PATH = 'imgShiftPath'
 # they will need to be changed if they're changed here)
 CONFILE = 'monitor.conf'
 
-import time
-from .transport import Connect
 
 class ReportInflux:
     """ Create a report (html or influxdb) with a summary of the processing.
@@ -119,9 +121,8 @@ class ReportInflux:
         # I put this import here so users with no database
         # can run tratinional html report
         from influxdb import InfluxDBClient
-        from pwem.protocols.monitors.secrets import (dataBase, passwordInflux,
-                                                     usernameInflux,
-                                                     hostinflux, port, ssl, verify_ssl)
+        from .secrets import (dataBase, passwordInflux, usernameInflux,
+                              hostinflux, port, ssl, verify_ssl)
 
         self.dataBaseName = dataBase
         try:
@@ -429,7 +430,6 @@ class ReportInflux:
                 self.ih.computeThumbnail(point['psdPathLocal'], point['psdPathLocalPng'],
                                     scaleFactor=scaleFactor, flipOnY=True)
 
-
                 X, Y, Z, N = self.ih.getDimensions(point['micPathLocal'])
                 if X > 512:
                     scaleFactor = X // 512
@@ -468,7 +468,6 @@ class ReportInflux:
                 print("Error updating database: ", e)
                 return False # do not mark files are read
 
-
             elapsed_time = time.time() - start_time
             if elapsed_time > self.refreshSecs:
                 break
@@ -496,13 +495,15 @@ def slugify(text):
     text = u'_'.join(text.split())
     return text
 
-def enCrypt(message):
-    """Totally naive encription routine that will not
-    stop a hacker"""
 
+def enCrypt(message):
+    """Totally naive encryption routine that will not
+    stop a hacker
+    """
     message_bytes = message.encode('ascii')
     base64_bytes = base64.b64encode(message_bytes)
     return base64_bytes.decode('ascii')
+
 
 def deCrypt(base64_message):
     """

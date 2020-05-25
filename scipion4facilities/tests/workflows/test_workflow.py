@@ -37,5 +37,3 @@ class TestWorkflow(pwtest.BaseTest):
             if filename.startswith(k):
                 return filename.replace(k, v.getWorkingDir())
         return filename
-                
-
