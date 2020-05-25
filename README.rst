@@ -1,6 +1,6 @@
-=================
+=========================
 Scipion4facilities plugin
-=================
+=========================
 
 This plugin allows to use different utils for cryo-EM facilities (like monitors)
 within the Scipion framework.
@@ -11,6 +11,8 @@ within the Scipion framework.
 
 .. |stable| image:: http://scipion-test.cnb.csic.es:9980/badges/facilities_prod.svg
 .. |devel| image:: http://scipion-test.cnb.csic.es:9980/badges/facilities_sdevel.svg
+
+Please, check the `facilities documentation <https://scipion-em.github.io/docs/docs/facilities/facilities.html>`_ for more details.
 
 
 Installation
