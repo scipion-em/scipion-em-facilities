@@ -421,7 +421,10 @@ class ReportInflux:
                 source.append(point['micPathLocalPng'])    # micrograph
 
                 # default value 512
-                X, Y, Z, N = self.ih.getDimensions(point['psdPathLocal'])
+                try:
+                    X, Y, Z, N = self.ih.getDimensions(point['psdPathLocal'])
+                except:
+                    print("file %s does not exist"% point['psdPathLocal'])
                 if X > 512:
                     scaleFactor = X // 512
                 else:
