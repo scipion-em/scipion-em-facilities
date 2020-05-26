@@ -3,7 +3,7 @@ Scipion for facilities
 ======================
 
 +------------------+------------------+
-| stable: |stable| | devel: | |devel| |
+| stable: |stable| | devel: |devel|   |
 +------------------+------------------+
 
 .. |stable| image:: http://scipion-test.cnb.csic.es:9980/badges/facilities_prod.svg
@@ -62,4 +62,4 @@ To check the installation, simply run the following Scipion test:
 
   scipion3 test --grep emfacilities --mode modules --run
 
-If `--run` is not passed, it only shows the available tests to check.
+If ``--run`` is not passed, it only shows the available tests to check.
