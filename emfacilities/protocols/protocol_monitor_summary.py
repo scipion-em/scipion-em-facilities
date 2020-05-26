@@ -23,6 +23,7 @@
 # *  e-mail address 'scipion@cnb.csic.es'
 # *
 # **************************************************************************
+
 import os.path
 
 import pyworkflow.utils as pwutils
@@ -31,6 +32,7 @@ from pyworkflow import VERSION_1_1
 
 from pwem.protocols import ProtCTFMicrographs, ProtAlignMovies
 from pwem import Domain
+
 from .report_influx import ReportInflux
 from .report_html import ReportHtml
 from .protocol_monitor import ProtMonitor, Monitor

@@ -30,7 +30,6 @@ import time
 import sqlite3 as lite
 import datetime
 import pytz
-from .secrets import timeZone
 
 try:
     import psutil
@@ -52,6 +51,7 @@ from pynvml import (nvmlInit, nvmlDeviceGetHandleByIndex,
                     nvmlDeviceGetComputeRunningProcesses)
 
 from .protocol_monitor import ProtMonitor, Monitor
+from .secrets import timeZone
 
 SYSTEM_LOG_SQLITE = 'system_log.sqlite'
 
@@ -469,4 +469,3 @@ class MonitorSystem(Monitor):
 
         # conn.close()
         return data
-

@@ -1,45 +1,65 @@
-====
-scipion4facilities
-====
+======================
+Scipion for facilities
+======================
 
-**scipion4facilities** is a Python module of Scipion framework for cryo-EM facilities
++------------------+------------------+
+| stable: |stable| | devel: | |devel| |
++------------------+------------------+
 
+.. |stable| image:: http://scipion-test.cnb.csic.es:9980/badges/facilities_prod.svg
+.. |devel| image:: http://scipion-test.cnb.csic.es:9980/badges/facilities_sdevel.svg
 
-There is a type of protocols called monitors which are used to produce live analysis plots, generate reports or raise alerts when some problems are detected. A monitor example is the CTF-monitor, that checks the computed defocus values for each micrograph as they are generated. CTF-monitor may raise an alert if the defocus values are above or below certain thresholds. A special case of this monitors is the monitor summary which encapsulates the CTF Monitor, the system monitor and the movie gain monitor and continuosly creates a report.
+'scipion-em-facilities' plugin allows to use different utils for cryo-EM facilities
+(like monitors) within the Scipion framework.
+
+Monitors are used to produce live analysis plots, generate reports or
+raise alerts when some problems are detected. A monitor example is the CTF-monitor,
+that checks the computed defocus values for each micrograph as they are generated.
+CTF-monitor may raise an alert if the defocus values are above or below certain thresholds.
+A special case of this monitors is the monitor summary which encapsulates the CTF Monitor,
+the system monitor and the movie gain monitor and continuously creates a report.
 
 This module contains protocols and utilities related with monitors.
 
-See https://scipion-em.github.io/docs/release-3.0.0/docs/facilities/customize-report.html for more information
+Please, check the `facilities documentation <https://scipion-em.github.io/docs/docs/facilities/facilities.html>`_
+for more details.
 
--------------
-Development
--------------
 
-To install **scipion4facilities** for development purposes, one can do:
+Installation
+------------
 
-::
+You will need to use `Scipion 3.0 <https://scipion-em.github.io/docs/release-3.0.0/index.html>`_
+to be able to run these protocols.
 
-    # Create a clean virtual environment
-    python -m venv ~/myenv
-    source ~/myenv/bin/activate
-    git clone git@github.com:scipion-em/scipion-em-facilities.git
-    cd scipion-em
-    python -m pip install -e .  # Install in the environment as development
+To install the plugin, you have two options:
 
--------------
-Running tests
--------------
+a) Stable version
 
-First make sure that **scipion4facilities** is available as a Python module in your
-current Python environment. During development, I tend to set the PYTHONPATH:
+.. code-block::
 
-::
+   scipion3 installp -p scipion-em-facilities
 
-    cd scipion-em
-    # Either you have installed as mentioned above, or modify the PYTHONPATH
-    export PYTHONPATH=$PYTHONPATH:$PWD
-    # After pyworkflow is accesible as a module, then:
-    cd scipion4facilities/tests
+b) Developer's version
 
-    python -m unittest discover
+   * 1st. Download repository
 
+   .. code-block::
+
+      git clone https://github.com/scipion-em/scipion-em-facilities.git /path/to/scipion-em-facilities
+
+   * 2nd. Install the plugin
+
+   .. code-block::
+
+      scipion3 installp -p /path/to/scipion-em-facilities --devel
+
+Testing
+-------
+
+To check the installation, simply run the following Scipion test:
+
+.. code-block::
+
+  scipion3 test --grep emfacilities --mode modules --run
+
+If `--run` is not passed, it only shows the available tests to check.

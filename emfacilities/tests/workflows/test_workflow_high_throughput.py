@@ -43,11 +43,15 @@ class HighThroughputTest(TestWorkflow):
     def test_workflow(self):
         # First, import a set of movies
         print("Importing a set of movies...")
-        protImport = emprot.ProtImportMovies(filesPath=self.movies, samplingRate=2.37, magnification=59000,
-                                             voltage=300, sphericalAberration=2.0)
+        protImport = emprot.ProtImportMovies(filesPath=self.movies,
+                                             samplingRate=2.37,
+                                             magnification=59000,
+                                             voltage=300,
+                                             sphericalAberration=2.0)
         protImport.setObjLabel('import movies - Day1')
         self.proj.launchProtocol(protImport, wait=True)
-        self.assertSetSize(protImport.outputMovies, msg="There was a problem importing movies")
+        self.assertSetSize(protImport.outputMovies,
+                           msg="There was a problem importing movies")
 
         print("Aligning the movies...")
         XmippProtOFAlignment = Domain.importFromPlugin('xmipp3.protocols',
@@ -59,7 +63,8 @@ class HighThroughputTest(TestWorkflow):
         protAlignMov.inputMovies.set(protImport.outputMovies)
         protAlignMov.setObjLabel('align movies - Day1')
         self.proj.launchProtocol(protAlignMov, wait=True)
-        self.assertSetSize(protAlignMov.outputMicrographs, msg="There was a problem aligning movies")
+        self.assertSetSize(protAlignMov.outputMicrographs,
+                           msg="There was a problem aligning movies")
 
         print("Preprocessing the micrographs...")
         XmippProtPreprocessMicrographs = Domain.importFromPlugin(
@@ -69,17 +74,20 @@ class HighThroughputTest(TestWorkflow):
         protPreprocess.inputMicrographs.set(protAlignMov.outputMicrographs)
         protPreprocess.setObjLabel('crop mics 50px')
         self.proj.launchProtocol(protPreprocess, wait=True)
-        self.assertSetSize(protPreprocess.outputMicrographs, msg="There was a problem with the crop")
+        self.assertSetSize(protPreprocess.outputMicrographs,
+                           msg="There was a problem with the crop")
 
         # Now estimate CTF on the micrographs
         print("Performing CTF Micrographs...")
         XmippProtCTFMicrographs = Domain.importFromPlugin('xmipp3.protocols',
                                                           'XmippProtCTFMicrographs')
-        protCTF = XmippProtCTFMicrographs(lowRes=0.04, highRes=0.31, runMode=1, numberOfMpi=1, numberOfThreads=3)
+        protCTF = XmippProtCTFMicrographs(lowRes=0.04, highRes=0.31, runMode=1,
+                                          numberOfMpi=1, numberOfThreads=3)
         protCTF.inputMicrographs.set(protPreprocess.outputMicrographs)
         protCTF.setObjLabel('ctf - Day1')
         self.proj.launchProtocol(protCTF, wait=True)
-        self.assertSetSize(protCTF.outputCTF, msg="There was a problem with the CTF")
+        self.assertSetSize(protCTF.outputCTF,
+                           msg="There was a problem with the CTF")
 
         print("Running Xmipp Import Coordinates")
         protPP = self.newProtocol(emprot.ProtImportCoordinates,
@@ -89,7 +97,8 @@ class HighThroughputTest(TestWorkflow):
         protPP.inputMicrographs.set(protPreprocess.outputMicrographs)
         protPP.setObjLabel('Picking - Day1')
         self.launchProtocol(protPP)
-        self.assertSetSize(protPP.outputCoordinates, msg="There was a problem with the Xmipp import coordinates")
+        self.assertSetSize(protPP.outputCoordinates,
+                           msg="There was a problem with the Xmipp import coordinates")
 
         print("Run extract particles with <Other> option")
         OTHER = Domain.importFromPlugin('xmipp3.constants', 'OTHER')
@@ -107,7 +116,8 @@ class HighThroughputTest(TestWorkflow):
         protExtract.inputMicrographs.set(protPreprocess.outputMicrographs)
         protExtract.setObjLabel('extract particles')
         self.proj.launchProtocol(protExtract, wait=True)
-        self.assertSetSize(protExtract.outputParticles, msg="There was a problem with the extract particles")
+        self.assertSetSize(protExtract.outputParticles,
+                           msg="There was a problem with the extract particles")
 
         print("Running Spider Filter")
 
@@ -118,17 +128,20 @@ class HighThroughputTest(TestWorkflow):
         protFilter.inputParticles.set(protExtract.outputParticles)
         protFilter.setObjLabel('spi filter')
         self.proj.launchProtocol(protFilter, wait=True)
-        self.assertSetSize(protFilter.outputParticles, msg="There was a problem with the Spider filter")
+        self.assertSetSize(protFilter.outputParticles,
+                           msg="There was a problem with the Spider filter")
 
         print("Run Only Align2d")
         XmippProtCL2DAlign = Domain.importFromPlugin('xmipp3.protocols',
                                                      'XmippProtCL2DAlign')
         protOnlyAlign = XmippProtCL2DAlign(maximumShift=5, numberOfIterations=10,
-                                           numberOfMpi=8, numberOfThreads=1, useReferenceImage=False)
+                                           numberOfMpi=8, numberOfThreads=1,
+                                           useReferenceImage=False)
         protOnlyAlign.inputParticles.set(protFilter.outputParticles)
         protOnlyAlign.setObjLabel('cl2d align')
         self.proj.launchProtocol(protOnlyAlign, wait=True)
-        self.assertSetSize(protOnlyAlign.outputParticles, msg="There was a problem with Only align2d")
+        self.assertSetSize(protOnlyAlign.outputParticles,
+                           msg="There was a problem with Only align2d")
 
         print("Running Spider Dimension Reduction")
         SpiderProtCAPCA = Domain.importFromPlugin('spider.protocols',
@@ -137,7 +150,8 @@ class HighThroughputTest(TestWorkflow):
         protCAPCA.inputParticles.set(protOnlyAlign.outputParticles)
         protCAPCA.setObjLabel('spi PCA')
         self.proj.launchProtocol(protCAPCA, wait=True)
-        self.assertIsNotNone(protCAPCA.imcFile, "There was a problem with Spider Dimension Reduction")
+        self.assertIsNotNone(protCAPCA.imcFile,
+                             msg="There was a problem with Spider Dimension Reduction")
 
         print("Running Spider Ward Classification")
         SpiderProtClassifyWard = Domain.importFromPlugin('spider.protocols',

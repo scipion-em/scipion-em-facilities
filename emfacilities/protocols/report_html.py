@@ -37,7 +37,8 @@ from pyworkflow.protocol import getUpdatedProtocol
 import pyworkflow.utils as pwutils
 
 from pwem.emlib.image import ImageHandler
-from pwem.utils import getTemplatePath
+
+from emfacilities import Plugin
 from .summary_provider import SummaryProvider
 
 # --------------------- CONSTANTS -----------------------------------
@@ -95,10 +96,12 @@ class ReportHtml:
         """ Returns the path of the customized template at
         config/execution.summary.html or the standard scipion HTML template"""
         # Try if there is a customized template
-        template = os.path.join(basename(pwutils.Config.SCIPION_CONFIG), 'execution.summary.html')
+        template = os.path.join(basename(pwutils.Config.SCIPION_CONFIG),
+                                'execution.summary.html')
 
         if not os.path.exists(template):
-            template = getTemplatePath('execution.summary.template.html')
+            template = os.path.join(Plugin.getPluginTemplateDir(),
+                                    'execution.summary.template.html')
         else:
             print("Customized HTML template found at %s." % template)
         return template
@@ -329,7 +332,7 @@ class ReportHtml:
         # Add it to the series
         timeSeries[PHASE_SHIFT] = phaseShiftSerie
 
-        # Get defocusU is comming in Å, reduce it to μm
+        # Get defocusU is coming in Å, reduce it to μm
         defocusSerie = data[DEFOCUS_U]
         defocusSerie = [i * 1e-4 for i in defocusSerie]
 

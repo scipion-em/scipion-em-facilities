@@ -29,9 +29,10 @@ import pyworkflow.protocol as pwprot
 
 import pwem.protocols as emprot
 
+import emfacilities.protocols as monitorsProt
 
-# Load the number of movies for the simulation, by default equal 5, but
-# can be modified in the environement
+# Load the number of movies for the simulation, by default equal 3,
+# but can be modified in the environement
 MICS = os.environ.get('SCIPION_TEST_MICS', 3)
 
 
@@ -95,9 +96,9 @@ class TestCtfStream(pwtests.BaseTest):
                   'monitorTime': 5
                   }
 
-        protMonitor = self.newProtocol(emprot.ProtMonitorCTF, **kwargs)
+        protMonitor = self.newProtocol(monitorsProt.ProtMonitorCTF, **kwargs)
         protMonitor.inputProtocol.set(protCTF)
         self.launchProtocol(protMonitor)
 
-        baseFn = protMonitor._getPath(emprot.CTF_LOG_SQLITE)
+        baseFn = protMonitor._getPath(monitorsProt.CTF_LOG_SQLITE)
         self.assertTrue(os.path.isfile(baseFn))

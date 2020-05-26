@@ -33,11 +33,12 @@ import pyworkflow.tests as pwtests
 
 from pwem import Domain, emlib
 import pwem.protocols as emprot
-import relion
 
 
 # Load the number of movies for the simulation, by default equal 5, but
 # can be modified in the environement
+from emfacilities.protocols import ProtMonitorSummary
+
 
 def _getVar(varSuffix, varType, default=None):
     return varType(os.environ.get('SCIPION_TEST_STREAM_%s' % varSuffix, default))
@@ -188,7 +189,7 @@ class TestStreamingWorkflow(pwtests.BaseTest):
         protocols.append(protCTF)
 
         # --------- SUMMARY MONITOR --------------------------
-        protMonitor = self.newProtocol(emprot.ProtMonitorSummary,
+        protMonitor = self.newProtocol(ProtMonitorSummary,
                                        objLabel='summary')
         protMonitor.inputProtocols.append(protImport)
         protMonitor.inputProtocols.append(protOF)
@@ -360,11 +361,13 @@ class TestRelionPickStreaming(TestBaseRelionStreaming):
 
         ProtRelion2Autopick = Domain.importFromPlugin('relion.protocols',
                                                       'ProtRelion2Autopick')
+        relion_RUN_COMPUTE = Domain.importFromPlugin('relion', 'RUN_COMPUTE')
+
         protPick = self.newProtocol(
             ProtRelion2Autopick, objLabel='autopick refs',
             inputMicrographs=protImport.outputMicrographs,
             ctfRelations=protCtf.outputCTF,
-            runType=relion.RUN_COMPUTE,
+            runType=relion_RUN_COMPUTE,
             inputReferences=protAvgs.outputAverages
         )
         self.launchProtocol(protPick)

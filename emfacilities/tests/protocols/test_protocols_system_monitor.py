@@ -20,12 +20,14 @@
 # *  All comments concerning this program package may be sent to the
 # *  e-mail address 'scipion@cnb.csic.es'
 # ***************************************************************************/
+
 import os.path
 
 import pyworkflow.tests as pwtests
 import pyworkflow.utils as pwutils
 
 import pwem.protocols as emprot
+import emfacilities.protocols as monitorsProt
 
 
 class TestStress(pwtests.BaseTest):
@@ -69,11 +71,11 @@ class TestStress(pwtests.BaseTest):
             "netInterfaces": 1,
             "doDiskIO": True}
 
-        prot2 = self.newProtocol(emprot.ProtMonitorSystem, **kwargs)
+        prot2 = self.newProtocol(monitorsProt.ProtMonitorSystem, **kwargs)
         prot2.inputProtocols.append(prot1)
         self.launchProtocol(prot2)
 
-        baseFn = prot2._getPath(emprot.SYSTEM_LOG_SQLITE)
+        baseFn = prot2._getPath(monitorsProt.SYSTEM_LOG_SQLITE)
 
         # not sure what to test here
         self.assertTrue(os.path.isfile(baseFn))

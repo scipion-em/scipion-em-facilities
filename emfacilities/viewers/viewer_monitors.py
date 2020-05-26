@@ -27,7 +27,6 @@
 import sys
 import tkinter as tk
 from matplotlib import animation
-from scipion4facilities.protocols.protocol_monitor_system import MonitorSystem
 
 from pyworkflow.gui.plotter import plt
 from pyworkflow.gui.tree import BoundTree
@@ -36,16 +35,16 @@ import pyworkflow.gui as pwgui
 import pyworkflow.gui.text as text
 import pyworkflow.utils as pwutils
 import pyworkflow.viewer as pwviewer
-
-import scipion4facilities.protocols as emprot
-
 from pwem.viewers.plotter import EmPlotter
+
+import emfacilities.protocols as monitorProt
+from emfacilities.protocols.protocol_monitor_system import MonitorSystem
 
 
 class ProtMonitorCTFViewer(pwviewer.Viewer):
     _environments = [pwviewer.DESKTOP_TKINTER]
     _label = 'ctf monitor'
-    _targets = [emprot.ProtMonitorCTF]
+    _targets = [monitorProt.ProtMonitorCTF]
 
     def _visualize(self, obj, **kwargs):
         return [CtfMonitorPlotter(obj.createMonitor())]
@@ -155,7 +154,7 @@ class CtfMonitorPlotter(EmPlotter):
 class ProtMonitorMovieGainViewer(pwviewer.Viewer):
     _environments = [pwviewer.DESKTOP_TKINTER]
     _label = 'movie gain monitor'
-    _targets = [emprot.ProtMonitorMovieGain]
+    _targets = [monitorProt.ProtMonitorMovieGain]
 
     def _visualize(self, obj, **kwargs):
         return [MovieGainMonitorPlotter(obj.createMonitor())]
@@ -287,7 +286,7 @@ class MovieGainMonitorPlotter(EmPlotter):
 class ProtMonitorSystemViewer(pwviewer.Viewer):
     _environments = [pwviewer.DESKTOP_TKINTER, pwviewer.WEB_DJANGO]
     _label = 'system monitor'
-    _targets = [emprot.ProtMonitorSystem]
+    _targets = [monitorProt.ProtMonitorSystem]
 
     def __init__(self, **args):
         pwviewer.Viewer.__init__(self, **args)
@@ -301,7 +300,7 @@ class ProtMonitorSystemViewer(pwviewer.Viewer):
 class SystemMonitorPlotter(EmPlotter):
     _environments = [pwviewer.DESKTOP_TKINTER, pwviewer.WEB_DJANGO]
     _label = 'System Monitor'
-    _targets = [emprot.ProtMonitorSystem]
+    _targets = [monitorProt.ProtMonitorSystem]
 
     def __init__(self, monitor, nifName=None):
         EmPlotter.__init__(self, windowTitle="system Monitor")
@@ -492,7 +491,7 @@ class SystemMonitorPlotter(EmPlotter):
 class ViewerMonitorSummary(pwviewer.Viewer):
     """ Wrapper to visualize PDF objects. """
     _environments = [pwviewer.DESKTOP_TKINTER]
-    _targets = [emprot.ProtMonitorSummary]
+    _targets = [monitorProt.ProtMonitorSummary]
 
     def visualize(self, obj, **kwargs):
         self.summaryWindow = self.tkWindow(SummaryWindow,
@@ -509,7 +508,7 @@ class SummaryWindow(pwgui.Window):
 
         self.protocol = kwargs.get('protocol')
         self.refresh = self.protocol.samplingInterval.get()
-        self.provider = emprot.SummaryProvider(self.protocol)
+        self.provider = monitorProt.SummaryProvider(self.protocol)
 
         content = tk.Frame(self.root)
         self._createContent(content)

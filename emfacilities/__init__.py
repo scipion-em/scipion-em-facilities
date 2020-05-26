@@ -27,8 +27,6 @@
 This modules contains classes useful for cryo-EM facilities
 """
 
-import os
-
 import pwem
 
 from .constants import *
@@ -37,33 +35,9 @@ _logo = "scipion_icon.gif"
 _references = ["delaRosaTrevin201693"]
 
 
-
 class Plugin(pwem.Plugin):
+    @classmethod
+    def getEnviron(cls):
+        pass
+
     _url = URL
-
-    @classmethod
-    def _defineVariables(cls):
-        pass
-
-    @classmethod
-    def _defineEmVar(cls, varName, defaultValue):
-        """ Shortcut method to define variables prepending EM_ROOT if variable is not absolute"""
-        pass
-
-    @classmethod
-    def getHTMLTemplatePath(self):
-        """ Returns the path of the customized template at
-        config/execution.summary.html or the standard scipion HTML template"""
-        # Try if there is a customized template
-        template = os.path.join(pwem.Config.SCIPION_CONFIG, 'execution.summary.html')
-
-        if not os.path.exists(template):
-            pluginDir = os.path.dirname(os.path.realpath(__file__))
-            template = os.path.join(pluginDir, 'execution.summary.template.html')
-        else:
-            print("Customized HTML template found at %s." % template)
-        return template
-
-    @classmethod
-    def defineBinaries(cls, env):
-        pass
