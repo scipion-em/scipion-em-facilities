@@ -27,7 +27,7 @@ import pyworkflow.tests as pwtests
 import pyworkflow.utils as pwutils
 
 import pwem.protocols as emprot
-import scipion4facilities.protocols as monitorsProt
+import emfacilities.protocols as monitorsProt
 
 
 class TestStress(pwtests.BaseTest):

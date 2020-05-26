@@ -1,8 +1,8 @@
-=================
-Scipion4facilities plugin
-=================
+======================
+Scipion for facilities
+======================
 
-This plugin allows to use different utils for cryo-EM facilities (like monitors)
+'scipion-em-facilities' plugin allows to use different utils for cryo-EM facilities (like monitors)
 within the Scipion framework.
 
 +------------------+------------------+
@@ -16,34 +16,38 @@ within the Scipion framework.
 Installation
 ------------
 
-You will need to use `Scipion 3.0 <https://github.com/I2PC/scipion/releases/tag/V3.0.0>`_
-to be able to run these protocols. To install the plugin, you have two options:
+You will need to use `Scipion 3.0 <https://scipion-em.github.io/docs/release-3.0.0/index.html>`_
+to be able to run these protocols.
+
+To install the plugin, you have two options:
 
 a) Stable version
 
 .. code-block::
 
-   scipion installp -p scipion-em-facilities
+   scipion3 installp -p scipion-em-facilities
 
 b) Developer's version
 
-   * download repository
+   * 1st. Download repository
 
    .. code-block::
 
-      git clone https://github.com/scipion-em/scipion-em-facilities.git
+      git clone https://github.com/scipion-em/scipion-em-facilities.git /path/to/scipion-em-facilities
 
-   * install
+   * 2nd. Install the plugin
 
    .. code-block::
 
-      scipion installp -p /path/to/scipion-em-facilities --devel
+      scipion3 installp -p /path/to/scipion-em-facilities --devel
 
 Testing
 -------
 
 To check the installation, simply run the following Scipion test:
 
-``scipion test --grep scipion4facilities --mode modules --run``
+.. code-block::
 
-If '--run' is not passed, it only shows the available tests to check.
+  scipion3 test --grep emfacilities --mode modules --run
+
+If `--run` is not passed, it only shows the available tests to check.

@@ -37,8 +37,8 @@ import pyworkflow.utils as pwutils
 import pyworkflow.viewer as pwviewer
 from pwem.viewers.plotter import EmPlotter
 
-import scipion4facilities.protocols as monitorProt
-from scipion4facilities.protocols.protocol_monitor_system import MonitorSystem
+import emfacilities.protocols as monitorProt
+from emfacilities.protocols.protocol_monitor_system import MonitorSystem
 
 
 class ProtMonitorCTFViewer(pwviewer.Viewer):

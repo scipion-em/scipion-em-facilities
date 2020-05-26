@@ -31,7 +31,7 @@ import pwem.objects as emobj
 import pwem.protocols as emprot
 from pwem import Domain
 
-from scipion4facilities.protocols import pynvml
+from emfacilities.protocols import pynvml
 
 
 # Load the number of movies for the simulation, by default equal 6, but

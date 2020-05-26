@@ -37,7 +37,7 @@ import pwem.protocols as emprot
 
 # Load the number of movies for the simulation, by default equal 5, but
 # can be modified in the environement
-from scipion4facilities.protocols import ProtMonitorSummary
+from emfacilities.protocols import ProtMonitorSummary
 
 
 def _getVar(varSuffix, varType, default=None):

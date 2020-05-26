@@ -25,7 +25,7 @@
 # *
 # **************************************************************************
 """
-This modules contains constants related to scipion4facilities
+This modules contains constants related to emfacilities
 """
 
 URL = 'https://scipion-em.github.io/docs/docs/facilities/facilities.html'

@@ -29,7 +29,7 @@ import pyworkflow.protocol as pwprot
 
 import pwem.protocols as emprot
 
-import scipion4facilities.protocols as monitorsProt
+import emfacilities.protocols as monitorsProt
 
 # Load the number of movies for the simulation, by default equal 3,
 # but can be modified in the environement

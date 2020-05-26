@@ -6,7 +6,7 @@ https://github.com/pypa/sampleproject
 """
 
 # Always prefer setuptools over distutils
-from scipion4facilities.constants import URL
+from emfacilities.constants import URL
 from setuptools import setup, find_packages
 # To use a consistent encoding
 from codecs import open
@@ -69,8 +69,7 @@ setup(
 
     # This should be a valid email address corresponding to the author listed
     # above.
-    author_email='scipion@cnb.csic.es, '
-                 'dmaluenda@cnb.csic.es, ',  # Optional
+    author_email='scipion@cnb.csic.es',  # Optional
 
     # Classifiers help users find your project by categorizing it.
     #
@@ -97,9 +96,9 @@ setup(
     packages=find_packages(),
     install_requires=[requirements],
     entry_points={
-        'pyworkflow.plugin': 'scipion4facilities = scipion4facilities'
+        'pyworkflow.plugin': 'emfacilities = emfacilities'
     },
     package_data={
-      'scipion4facilities': ['templates/*', 'scipion_icon.gif', 'protocols.conf'],
+      'emfacilities': ['templates/*', 'scipion_icon.gif', 'protocols.conf'],
     }
 )

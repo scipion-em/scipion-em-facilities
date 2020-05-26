@@ -38,7 +38,7 @@ import pyworkflow.utils as pwutils
 
 from pwem.emlib.image import ImageHandler
 
-from scipion4facilities import Plugin
+from emfacilities import Plugin
 from .summary_provider import SummaryProvider
 
 # --------------------- CONSTANTS -----------------------------------
