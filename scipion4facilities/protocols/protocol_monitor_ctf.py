@@ -274,7 +274,7 @@ class MonitorCTF(Monitor):
 
 
     def getDataInflux(self, lastId=-1):
-        "retuen quey as a list of dictionaries"
+        "return query as a list of dictionaries"
         try:
             command = "select * from %s where id > %d " \
                       "order by id" % (self._tableName, lastId)
