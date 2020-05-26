@@ -2,9 +2,6 @@
 Scipion for facilities
 ======================
 
-'scipion-em-facilities' plugin allows to use different utils for cryo-EM facilities (like monitors)
-within the Scipion framework.
-
 +------------------+------------------+
 | stable: |stable| | devel: | |devel| |
 +------------------+------------------+
@@ -12,7 +9,20 @@ within the Scipion framework.
 .. |stable| image:: http://scipion-test.cnb.csic.es:9980/badges/facilities_prod.svg
 .. |devel| image:: http://scipion-test.cnb.csic.es:9980/badges/facilities_sdevel.svg
 
-Please, check the `facilities documentation <https://scipion-em.github.io/docs/docs/facilities/facilities.html>`_ for more details.
+'scipion-em-facilities' plugin allows to use different utils for cryo-EM facilities
+(like monitors) within the Scipion framework.
+
+Monitors are used to produce live analysis plots, generate reports or
+raise alerts when some problems are detected. A monitor example is the CTF-monitor,
+that checks the computed defocus values for each micrograph as they are generated.
+CTF-monitor may raise an alert if the defocus values are above or below certain thresholds.
+A special case of this monitors is the monitor summary which encapsulates the CTF Monitor,
+the system monitor and the movie gain monitor and continuously creates a report.
+
+This module contains protocols and utilities related with monitors.
+
+Please, check the `facilities documentation <https://scipion-em.github.io/docs/docs/facilities/facilities.html>`_
+for more details.
 
 
 Installation
