@@ -32,6 +32,7 @@ from configparser import ConfigParser
 import urllib3
 import base64
 import time
+from emfacilities.constants import SECRETSFILE
 from .transport import Connect
 
 import pyworkflow.utils as pwutils
@@ -51,7 +52,6 @@ SHIFT_PATH = 'imgShiftPath'
 # used in the execution.summary.template.html to read data (where
 # they will need to be changed if they're changed here)
 CONFILE = 'monitor.conf'
-
 
 class ReportInflux:
     """ Create a report (html or influxdb) with a summary of the processing.
@@ -121,10 +121,32 @@ class ReportInflux:
         # I put this import here so users with no database
         # can run tratinional html report
         from influxdb import InfluxDBClient
-        from .secrets import (dataBase, passwordInflux, usernameInflux,
-                              hostinflux, port, ssl, verify_ssl)
-
+        
+        confParser = ConfigParser()
+        from emfacilities.constants import (SECRETSFILE,
+                                            EMFACILITIES_HOME_VARNAME)
+        _path = os.getenv(EMFACILITIES_HOME_VARNAME)
+        secretsfile = os.path.join(_path, SECRETSFILE)
+        confParser.read(secretsfile)
+        #influx data
+        dataBase = confParser.get('influx', 'dataBase') 
+        passwordInflux = confParser.get('influx', 'passwordInflux') 
+        usernameInflux = confParser.get('influx', 'usernameInflux') 
+        hostinflux = confParser.get('influx', 'hostinflux') 
+        port = int(confParser.get('influx', 'port')) 
+        ssl = confParser.get('influx', 'ssl')
+        ssl = ssl.lower() in ['true', 1, 't', 'y'] 
+        verify_ssl = confParser.get('influx', 'verify_ssl')
+        verify_ssl = verify_ssl.lower() in ['true', 1, 't', 'y']
+        self.timeDelta =int(confParser.get('influx', 'TimeDelta'))
         self.dataBaseName = dataBase
+        #paramiko data
+        self.usernameParamiko = confParser.get('paramiko', 'usernameParamiko')
+        self.passwordParamiko = confParser.get('paramiko', 'passwordParamiko')
+        self.keyfilepath = confParser.get('paramiko', 'keyfilepath')
+        self.keyfiletype = confParser.get('paramiko', 'keyfiletype')
+        self.remote_path = confParser.get('paramiko', 'remote_path')
+        self.hostparamiko = confParser.get('paramiko', 'hostparamiko')
         try:
             # since I am using a self generated certificate
             # the certificate can not be verified against a
@@ -150,7 +172,8 @@ class ReportInflux:
             # delete meassurement
             # project names may contain forbiden character
             # IF this is a problem we will need to slugify the projName
-            self.client.drop_measurement(self.projectName)
+            # self.client.drop_measurement(self.projectName)
+            self.client.delete_series(measurement=self.projectName)
             print("dropping meassurement:", self.projectName) 
             # replication -> number of copies of the DB stored in the cluster
             # 12w -> delete data after 12 weeks
@@ -394,16 +417,18 @@ class ReportInflux:
                      and transferImage = false
                    order by time desc
                    limit 10'''% self.projectName
-        from .secrets import (usernameParamiko, keyfilepath,
-                              keyfiletype, remote_path, hostparamiko)
 
-        connect = Connect(host=hostparamiko,
+        result = self.client.query(query)
+        if len(result) < 1:
+            return True
+ 
+        connect = Connect(host=self.hostparamiko,
                           port=22,
-                          username= deCrypt(usernameParamiko),
+                          username= deCrypt(self.usernameParamiko),
                           password=None,
-                          keyfilepath=deCrypt(keyfilepath),
-                          keyfiletype=deCrypt(keyfiletype),
-                          remote_path=remote_path,
+                          keyfilepath=deCrypt(self.keyfilepath),
+                          keyfiletype=deCrypt(self.keyfiletype),
+                          remote_path=self.remote_path,
                           projectName=self.projectName)
 
         while True:
