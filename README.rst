@@ -29,7 +29,9 @@ Installation
 ------------
 
 You will need to use `Scipion 3.0 <https://scipion-em.github.io/docs/release-3.0.0/index.html>`_
-to be able to run these protocols.
+to be able to run these protocols. If you want to use the summary monitor with grafana
+you will need to create the file secrets.cfg in the directory defined by the variable EMFACILITIES_HOME
+(see the above mention web site for details).
 
 To install the plugin, you have two options:
 
