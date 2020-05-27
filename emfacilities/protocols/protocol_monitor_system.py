@@ -30,6 +30,7 @@ import time
 import sqlite3 as lite
 import datetime
 import pytz
+from configparser import ConfigParser
 
 try:
     import psutil
@@ -51,7 +52,6 @@ from pynvml import (nvmlInit, nvmlDeviceGetHandleByIndex,
                     nvmlDeviceGetComputeRunningProcesses)
 
 from .protocol_monitor import ProtMonitor, Monitor
-from .secrets import timeZone
 
 SYSTEM_LOG_SQLITE = 'system_log.sqlite'
 
@@ -257,6 +257,17 @@ class MonitorSystem(Monitor):
             self.conn.row_factory = \
                 lambda c, r: dict([(col[0], r[idx])
                                    for idx, col in enumerate(c.description)])
+            # read timezone and offset
+            from emfacilities.constants import (SECRETSFILE,
+                                                EMFACILITIES_HOME_VARNAME)
+            _path = os.getenv(EMFACILITIES_HOME_VARNAME)
+            secretsfile = os.path.join(_path, SECRETSFILE)
+            confParser = ConfigParser()
+            confParser.read(secretsfile)
+
+            self.timeDelta = int(confParser.get('influx', 'timeDelta'))
+            self.timeZone = confParser.get('influx', 'timeZone')
+
         self.cur = self.conn.cursor()
 
     def warning(self, msg):
@@ -398,7 +409,7 @@ class MonitorSystem(Monitor):
         # represents a row of the table
         listOfDictionaries = self.cur.fetchall()
         for item in listOfDictionaries:
-            local = pytz.timezone(timeZone)
+            local = pytz.timezone(self.timeZone)
             # convert dates from scipion to datetime.datetime
             for d in listOfDictionaries:
                 datum = d['timestamp']
@@ -406,6 +417,8 @@ class MonitorSystem(Monitor):
                               # oposite -> strftime
                 if isinstance(datum, str):
                     naive = datetime.datetime.strptime(datum, "%Y-%m-%d %H:%M:%S")
+                    if self.timeDelta != 0:
+                        naive = naive + datetime.timedelta(hours=self.timeDelta)
                 elif isinstance(datum, datetime.datetime):
                     continue
                 else:
