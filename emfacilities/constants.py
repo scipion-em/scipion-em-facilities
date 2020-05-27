@@ -29,7 +29,6 @@ This modules contains constants related to emfacilities
 """
 
 URL = 'https://scipion-em.github.io/docs/docs/facilities/facilities.html'
-CONFILE = 'monitor.conf'
 SECRETSFILE = 'secrets.cfg'
 EMFACILITIES_HOME_VARNAME='EMFACILITIES_HOME'
 
