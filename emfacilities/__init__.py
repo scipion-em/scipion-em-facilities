@@ -36,6 +36,13 @@ _references = ["delaRosaTrevin201693"]
 
 
 class Plugin(pwem.Plugin):
+    _homeVar = EMFACILITIES_HOME_VARNAME 
+    _pathVars = [EMFACILITIES_HOME_VARNAME]
+
+    @classmethod
+    def _defineVariables(cls):
+        cls._defineEmVar(EMFACILITIES_HOME_VARNAME, '~/.config/scipion')
+
     @classmethod
     def getEnviron(cls):
         pass
