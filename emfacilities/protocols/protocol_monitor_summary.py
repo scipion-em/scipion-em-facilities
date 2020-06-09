@@ -315,7 +315,6 @@ class ProtMonitorSummary(ProtMonitor):
         self.createReportDir()
         if self.doInflux:
             htmlReport = ReportInflux(self, ctfMonitor, sysMonitor, movieGainMonitor,
-                                    self.publishCmd.get(),
                                     refreshSecs=self.samplingInterval.get())
         else:
             htmlReport = ReportHtml(self, ctfMonitor, sysMonitor, movieGainMonitor,

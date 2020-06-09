@@ -58,7 +58,7 @@ class ReportInflux:
     The report will be updated with a given frequency.
     """
     def __init__(self, protocol, ctfMonitor,
-                 sysMonitor, movieGainMonitor, publishCmd=None,
+                 sysMonitor, movieGainMonitor,
                  **kwargs):
         """
         :param protocol:
@@ -85,7 +85,6 @@ class ReportInflux:
         self.movieGainMonitor = movieGainMonitor
         self.lastThumbIndex = 0
         self.thumbsReady = 0
-        self.publishCmd = publishCmd
         self.refreshSecs = kwargs.get('refreshSecs', 60)
         if self.refreshSecs < 10:
             self.refreshSecs = 10
