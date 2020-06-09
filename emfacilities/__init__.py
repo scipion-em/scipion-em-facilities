@@ -26,8 +26,10 @@
 """
 This modules contains classes useful for cryo-EM facilities
 """
+import os
 
 import pwem
+from pyworkflow import Config
 
 from .constants import *
 
@@ -41,7 +43,7 @@ class Plugin(pwem.Plugin):
 
     @classmethod
     def _defineVariables(cls):
-        cls._defineEmVar(EMFACILITIES_HOME_VARNAME, '~/.config/scipion')
+        cls._defineVar(EMFACILITIES_HOME_VARNAME, os.path.dirname(Config.SCIPION_CONFIG))
 
     @classmethod
     def getEnviron(cls):

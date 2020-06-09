@@ -28,22 +28,24 @@
 import os
 from os.path import basename
 from datetime import datetime, timedelta
-from configparser import ConfigParser
+from configparser import ConfigParser, NoOptionError, NoSectionError
 import urllib3
 import base64
 import time
-from emfacilities.constants import SECRETSFILE
 from .transport import Connect
 
 import pyworkflow.utils as pwutils
 from pwem.emlib.image import ImageHandler
 
-from .summary_provider import SummaryProvider
+from emfacilities.protocols import SummaryProvider
+from influxdb import InfluxDBClient
 
 
 # --------------------- CONSTANTS -----------------------------------
 # These constants are the keys used in the ctfMonitor function
 # getData() to store paths to micrographs, psd files and shift plots
+from .. import Plugin
+
 MIC_PATH = 'imgMicPath'
 PSD_PATH = 'imgPsdPath'
 SHIFT_PATH = 'imgShiftPath'
@@ -54,7 +56,7 @@ SHIFT_PATH = 'imgShiftPath'
 CONFILE = 'monitor.conf'
 
 class ReportInflux:
-    """ Create a report (html or influxdb) with a summary of the processing.
+    """ Create a report using influxdb with a summary of the processing.
     The report will be updated with a given frequency.
     """
     def __init__(self, protocol, ctfMonitor,
@@ -65,17 +67,11 @@ class ReportInflux:
         :param ctfMonitor:
         :param sysMonitor:
         :param movieGainMonitor:
-        :param publishCmd: Send it to a server computer so user
-                           may access this information via web
-        :param influxdb:   False -> scipion should create a web page
-                           True -> scipion should connect to a database
         :param kwargs:     refreshSecs -> update each refreshSecs seconds
         """
 
         # The CTF protocol to monitor
         self.protocol = protocol
-        self.ctfProtocol = protocol._getCtfProtocol()
-        self.alignProtocol = protocol._getAlignProtocol()
         self.micThumbSymlinks = False
         self.reportPath = protocol.reportPath
         self.reportDir = protocol.reportDir
@@ -96,56 +92,45 @@ class ReportInflux:
         # for example to decide which files need to be tranfered
         self.confFileName = self.protocol._getTmpPath(CONFILE)
         if not os.path.isfile(self.confFileName):
-            # Create the configuration file as it doesn't exist yet
-            self.confParser = ConfigParser()
-            self.confParser.add_section("project")
-            self.confParser.set("project", "projectName",
-                           self.protocol.getProject().getShortName())
-            self.confParser.set("project", "properties", "1")
-            self.confParser.set("project", "acquisition", "1")
-            self.confParser.set("project", "summary", "1")
-            self.confParser.add_section('ctf')
-            self.confParser.set("ctf", "lastId", "0")
-            self.confParser.add_section("gain")
-            self.confParser.set("gain", "lastId", "0")
-            self.confParser.add_section("system")
-            self.confParser.set("system", "lastId", "0")
-            with open(self.confFileName, 'w') as confFile:
-                self.confParser.write(confFile)
+            self.confParser = self.createStatusConfigFile(self.confFileName,
+                                                          self.protocol.getProject().getShortName())
         else:
             self.confParser = ConfigParser()
             self.confParser.read(self.confFileName)
 
-        # open connection to database
-        # I put this import here so users with no database
-        # can run tratinional html report
-        from influxdb import InfluxDBClient
+        # Clean project name from special characters
+        self.projectName = slugify(self.protocol.getProject().getShortName())
+
+        # Parse secrets file and get authentication info
+        hostinflux, passwordInflux, port, ssl, usernameInflux, verify_ssl = self.parseSecrets()
+
+        # Connect to influx
+        self.connectToInflux(hostinflux, passwordInflux, port, ssl, usernameInflux, verify_ssl)
+    
+    @staticmethod
+    def createStatusConfigFile(configFileName, projectName):
         
+        # Create the configuration file as it doesn't exist yet
         confParser = ConfigParser()
-        from emfacilities.constants import (SECRETSFILE,
-                                            EMFACILITIES_HOME_VARNAME)
-        _path = os.getenv(EMFACILITIES_HOME_VARNAME)
-        secretsfile = os.path.join(_path, SECRETSFILE)
-        confParser.read(secretsfile)
-        #influx data
-        dataBase = confParser.get('influx', 'dataBase') 
-        passwordInflux = confParser.get('influx', 'passwordInflux') 
-        usernameInflux = confParser.get('influx', 'usernameInflux') 
-        hostinflux = confParser.get('influx', 'hostinflux') 
-        port = int(confParser.get('influx', 'port')) 
-        ssl = confParser.get('influx', 'ssl')
-        ssl = ssl.lower() in ['true', 1, 't', 'y'] 
-        verify_ssl = confParser.get('influx', 'verify_ssl')
-        verify_ssl = verify_ssl.lower() in ['true', 1, 't', 'y']
-        self.timeDelta =int(confParser.get('influx', 'TimeDelta'))
-        self.dataBaseName = dataBase
-        #paramiko data
-        self.usernameParamiko = confParser.get('paramiko', 'usernameParamiko')
-        self.passwordParamiko = confParser.get('paramiko', 'passwordParamiko')
-        self.keyfilepath = confParser.get('paramiko', 'keyfilepath')
-        self.keyfiletype = confParser.get('paramiko', 'keyfiletype')
-        self.remote_path = confParser.get('paramiko', 'remote_path')
-        self.hostparamiko = confParser.get('paramiko', 'hostparamiko')
+        confParser.add_section("project")
+        confParser.set("project", "projectName",
+                            projectName)
+        confParser.set("project", "properties", "1")
+        confParser.set("project", "acquisition", "1")
+        confParser.set("project", "summary", "1")
+        confParser.add_section('ctf')
+        confParser.set("ctf", "lastId", "0")
+        confParser.add_section("gain")
+        confParser.set("gain", "lastId", "0")
+        confParser.add_section("system")
+        confParser.set("system", "lastId", "0")
+
+        with open(configFileName, 'w') as confFile:
+            confParser.write(confFile)
+
+        return confParser
+
+    def connectToInflux(self, hostinflux, passwordInflux, port, ssl, usernameInflux, verify_ssl):
         try:
             # since I am using a self generated certificate
             # the certificate can not be verified against a
@@ -166,14 +151,12 @@ class ReportInflux:
             # self.client.create_database("scipion")
             self.client.switch_database(self.dataBaseName)
 
-            self.projectName = slugify(self.protocol.getProject().getShortName())
-
             # delete meassurement
             # project names may contain forbiden character
             # IF this is a problem we will need to slugify the projName
             # self.client.drop_measurement(self.projectName)
             self.client.delete_series(measurement=self.projectName)
-            print("dropping meassurement:", self.projectName) 
+
             # replication -> number of copies of the DB stored in the cluster
             # 12w -> delete data after 12 weeks
             self.client.create_retention_policy("ret_pol", "12w",
@@ -183,10 +166,48 @@ class ReportInflux:
         except Exception as e:
             print("Error:", e)
 
+    def parseSecrets(self):
+        # Read secrets file to connect to influx and send file using paramiko
+        # open connection to database
+        # I put this import here so users with no database
+        # can run traditional html report
+        try:
+        
+            secretsParser = ConfigParser()
+            from emfacilities.constants import (SECRETSFILE,
+                                                EMFACILITIES_HOME_VARNAME)
+            _path = Plugin.getHome(EMFACILITIES_HOME_VARNAME)
+            secretsfile = os.path.join(_path, SECRETSFILE)
+            secretsParser.read(secretsfile)
+            # influx data
+            dataBase = secretsParser.get('influx', 'dataBase')
+            passwordInflux = secretsParser.get('influx', 'passwordInflux')
+            usernameInflux = secretsParser.get('influx', 'usernameInflux')
+            hostinflux = secretsParser.get('influx', 'hostinflux')
+            port = int(secretsParser.get('influx', 'port'))
+            ssl = secretsParser.get('influx', 'ssl')
+            ssl = ssl.lower() in ['true', 1, 't', 'y']
+            verify_ssl = secretsParser.get('influx', 'verify_ssl')
+            verify_ssl = verify_ssl.lower() in ['true', 1, 't', 'y']
+            self.timeDelta = int(secretsParser.get('influx', 'TimeDelta'))
+            self.dataBaseName = dataBase
+            # paramiko data
+            self.usernameParamiko = secretsParser.get('paramiko', 'usernameParamiko')
+            self.passwordParamiko = secretsParser.get('paramiko', 'passwordParamiko')
+            self.keyfilepath = secretsParser.get('paramiko', 'keyfilepath')
+            self.keyfiletype = secretsParser.get('paramiko', 'keyfiletype')
+            self.remote_path = secretsParser.get('paramiko', 'remote_path')
+            self.hostparamiko = secretsParser.get('paramiko', 'hostparamiko')
+
+        except NoSectionError as e:
+            print("Can not process secrets file %s: %s" % (secretsfile, str(e)))
+            raise e
+
+        return hostinflux, passwordInflux, port, ssl, usernameInflux, verify_ssl
+
     #def __del__(self):
     #    if self.influxsb:
     #        self.client.close()
-
 
     def generate(self, finished):
 
