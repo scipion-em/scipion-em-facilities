@@ -48,3 +48,7 @@ class Plugin(pwem.Plugin):
         pass
 
     _url = URL
+
+    @classmethod
+    def defineBinaries(cls, env):
+        pass

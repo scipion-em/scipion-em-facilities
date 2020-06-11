@@ -18,4 +18,3 @@
 *.egg-info
 
 dist/*
-*.json.template
