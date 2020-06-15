@@ -27,6 +27,7 @@
 This modules contains classes useful for cryo-EM facilities
 """
 
+import os
 import pwem
 
 from .constants import *
@@ -41,7 +42,8 @@ class Plugin(pwem.Plugin):
 
     @classmethod
     def _defineVariables(cls):
-        cls._defineEmVar(EMFACILITIES_HOME_VARNAME, '~/.config/scipion')
+        cls._defineEmVar(EMFACILITIES_HOME_VARNAME,
+                         os.path.expanduser('~/.config/scipion'))
 
     @classmethod
     def getEnviron(cls):
