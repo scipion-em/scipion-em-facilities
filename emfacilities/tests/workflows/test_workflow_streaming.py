@@ -368,7 +368,8 @@ class TestRelionPickStreaming(TestBaseRelionStreaming):
             inputMicrographs=protImport.outputMicrographs,
             ctfRelations=protCtf.outputCTF,
             runType=relion_RUN_COMPUTE,
-            inputReferences=protAvgs.outputAverages
+            inputReferences=protAvgs.outputAverages,
+            numberOfMpi = 2
         )
         self.launchProtocol(protPick)
 
