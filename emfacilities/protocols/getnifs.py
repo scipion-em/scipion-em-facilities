@@ -111,7 +111,7 @@ def get_network_interfaces():
     retval = {}
     for ifa in ifap_iter(ifap):
         try:
-            name = ifa.ifa_name
+            name = ifa.ifa_name.decode("utf-8")
             i = retval.get(name)
             if not i:
                 i = retval[name] = NetworkInterface(name)
@@ -122,7 +122,7 @@ def get_network_interfaces():
             del retval[name]
             print("get_network_interfaces: Can not connect to NIC %s" % name)
         except Exception as ex:
-            print("Unexpected error:", sys.exc_info()[0])
+            print("Unexpected error:", ex)
     # print retval.values()
     libc.freeifaddrs(ifap)
     return retval.values()

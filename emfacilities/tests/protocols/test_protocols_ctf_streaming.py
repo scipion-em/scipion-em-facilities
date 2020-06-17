@@ -74,7 +74,7 @@ class TestCtfStreaming(pwtests.BaseTest):
 
                 # Check if the protocol is still launched
                 if prot.isLaunched():
-                    break
+                    continue
                 elif prot.isScheduled():
                     continue
 
