@@ -23,7 +23,7 @@ This is the description ... ***
         "samplingRate": 0.885,
         "scannedPixelSize": 7.0,
         "doseInitial": 0.0,
-        "dosePerFrame": null,
+        "dosePerFrame": 0.0,
         "gainFile": "%(SCIPION_TESTS)s/relion30_tutorial/Movies/gain.mrc",
         "darkFile": null,
         "dataStreaming": true,
@@ -341,7 +341,7 @@ This is the description ... ***
         "_queueParams": null,
         "runName": null,
         "runMode": 0,
-        "downsampleType": 0,
+        "downsampleType": 1,
         "downFactor": 1.0,
         "boxSize": -1,
         "doBorders": true,
@@ -357,7 +357,8 @@ This is the description ... ***
         "numberOfThreads": 4,
         "numberOfMpi": 1,
         "ctfRelations": "309.outputCTF",
-        "inputCoordinates": "560.consensusCoordinates"
+        "inputCoordinates": "560.consensusCoordinates",
+        "inputMicrographs": "360.outputMicrographs"
     },
     {
         "object.className": "XmippProtExtractParticles",
@@ -383,7 +384,7 @@ This is the description ... ***
         "hostName": "localhost",
         "numberOfThreads": 4,
         "numberOfMpi": 1,
-        "inputMicrographs": "309.outputMicrographs",
+        "inputMicrographs": "97.outputMicrographs",
         "ctfRelations": "309.outputCTF",
         "inputCoordinates": "560.consensusCoordinates"
     },
