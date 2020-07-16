@@ -338,11 +338,11 @@ class MonitorSystem(Monitor):
             self.warning("CPU allocation =%f." % cpu)
             self.cpuAlert = cpu
 
-        if self.memAlert < 100 and mem.percent > self.memAlert:
+        if self.memAlert < 100 and mem > self.memAlert:
             self.warning("Memory allocation =%f." % mem)
             self.memAlert = mem
 
-        if self.swapAlert < 100 and swap.percent > self.swapAlert:
+        if self.swapAlert < 100 and swap > self.swapAlert:
             self.warning("SWAP allocation =%f." % swap)
             self.swapAlert = swap
 

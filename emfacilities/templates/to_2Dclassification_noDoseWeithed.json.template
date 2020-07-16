@@ -65,7 +65,7 @@ This is the description ... ***
         "_queueParams": null,
         "runName": null,
         "runMode": 0,
-        "gpuList": "2 3",
+        "gpuList": "0",
         "doSaveAveMic": true,
         "useAlignToSum": true,
         "alignFrame0": 1,
@@ -96,7 +96,7 @@ This is the description ... ***
         "defectFile": null,
         "extraParams2": "",
         "hostName": "localhost",
-        "numberOfThreads": 3,
+        "numberOfThreads": 1,
         "numberOfMpi": 1,
         "inputMovies": "64.outputMovies"
     },
