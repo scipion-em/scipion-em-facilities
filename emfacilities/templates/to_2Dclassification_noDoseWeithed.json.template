@@ -1,4 +1,4 @@
-This is the description ... ***
+This workflow goes from Movies (NO DOSE weighed) to 2Dclassification in streaming.
 [
     {
         "object.className": "ProtImportMovies",
@@ -10,7 +10,7 @@ This is the description ... ***
         "runName": null,
         "runMode": 0,
         "importFrom": 0,
-        "filesPath": "~Movie's folder|%(SCIPION_TESTS)s/relion30_tutorial/Movies|2~",
+        "filesPath": "~Movie's folder|%(SCIPION_TESTS)s/relion30_tutorial/Movies|2|moviesPath~",
         "filesPattern": "*.tiff",
         "copyFiles": false,
         "haveDataBeenPhaseFlipped": false,
@@ -176,6 +176,36 @@ This is the description ... ***
         "inputMicrographs": "159.outputMicrographs"
     },
     {
+        "object.className": "XmippProtCTFMicrographs",
+        "object.id": "270",
+        "object.label": "xmipp3 - ctf estimation",
+        "object.comment": "",
+        "_useQueue": false,
+        "_queueParams": null,
+        "runName": null,
+        "runMode": 0,
+        "recalculate": false,
+        "sqliteFile": null,
+        "AutoDownsampling": true,
+        "ctfDownFactor": 1.0,
+        "doInitialCTF": true,
+        "doOptimizeDefocus": false,
+        "findPhaseShift": false,
+        "doCTFAutoDownsampling": true,
+        "refineAmplitudeContrast": false,
+        "skipBorders": false,
+        "lowRes": 0.05,
+        "highRes": 0.35,
+        "minDefocus": 0.25,
+        "maxDefocus": 4.0,
+        "windowSize": 512,
+        "hostName": "localhost",
+        "numberOfThreads": 4,
+        "numberOfMpi": 1,
+        "inputMicrographs": "159.outputMicrographs",
+        "ctfRelations": "256.outputCTF"
+    }
+    {
         "object.className": "XmippProtCTFConsensus",
         "object.id": "309",
         "object.label": "xmipp3 - ctf screening",
@@ -205,6 +235,39 @@ This is the description ... ***
         "hostName": "localhost",
         "inputCTF": "192.outputCTF",
         "inputCTF2": "256.outputCTF"
+    },
+    {
+        "object.className": "XmippProtCTFConsensus",
+        "object.id": "330",
+        "object.label": "Xmipp - CTF quality control",
+        "object.comment": "",
+        "_useQueue": false,
+        "_queueParams": null,
+        "runName": null,
+        "runMode": 0,
+        "useDefocus": false,
+        "minDefocus": 4000.0,
+        "maxDefocus": 40000.0,
+        "useAstigmatism": false,
+        "astigmatism": 1000.0,
+        "useResolution": false,
+        "resolution": 5.0,
+        "useCritXmipp": true,
+        "critFirstZero": 5.0,
+        "minCritFirstZeroRatio": 0.9,
+        "maxCritFirstZeroRatio": 1.1,
+        "critCorr": 0.05,
+        "critCtfMargin": 1.5,
+        "critIceness": 1.0,
+        "minCritNonAstigmaticValidity": 0.3,
+        "maxCritNonAstigmaticValidity": 9.0,
+        "calculateConsensus": true,
+        "minConsResol": 7.0,
+        "averageDefocus": false,
+        "includeSecondary": true,
+        "hostName": "localhost",
+        "inputCTF": "309.outputCTF",
+        "inputCTF2": "270.outputCTF"
     },
     {
         "object.className": "XmippProtPreprocessMicrographs",
@@ -241,7 +304,7 @@ This is the description ... ***
         "hostName": "localhost",
         "numberOfThreads": 2,
         "numberOfMpi": 1,
-        "inputMicrographs": "309.outputMicrographs"
+        "inputMicrographs": "330.outputMicrographs"
     },
     {
         "object.className": "XmippProtTriggerData",
@@ -333,6 +396,22 @@ This is the description ... ***
         "consensus": -1
     },
     {
+        "object.className": "XmippProtConsensusPicking",
+        "object.id": "580",
+        "object.label": "xmipp3 - picking consensus (OR)",
+        "object.comment": "Set the 'Radius' according to your data (a tenth of the particle size is a reasonable value)",
+        "_useQueue": false,
+        "_queueParams": null,
+        "runName": null,
+        "runMode": 0,
+        "inputCoordinates": [
+            "480.outputCoordinates",
+            "516.outputCoordinates"
+        ],
+        "consensusRadius": 10,
+        "consensus": 1
+    },
+    {
         "object.className": "XmippProtExtractParticles",
         "object.id": "591",
         "object.label": "xmipp3 - extract DOWNSAMPLED particles",
@@ -356,13 +435,13 @@ This is the description ... ***
         "hostName": "localhost",
         "numberOfThreads": 4,
         "numberOfMpi": 1,
-        "ctfRelations": "309.outputCTF",
+        "ctfRelations": "330.outputCTF",
         "inputCoordinates": "560.consensusCoordinates",
         "inputMicrographs": "360.outputMicrographs"
     },
     {
         "object.className": "XmippProtExtractParticles",
-        "object.id": "637",
+        "object.id": "580",
         "object.label": "xmipp3 - extract FULL SIZE particles",
         "object.comment": "This will contain the particles at full size to future manual analysis.",
         "_useQueue": false,
@@ -376,7 +455,7 @@ This is the description ... ***
         "doRemoveDust": true,
         "thresholdDust": 5.0,
         "doInvert": true,
-        "doFlip": true,
+        "doFlip": false,
         "doNormalize": true,
         "normType": 2,
         "backRadius": -1,
@@ -385,7 +464,7 @@ This is the description ... ***
         "numberOfThreads": 4,
         "numberOfMpi": 1,
         "inputMicrographs": "97.outputMicrographs",
-        "ctfRelations": "309.outputCTF",
+        "ctfRelations": "330.outputCTF",
         "inputCoordinates": "560.consensusCoordinates"
     },
     {
@@ -616,7 +695,7 @@ This is the description ... ***
             "2",
             "64",
             "159",
-            "309"
+            "330"
         ],
         "samplingInterval": 60,
         "stddevValue": 0.04,
