@@ -139,6 +139,8 @@ class ReportInflux:
         verify_ssl = confParser.get('influx', 'verify_ssl')
         verify_ssl = verify_ssl.lower() in ['true', 1, 't', 'y']
         self.timeDelta =int(confParser.get('influx', 'TimeDelta'))
+        # directory with images from apaches point of view
+        self.apacheImgDir = confParser.get('influx', 'apacheImgDir') 
         self.dataBaseName = dataBase
         #paramiko data
         self.usernameParamiko = confParser.get('paramiko', 'usernameParamiko')
@@ -312,7 +314,7 @@ class ReportInflux:
                     # elif key == 'ctfID':
                     #     fields['ctfID'] = "<b>" + str(ctf[key]) + "</b>"
                     elif key == 'shiftPlotPath':
-                        temp = os.path.join('/public/img/scipionbox', self.projectName, basename(ctf[key]))
+                        temp = os.path.join(self.apacheImgDir, self.projectName, basename(ctf[key]))
                         popUpStr = """<a href = "%s" target = "_blank"> <img src="%s"  alt="%s" width="128px" height="128px"> </a>""" % \
                                    (temp, temp, basename(ctf[key]))
                         fields[key] = popUpStr
@@ -321,7 +323,7 @@ class ReportInflux:
                         # convert to pǹg
                         baseName = basename(ctf[key])
                         baseNamePng = pwutils.replaceBaseExt(ctf[key], "png")
-                        temp = os.path.join('/public/img/scipionbox', self.projectName, baseName)
+                        temp = os.path.join(self.apacheImgDir, self.projectName, baseName)
                         temp = pwutils.replaceExt(temp, "png")
                         popUpStr = """<a href = "%s" target = "_blank"> <img src="%s"  alt="%s" width="128px" height="128px"> </a>""" % \
                                    (temp, temp, baseNamePng)
@@ -332,7 +334,7 @@ class ReportInflux:
                         # convert to pǹg
                         baseName = basename(ctf[key])
                         baseNamePng = pwutils.replaceBaseExt(ctf[key], "png")
-                        temp = os.path.join('/public/img/scipionbox', self.projectName, baseName)
+                        temp = os.path.join(self.apacheImgDir, self.projectName, baseName)
                         temp = pwutils.replaceExt(temp, "png")
                         popUpStr = """<a href = "%s" target = "_blank"> <img src="%s"  alt="%s" width="128px" height="128px"> </a>""" % \
                                    (temp, temp, baseNamePng)
