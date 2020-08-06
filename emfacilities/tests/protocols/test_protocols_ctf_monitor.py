@@ -74,8 +74,6 @@ class TestCtfStream(pwtests.BaseTest):
         kwargs = {
             'useCtffind4': True,
             'ctfDownFactor': 2,
-            'highRes': 0.4,
-            'lowRes': 0.05,
             'numberOfThreads': 4
         }
         from pwem import Domain

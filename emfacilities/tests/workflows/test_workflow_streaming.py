@@ -184,7 +184,7 @@ class TestStreamingWorkflow(pwtests.BaseTest):
                                    objLabel='ctffind4')
         protCTF.inputMicrographs.set(protOF)
         protCTF.inputMicrographs.setExtended('outputMicrographs')
-        self.proj.launchProtocol(protCTF, wait=False)
+        self.proj.scheduleProtocol(protCTF)
         self._waitOutput(protCTF, 'outputCTF')
         protocols.append(protCTF)
 

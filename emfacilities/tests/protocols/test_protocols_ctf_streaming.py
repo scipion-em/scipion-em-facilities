@@ -117,8 +117,7 @@ class TestCtfStreaming(pwtests.BaseTest):
 
         ProtCTFFind = Domain.importFromPlugin('cistem.protocols',
                                               'CistemProtCTFFind', doRaise=True)
-        protCTF = ProtCTFFind()
-
+        protCTF = self.newProtocol(ProtCTFFind)
         protCTF.inputMicrographs.set(protStream)
         protCTF.inputMicrographs.setExtended('outputMicrographs')
         protCTF.findPhaseShift.set(True)

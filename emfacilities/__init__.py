@@ -42,7 +42,7 @@ class Plugin(pwem.Plugin):
 
     @classmethod
     def _defineVariables(cls):
-        cls._defineEmVar(EMFACILITIES_HOME_VARNAME, 'emfacilities')
+        cls._defineEmVar(EMFACILITIES_HOME_VARNAME, '')
                          #os.path.expanduser('~/.config/scipion'))
 
     @classmethod
