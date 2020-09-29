@@ -132,17 +132,16 @@ class CtfMonitorPlotter(EmPlotter):
                         linewidth=0.5, linestyle='dashed', zorder=0)
 
     def show(self):
-        self.paint(['defocusU', 'defocusV'])
+        self.paint([('defocusU', 'r'), ('defocusV', 'b')])
 
     def paint(self, labels):
         for label in labels:
-            if label == 'defocusU':
-                self.lines[label], = self.ax.plot([], [], '-o',
-                                                  label=label, color='b')
-            else:
-                self.lines[label], = self.ax.plot([], [], '-o',
-                                                  label=label, color='r')
+            labelValue = self.monitor.getData()[label[0]]
+            color = label[1]
+            self.lines[label[0]], = self.ax.plot(labelValue, '-o',
+                                              label=label[0], color=color)
 
+        self.legend()
         anim = animation.FuncAnimation(self.fig, self.animate,
                                        interval=self.monitor.samplingInterval * 1000)  # miliseconds
 
@@ -252,26 +251,26 @@ class MovieGainMonitorPlotter(EmPlotter):
                         loc=2, prop={'size': 10}).get_frame().set_alpha(0.5)
 
     def show(self):
-        self.paint(['ratio1', 'ratio2', 'standard_deviation'])
+        self.paint([('ratio1', 'b'), ('ratio2', 'b'),
+                    ('standard_deviation', 'r')])
 
     def paint(self, labels):
         for label in labels:
+            labelValue = self.monitor.getData()[label[0]]
+            color = label[1]
             if label == 'standard_deviation':
-                self.lines[label], = \
-                    self.ax2.plot([], [], '-o',
-                                  label='Standard deviation',
-                                  color='r')
+                self.lines[label[0]], = self.ax2.plot(labelValue, '-o',
+                                                   label=label[0], color=color)
             if label == 'ratio1':
-                self.lines[label], = \
-                    self.ax.plot([], [], '-o',
-                                 label='97.5/2.5 percentile',
-                                 color='b')
+                self.lines[label[0]], = self.ax.plot(labelValue, '-o',
+                                                  label='97.5/2.5 percentile',
+                                                  color=color)
             if label == 'ratio2':
-                self.lines[label], = \
-                    self.ax.plot([], [], '-*',
-                                 label='max/97.5 percentile',
-                                 color='b')
+                self.lines[label[0]], = self.ax.plot(labelValue, '-*',
+                                                  label='max/97.5 percentile',
+                                                  color=color)
 
+        self.legend()
         anim = animation.FuncAnimation(self.fig, self.animate,
                                        interval=self.monitor.samplingInterval * 1000)  # miliseconds
 
@@ -463,8 +462,11 @@ class SystemMonitorPlotter(EmPlotter):
 
     def paint(self, labels):
         for label in labels:
-            self.lines[label], = self.ax.plot([], [], '-', label=label)
-
+            labelValue = self.monitor.getData()[label]
+            color = self.color[label]
+            self.lines[label], = self.ax.plot(labelValue, '-', label=label,
+                                              color=color)
+        self.ax.legend()
         anim = animation.FuncAnimation(
             self.fig, self.animate,
             interval=self.monitor.samplingInterval * 1000)  # miliseconds
