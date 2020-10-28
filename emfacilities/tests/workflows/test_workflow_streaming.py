@@ -357,19 +357,17 @@ class TestRelionPickStreaming(TestBaseRelionStreaming):
 
         self._waitUntilMinSize(protCtf.outputCTF)
 
-        # Select some good averages from the iterations mrcs a
+        # Select some good averages from the iterations mrcs
 
         ProtRelion2Autopick = Domain.importFromPlugin('relion.protocols',
                                                       'ProtRelion2Autopick')
-        relion_RUN_COMPUTE = Domain.importFromPlugin('relion', 'RUN_COMPUTE')
 
         protPick = self.newProtocol(
             ProtRelion2Autopick, objLabel='autopick refs',
             inputMicrographs=protImport.outputMicrographs,
             ctfRelations=protCtf.outputCTF,
-            runType=relion_RUN_COMPUTE,
             inputReferences=protAvgs.outputAverages,
-            numberOfMpi = 2
+            numberOfMpi=2
         )
         self.launchProtocol(protPick)
 
