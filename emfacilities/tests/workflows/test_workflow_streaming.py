@@ -168,6 +168,10 @@ class TestStreamingWorkflow(pwtests.BaseTest):
                                   doComputePSD=False,
                                   alignFrame0=3,
                                   alignFrameN=10,
+                                  autoControlPoints=False,
+                                  controlPointX=3,
+                                  controlPointY=3,
+                                  controlPointT=5,
                                   sumFrame0=3,
                                   sumFrameN=10,
                                   doApplyDoseFilter=False)
