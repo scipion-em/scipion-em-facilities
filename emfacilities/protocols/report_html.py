@@ -158,6 +158,15 @@ class ReportHtml:
             - ext: extension of the thumbnail images. Defaults to png.
             - micIdSet: mic indexes to use
         """
+        def getMicSet(alignedProt):
+            # TODO get this output names from Protocol constants
+            if hasattr(alignedProt, 'outputMicrographsDoseWeighted'):
+                return alignedProt.outputMicrographsDoseWeighted
+            elif hasattr(updatedProt, 'outputMicrographs'):
+                return updatedProt.outputMicrographs
+            else:
+                return None
+
         # get psd thumbs from ctfData
         if ctfData is not None:
             for i in range(thumbsDone, len(ctfData[PSD_PATH])):
@@ -171,8 +180,8 @@ class ReportHtml:
         if self.alignProtocol is not None:
             getMicFromCTF = False
             updatedProt = getUpdatedProtocol(self.alignProtocol)
-            if hasattr(updatedProt, 'outputMicrographs'):
-                outputSet = updatedProt.outputMicrographs
+            outputSet = getMicSet(updatedProt)
+            if outputSet is not None:
                 if micIdSet is None:
                     micIdSet = list(outputSet.getIdSet())
             else:
