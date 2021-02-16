@@ -162,8 +162,8 @@ class ReportHtml:
             # TODO get this output names from Protocol constants
             if hasattr(alignedProt, 'outputMicrographsDoseWeighted'):
                 return alignedProt.outputMicrographsDoseWeighted
-            elif hasattr(updatedProt, 'outputMicrographs'):
-                return updatedProt.outputMicrographs
+            elif hasattr(alignedProt, 'outputMicrographs'):
+                return alignedProt.outputMicrographs
             else:
                 return None
 
