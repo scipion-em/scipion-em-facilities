@@ -74,27 +74,27 @@ class UsedItemsTracker(EMProtocol):
                        'will be tracked and scored according to the number of used particles in them')
     form.addParam('inputCTFs', params.PointerParam,
                   pointerClass='SetOfCTFs', expertLevel=params.LEVEL_ADVANCED,
-                  label="Input CTFs", condition='trackCTFs', allowsNull=True,
+                  label="Input CTFs", condition='trackCTFs and trackMics', allowsNull=True,
                   help='Set of CTFs where to track the used items. If None, the first protocol'
                        'with output CTFs will be used')
 
     form.addParam('trackCoordinates', params.BooleanParam, default=True,
-                  label='Track used cooridnates?', condition='trackMics',
+                  label='Track used coordinates?', condition='trackMics',
                   help='The coordinates used in the final volume reconstruction will be tracked')
     form.addParam('inputCoordinates', params.PointerParam,
                   pointerClass='SetOfCoordinates', expertLevel=params.LEVEL_ADVANCED,
-                  label="Input Coordinates", condition='trackCoordinates', allowsNull=True,
+                  label="Input Coordinates", condition='trackCoordinates and trackMics', allowsNull=True,
                   help='Set of Coordinates where to track the used items. If None, the first protocol'
                        'with output Coordinates will be used')
 
-    form.addParam('trackClasses2D', params.BooleanParam, default=True,
+    '''form.addParam('trackClasses2D', params.BooleanParam, default=True,
                   label='Track used Classes2D?',
                   help='The Classes2D used in the final volume reconstruction will be tracked')
     form.addParam('inputClasses2D', params.PointerParam,
                   pointerClass='SetOfClasses2D', expertLevel=params.LEVEL_ADVANCED,
                   label="Input Classes2D", condition='trackClasses2D', allowsNull=True,
                   help='Set of Classes2D where to track the used items. If None, the first protocol'
-                       'with output Classes2D will be used')
+                       'with output Classes2D will be used')'''
 
 
   # --------------------------- INSERT steps functions ----------------------
@@ -126,48 +126,48 @@ class UsedItemsTracker(EMProtocol):
     if self.trackMics.get():
       print('\nTracking used micrographs')
       #todo: join the sets of particles or join the created outs
-      for particlesSet in particleSets:
-        if self.inputMicrographs.get() is None:
-          micTracks, micCodes = self.getUpperSetTracks(self.particlesTracks, setType='SetOfMicrographs')
-          micSets = self.getCodesSets(micCodes)
+      particlesSet = particleSets[0]
+      if self.inputMicrographs.get() is None:
+        micTracks, micCodes = self.getUpperSetTracks(self.particlesTracks, setType='SetOfMicrographs')
+        micSets = self.getCodesSets(micCodes)
+      else:
+        micSets = [self.inputMicrographs.get()]
+
+      micDic = self.buildMicDic(micSets)
+      micCountDic = self.countParticlesPerMic(particlesSet, micDic)
+      outFile = self._getExtraPath('micScores.tsv')
+      self.createMicScoreOutput(micCountDic, outFile)
+      print('Number of used particles per micrographs written in ', outFile)
+
+      outputMics = self.buildSetOfMics(micDic, micSets)
+      self._defineOutputs(usedMicrographs=outputMics)
+
+      if self.trackCTFs.get():
+        print('\nTracking used CTFs')
+        if self.inputCTFs.get() is None:
+          ctfTracks, ctfCodes = self.getUpperSetTracks(self.particlesTracks, setType='SetOfCTF')
+          ctfSets = self.getCodesSets(ctfCodes)
         else:
-          micSets = [self.inputMicrographs.get()]
+          ctfSets = [self.inputCTFs.get()]
 
-        micDic = self.buildMicDic(micSets)
-        micCountDic = self.countParticlesPerMic(particlesSet, micDic)
-        outFile = self._getExtraPath('micScores.tsv')
-        self.createMicScoreOutput(micCountDic, outFile)
-        print('Number of used particles per micrographs written in ', outFile)
+        ctfSet = self.filterFilenamesSets(ctfSets)
+        outputCTF = self.buildSetOfCTF(ctfSet, ctfSets)
+        self._defineOutputs(usedCTFs=outputCTF)
 
-        outputMics = self.buildSetOfMics(micDic, micSets)
-        self._defineOutputs(usedMicrographs=outputMics)
+      if self.trackCoordinates.get():
+        print('\nTracking used coordinates')
+        if self.inputCoordinates.get() is None:
+          coordTracks, coordCodes = self.getUpperSetTracks(self.particlesTracks, setType='SetOfCoordinates')
+          coordSets = self.getCodesSets(coordCodes)
+        else:
+          coordSets = [self.inputCoordinates.get()]
 
-        if self.trackCTFs.get():
-          print('\nTracking used CTFs')
-          if self.inputCTFs.get() is None:
-            ctfTracks, ctfCodes = self.getUpperSetTracks(self.particlesTracks, setType='SetOfCTF')
-            ctfSets = self.getCodesSets(ctfCodes)
-          else:
-            ctfSets = [self.inputCTFs.get()]
+        coords = self.getParticleCoordinates(particlesSet)
+        downSamplingFactor = self.getDownsampling(outputMics, particlesSet)
+        coords = self.scaleCoords(coords, downSamplingFactor)
 
-          ctfSet = self.filterFilenamesSets(ctfSets)
-          outputCTF = self.buildSetOfCTF(ctfSet, ctfSets)
-          self._defineOutputs(usedCTFs=outputCTF)
-
-        if self.trackCoordinates.get():
-          print('\nTracking used coordinates')
-          if self.inputCoordinates.get() is None:
-            coordTracks, coordCodes = self.getUpperSetTracks(self.particlesTracks, setType='SetOfCoordinates')
-            coordSets = self.getCodesSets(coordCodes)
-          else:
-            coordSets = [self.inputCoordinates.get()]
-
-          coords = self.getParticleCoordinates(particlesSet)
-          downSamplingFactor = self.getDownsampling(outputMics, particlesSet)
-          coords = self.scaleCoords(coords, downSamplingFactor)
-
-          outputCoordinates = self.buildSetOfCoordinates(outputMics, coords, coordSets)
-          self._defineOutputs(usedCoordinates=outputCoordinates)
+        outputCoordinates = self.buildSetOfCoordinates(outputMics, coords, coordSets)
+        self._defineOutputs(usedCoordinates=outputCoordinates)
 
   # --------------------------- STEPS functions -----------------------------
   def joinSetsOfParticles(self, particlesSets):
