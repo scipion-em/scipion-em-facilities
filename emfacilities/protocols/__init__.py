@@ -13,6 +13,8 @@ from .protocol_monitor_movie_gain import ProtMonitorMovieGain, MonitorMovieGain
 from .protocol_monitor_2d_streamer import ProtMonitor2dStreamer
 
 from .report_html import ReportHtml
+
+from .protocol_trackUsedItems import UsedItemsTracker
 try:
     from .getnifs import *
 except ImportError:
