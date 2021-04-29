@@ -29,6 +29,7 @@ from pwem.protocols.protocol import EMProtocol
 from pwem.objects import Micrograph
 from pyworkflow.protocol import params
 import copy, os
+import networkx as nx
 
 class UsedItemsTracker(EMProtocol):
   """
@@ -53,9 +54,9 @@ class UsedItemsTracker(EMProtocol):
                   help='The particles used in the final volume reconstruction will be tracked')
     form.addParam('inputParticles', params.PointerParam,
                   pointerClass='SetOfParticles', expertLevel=params.LEVEL_ADVANCED,
-                  label="Input Particles", condition='trackParticles', allowsNull=True,
-                  help='Set of Particles where to track the used items. If None, the set of particles'
-                       'closer to the volume will be used. It will also be used to find the used mics, ctfs'
+                  label="Used Particles", allowsNull=True,
+                  help='Set of Particles containing the used particles. If None, the set of particles'
+                       'closest to the volume will be used. It will also be used to find the used mics, ctfs'
                        'and coordinates.')
     
     form.addParam('trackMics', params.BooleanParam, default=True,
@@ -66,7 +67,8 @@ class UsedItemsTracker(EMProtocol):
                   pointerClass='SetOfMicrographs', expertLevel=params.LEVEL_ADVANCED,
                   label="Input micrographs", condition='trackMics', allowsNull=True,
                   help='Set of micrographs where to track the used items. If None, the first protocol'
-                       'with output micrographs will be used')
+                       'with output micrographs will be used. Each of these micrographs will be scored'
+                       'depending on the number of used particles in them')
 
     form.addParam('trackCTFs', params.BooleanParam, default=True,
                   label='Track used CTFs?', condition='trackMics',
@@ -107,31 +109,29 @@ class UsedItemsTracker(EMProtocol):
 
     self.inpDic, self.outDic = self.buildInputsDic(self.project), self.buildOutputsDic(self.project)
     self.protDic = self.project.getProtocolsDict()
-    self.allTracks = self.generateOutputsTrackRec(self.getObjId(), [], [])
+    self.outGraph = self.generateOutputsGraphRec(self.getObjId())
 
   def getUsedItemsStep(self):
-    if self.inputParticles.get() is None:
-      self.particlesTracks, self.particlesCodes = self.getLowerSetTracks(self.allTracks, setType='SetOfParticles')
-      particleSets = self.getCodesSets(self.particlesCodes)
-    else:
-      partCode = '{}.{}'.format(self.inputParticles.getObjValue().strId(), self.inputParticles.getExtended())
-      self.particlesTracks, self.particlesCodes = self.getLowerSetTracks(self.allTracks, exactCode=partCode)
-      particleSets = [self.inputParticles.get()]
+    particleSets = self.getInputParticles()
+    particlesSet = self.joinSetsOfParticles(particleSets)
+    partSamplingRate = particlesSet.getSamplingRate()
+    firstParticlesCodes = self.getFurthestCodesFromNode(self.outGraph, self.particlesCodes[0],
+                                                        nodeConditions=[('objType', 'SetOfParticles'),
+                                                                        ('samplingRate', partSamplingRate)])
+    firstParticlesSets = self.getCodesSets(firstParticlesCodes)
+    print('Original particles code: ', firstParticlesCodes)
+    notParticlesSet = self.getUnused(particleSets, firstParticlesSets)
 
     if self.trackParticles.get():
       print('\nTracking used particles')
-      particlesSet = self.joinSetsOfParticles(particleSets)
       self._defineOutputs(usedParticles=particlesSet)
+      self._defineOutputs(unusedParticles=notParticlesSet)
 
     if self.trackMics.get():
       print('\nTracking used micrographs')
       #todo: join the sets of particles or join the created outs
-      particlesSet = particleSets[0]
-      if self.inputMicrographs.get() is None:
-        micTracks, micCodes = self.getUpperSetTracks(self.particlesTracks, setType='SetOfMicrographs')
-        micSets = self.getCodesSets(micCodes)
-      else:
-        micSets = [self.inputMicrographs.get()]
+      particlesSet = self.joinSetsOfParticles(particleSets)
+      micSets = self.getInputMicrographs()
 
       micDic = self.buildMicDic(micSets)
       micCountDic = self.countParticlesPerMic(particlesSet, micDic)
@@ -144,11 +144,7 @@ class UsedItemsTracker(EMProtocol):
 
       if self.trackCTFs.get():
         print('\nTracking used CTFs')
-        if self.inputCTFs.get() is None:
-          ctfTracks, ctfCodes = self.getUpperSetTracks(self.particlesTracks, setType='SetOfCTF')
-          ctfSets = self.getCodesSets(ctfCodes)
-        else:
-          ctfSets = [self.inputCTFs.get()]
+        ctfSets = self.getInputCTFs()
 
         ctfSet = self.filterFilenamesSets(ctfSets)
         outputCTF = self.buildSetOfCTF(ctfSet, ctfSets)
@@ -156,20 +152,131 @@ class UsedItemsTracker(EMProtocol):
 
       if self.trackCoordinates.get():
         print('\nTracking used coordinates')
-        if self.inputCoordinates.get() is None:
-          coordTracks, coordCodes = self.getUpperSetTracks(self.particlesTracks, setType='SetOfCoordinates')
-          coordSets = self.getCodesSets(coordCodes)
-        else:
-          coordSets = [self.inputCoordinates.get()]
+        coordSets = self.getInputCoordinates()
+        downSamplingFactor = self.getDownsampling(outputMics, particlesSet)
 
         coords = self.getParticleCoordinates(particlesSet)
-        downSamplingFactor = self.getDownsampling(outputMics, particlesSet)
         coords = self.scaleCoords(coords, downSamplingFactor)
-
-        outputCoordinates = self.buildSetOfCoordinates(outputMics, coords, coordSets)
+        outputCoordinates = self.buildSetOfCoordinates(outputMics, coords, coordSets, '_used')
         self._defineOutputs(usedCoordinates=outputCoordinates)
 
+        notCoords = self.getParticleCoordinates(notParticlesSet)
+        notCoords = self.scaleCoords(notCoords, downSamplingFactor)
+        notOutputCoordinates = self.buildSetOfCoordinates(outputMics, notCoords, coordSets, '_unused')
+        self._defineOutputs(unusedCoordinates=notOutputCoordinates)
+
   # --------------------------- STEPS functions -----------------------------
+  def getInputParticles(self):
+    if self.inputParticles.get() is None:
+      self.particlesCodes = self.getFurthestCodesFromNode(self.outGraph, 'root',
+                                                          nodeConditions=[('objType', 'SetOfParticles')])
+      particleSets = self.getCodesSets(self.particlesCodes)
+    else:
+      self.particlesCodes = \
+        ['{}.{}'.format(self.inputParticles.getObjValue().strId(), self.inputParticles.getExtended())]
+      particleSets = [self.inputParticles.get()]
+    return particleSets
+
+  def getInputMicrographs(self):
+    if self.inputMicrographs.get() is None:
+      micCodes = self.getClosestCodesFromNode(self.outGraph, 'root',
+                                              nodeConditions=[('objType', 'SetOfMicrographs')])
+      micSets = self.getCodesSets(micCodes)
+    else:
+      micSets = [self.inputMicrographs.get()]
+    return micSets
+
+  def getInputCTFs(self):
+    if self.inputCTFs.get() is None:
+      ctfCodes = self.getFurthestCodesFromNode(self.outGraph, 'root',
+                                              nodeConditions=[('objType', 'SetOfCTF')])
+      ctfSets = self.getCodesSets(ctfCodes)
+    else:
+      ctfSets = [self.inputCTFs.get()]
+    return ctfSets
+
+  def getInputCoordinates(self):
+    if self.inputCoordinates.get() is None:
+      coordCodes = self.getClosestCodesFromNode(self.outGraph, 'root',
+                                                nodeConditions=[('objType', 'SetOfCoordinates')])
+      coordSets = self.getCodesSets(coordCodes)
+    else:
+      coordSets = [self.inputCoordinates.get()]
+    return coordSets
+
+  def getLongestPath(self, outGraph, node1, node2):
+    if nx.has_path(outGraph, node1, node2):
+      allPaths = nx.all_simple_paths(outGraph, node1, node2)
+    elif nx.has_path(outGraph, node2, node1):
+      allPaths = nx.all_simple_paths(outGraph, node2, node1)
+    else:
+      return None
+    return max(allPaths, key=len)
+
+  def validateConditions(self, node, conditions):
+    for condition in conditions:
+      if not node[condition[0]] == condition[1]:
+        return False
+    return True
+
+  def getFurthestCodesFromNode(self, outGraph, oriNode, nodeConditions):
+    '''In a directed graph representing the project outputs, retrieves the output codes (protId.atrName)
+    of the outputs of type setType which are furthest from the project root, following the longest possible path'''
+    maxDist, furthestCodes = 0, []
+    for nodeKey in outGraph.nodes:
+      if nodeKey not in ['root', oriNode] and self.validateConditions(outGraph.nodes[nodeKey], nodeConditions):
+        longPath = self.getLongestPath(outGraph, oriNode, nodeKey)
+        if longPath is not None:
+          dist = len(longPath)
+          if dist > maxDist:
+            maxDist = dist
+            furthestCodes = [nodeKey]
+          elif dist == maxDist:
+            furthestCodes.append(nodeKey)
+    return furthestCodes
+
+  def getClosestCodesFromNode(self, outGraph, oriNode, nodeConditions):
+    '''In a directed graph representing the project outputs, retrieves the output codes (protId.atrName)
+    of the outputs of type setType which are closest from the project root, following the longest possible path'''
+    minDist, closestCodes = 10000, []
+    for nodeKey in outGraph.nodes:
+      if not nodeKey in ['root', oriNode] and self.validateConditions(outGraph.nodes[nodeKey], nodeConditions):
+        dist = len(self.getLongestPath(outGraph, oriNode, nodeKey))
+        if dist < minDist:
+          minDist = dist
+          closestCodes = [nodeKey]
+        elif dist == minDist:
+          closestCodes.append(nodeKey)
+    return closestCodes
+
+  def createScipionSet(self, particles, suffix=''):
+    scipionSet = self._createSetOfParticles(suffix)
+    for part in particles:
+      scipionSet.append(part)
+    return scipionSet
+
+  def joinParticleSetsIds(self, particleSets):
+    ids = set([])
+    for particles in particleSets:
+      for part in particles:
+        ids.add(part.getObjId())
+    return ids
+
+  def getUnused(self, usedParticlesSets, firstParticlesSets):
+    usedParticlesIds = self.joinParticleSetsIds(usedParticlesSets)
+    notParticles, notUsedIds = [], []
+
+    for particleSet in firstParticlesSets:
+      for part in particleSet:
+        if not part.getObjId() in usedParticlesIds and not part.getObjId() in notUsedIds:
+          cPart = part.clone()
+          notParticles.append(cPart)
+          notUsedIds.append(cPart.getObjId())
+
+    notParticlesSet = self.createScipionSet(notParticles, '_unused')
+    notParticlesSet.copyInfo(firstParticlesSets[0])
+    return notParticlesSet
+
   def joinSetsOfParticles(self, particlesSets):
     if len(particlesSets) == 1:
       return particlesSets[0]
@@ -186,11 +293,11 @@ class UsedItemsTracker(EMProtocol):
       co.scale(factor)
     return coords
 
-  def buildSetOfCoordinates(self, outputMics, coords, coordSets):
-    outputCoordinates = self._createSetOfCoordinates(outputMics)
+  def buildSetOfCoordinates(self, outputMics, coords, coordSets, suffix=''):
+    outputCoordinates = self._createSetOfCoordinates(outputMics, suffix)
     outputCoordinates.copyInfo(coordSets[0])
     for coord in coords:
-        outputCoordinates.append(coord)
+      outputCoordinates.append(coord.clone())
 
     return outputCoordinates
 
@@ -203,7 +310,6 @@ class UsedItemsTracker(EMProtocol):
       try:
         outputCTF.append(ctf)
       except:
-        print('Este ctf malo: ', ctf)
         pass
     return outputCTF
 
@@ -295,29 +401,56 @@ class UsedItemsTracker(EMProtocol):
         outDic[protId][key] = oValue
     return outDic
 
-  def generateOutputsTrackRec(self, curProtId, curOutCodes, allOutCodes):
+  def generateOutputsGraphRec(self, curProtId, outGraph=nx.DiGraph(), prevCode=None):
+    '''Generates a directed graph from a project with the protocol outputs as nodes, starting from the
+    current protocol Id (curProtId) and moving upwards. Therefore, the resulting outputs graphs contains
+    only those outputs necessary for the generation of the input of this protocol (default volume)'''
     inpKeys = self.inpDic[curProtId].keys()
     if len(inpKeys) == 0:
-      allOutCodes.append(curOutCodes)
-      return allOutCodes
+      if not 'root' in outGraph:
+        outGraph.add_node('root')
+      outGraph.add_edge('root', prevCode)
+      return outGraph
+
     for k in inpKeys:
       outCodes = self.protDic[curProtId][k]
       if not type(outCodes) == list:
         outCodes = [outCodes]
+
       for outCode in outCodes:
-        if outCode.split('.')[1] == '':
-          # Special case of subset with entire protocol as input
-          parentProtId = int(outCode.split('.')[0])
-          outKey = list(self.outDic[parentProtId])[0]
-          outCode = str(parentProtId) + '.' + outKey
-        else:
-          parentProtId, outKey = int(outCode.split('.')[0]), outCode.split('.')[1]
+        protId, outKey, outCode = self.manageCodes(outCode)
+        outGraph, nextProId = self.addNode(outCode, outGraph)
+        if prevCode is not None:
+          outGraph.add_edge(outCode, prevCode)
 
-        nextOutCodes = copy.deepcopy(curOutCodes)
-        nextOutCodes.append(copy.deepcopy(outCode))
-        allOutCodes = self.generateOutputsTrackRec(parentProtId, nextOutCodes, allOutCodes)
+        outGraph = self.generateOutputsGraphRec(nextProId, outGraph, outCode)
+    return outGraph
 
-    return allOutCodes
+  def manageCodes(self, outCode):
+    if outCode.split('.')[1] == '':
+      # Special case of subset with entire protocol as input
+      parentProtId = int(outCode.split('.')[0])
+      outKey = list(self.outDic[parentProtId])[0]
+      outCode = str(parentProtId) + '.' + outKey
+    else:
+      parentProtId, outKey = int(outCode.split('.')[0]), outCode.split('.')[1]
+    return parentProtId, outKey, outCode
+
+  def addNode(self, outCode, outGraph):
+    protId, outKey, outCode = self.manageCodes(outCode)
+
+    outGraph.add_node(outCode, code=outCode, protId=protId, atrName=outKey,
+                      obj=self.outDic[protId][outKey],
+                      objType=self.outDic[protId][outKey].__str__().split()[0],
+                      samplingRate=self.tryGetSamplingRate(self.outDic[protId][outKey]))
+
+    return outGraph, protId
+
+  def tryGetSamplingRate(self, scipionSet):
+    try:
+      return scipionSet.getSamplingRate()
+    except:
+      return scipionSet.getMicrographs().getSamplingRate()
 
   def getCodeType(self, code):
     if len(code.split('.')) == 2:
@@ -332,49 +465,51 @@ class UsedItemsTracker(EMProtocol):
     #print('Code: {}\nType: {}'.format(code, objType))
     return objType
 
-  def getLowerSetTracks(self, allOutCodes, setType = None, exactCode = None):
-    '''Select the tracks which contain a setType object at lower level (counting from earlier protocols)'''
-    lower=10000
-    lowerTracks, lowerCodes = [], set([])
-    for codeTrack in allOutCodes:
-      for i in range(-len(codeTrack), 0):
-        if i > lower:
-          continue
-
-        code = codeTrack[i]
-        codeType = self.getCodeType(code)
-        if codeType == setType or code == exactCode:
-          if i == lower:
-            lowerTracks.append(codeTrack)
-            lowerCodes.add(code)
-          elif i < lower:
-            lowerTracks = [codeTrack]
-            lowerCodes = {code}
-            lower=i
-
-    return lowerTracks, lowerCodes
-
-  def getUpperSetTracks(self, allOutCodes, setType = None, exactCode = None):
-    '''Select the tracks which contain a setType object at Upper level (counting from earlier protocols)'''
+  def getUpperSetCodes(self, allOutCodes, setType = None):
+    '''Select the set code which contain a setType object at Upper level (counting from earlier protocols)'''
     upper = -10000
-    upperTracks, upperCodes = [], set([])
+    upperCodes = set([])
     for codeTrack in allOutCodes:
-      for i in range(-len(codeTrack), 0):
-        if i < upper:
-          continue
+      for i in range(-1, -len(codeTrack), -1):
+        if i < upper: break
 
         code = codeTrack[i]
         codeType = self.getCodeType(code)
-        if codeType == setType or code == exactCode:
+        if codeType == setType:
           if i == upper:
-            upperTracks.append(codeTrack)
             upperCodes.add(code)
           elif i > upper:
-            upperTracks = [codeTrack]
-            upperCodes = {code}
-            upper = i
+            upperCodes, upper = {code}, i
 
-    return upperTracks, upperCodes
+    return upperCodes
+
+  def getLowerSetCodes(self, allOutCodes, setType = None):
+    '''Select the set code which contain a setType object at lower level (counting from earlier protocols)'''
+    lower = 10000
+    lowerCodes = set([])
+    for codeTrack in allOutCodes:
+      for i in range(-1, -len(codeTrack), -1):
+        if i > lower: break
+
+        code = codeTrack[i]
+        codeType = self.getCodeType(code)
+        if codeType == setType:
+          if i == lower:
+            lowerCodes.add(code)
+          elif i < lower:
+            lowerCodes, lower = {code}, i
+
+    return lowerCodes
+
+  def filterTracks(self, tracks, codes):
+    '''Filter the tracks which do not contain the specified codes'''
+    ntracks = []
+    for t in tracks:
+      for code in codes:
+        if code in t:
+          ntracks.append(t)
+          break
+    return ntracks
 
   def getCodesSets(self, codes):
     sets = []
