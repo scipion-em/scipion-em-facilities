@@ -58,41 +58,41 @@ class UsedItemsTracker(EMProtocol):
     form.addParam('trackParticles', params.BooleanParam, default=True,
                   label='Track used particles?',
                   help='The particles used in the final volume reconstruction will be tracked')
-    form.addParam('inputParticles', params.PointerParam,
+    form.addParam('originalParticles', params.PointerParam,
                   pointerClass='SetOfParticles', expertLevel=params.LEVEL_ADVANCED,
-                  label="Used Particles", allowsNull=True,
-                  help='Set of Particles containing the used particles. If None, the set of particles'
-                       'closest to the volume will be used. It will also be used to find the used mics, ctfs'
-                       'and coordinates.')
+                  label="Original Particles", allowsNull=True,
+                  help='Set of Particles containing the complete set of original particles, including the used and '
+                       'filtered particles. If None, the set of particles with same sampling rate and furthest to the '
+                       'used particles will be used.')
     
     form.addParam('trackMics', params.BooleanParam, default=True,
                   label='Track used micrographs?',
                   help='The micrographs with picked particles used in the final volume reconstruction '
                        'will be tracked and scored according to the number of used particles in them')
-    form.addParam('inputMicrographs', params.PointerParam,
+    form.addParam('originalMicrographs', params.PointerParam,
                   pointerClass='SetOfMicrographs', expertLevel=params.LEVEL_ADVANCED,
-                  label="Input micrographs", condition='trackMics', allowsNull=True,
-                  help='Set of micrographs where to track the used items. If None, the first protocol'
-                       'with output micrographs will be used. Each of these micrographs will be scored'
-                       'depending on the number of used particles in them')
+                  label="Original micrographs", condition='trackMics', allowsNull=True,
+                  help='Set of micrographs containing the complete set of original mics, including the used and '
+                       'filtered mics. If None, the first protocol with output micrographs will be used. '
+                       'Each of these micrographs will be scored depending on the number of used particles in them')
 
     form.addParam('trackCTFs', params.BooleanParam, default=True,
                   label='Track used CTFs?', condition='trackMics',
                   help='The CTFs from micrographs with picked particles used in the final volume reconstruction '
                        'will be tracked and scored according to the number of used particles in them')
-    form.addParam('inputCTFs', params.PointerParam,
+    '''form.addParam('originalCTFs', params.PointerParam,
                   pointerClass='SetOfCTFs', expertLevel=params.LEVEL_ADVANCED,
-                  label="Input CTFs", condition='trackCTFs and trackMics', allowsNull=True,
+                  label="Original CTFs", condition='trackCTFs and trackMics', allowsNull=True,
                   help='Set of CTFs where to track the used items. If None, the first protocol'
-                       'with output CTFs will be used')
+                       'with output CTFs will be used')'''
 
     form.addParam('trackCoordinates', params.BooleanParam, default=True,
                   label='Track used coordinates?', condition='trackMics',
                   help='The coordinates used in the final volume reconstruction will be tracked')
-    form.addParam('inputCoordinates', params.PointerParam,
+    form.addParam('originalCoordinates', params.PointerParam,
                   pointerClass='SetOfCoordinates', expertLevel=params.LEVEL_ADVANCED,
-                  label="Input Coordinates", condition='trackCoordinates and trackMics', allowsNull=True,
-                  help='Set of Coordinates where to track the used items. If None, the first protocol'
+                  label="Original Coordinates", condition='trackCoordinates and trackMics', allowsNull=True,
+                  help='Set of Coordinates where to get the coordinates parameters. If None, the first protocol '
                        'with output Coordinates will be used')
 
     '''form.addParam('trackClasses2D', params.BooleanParam, default=True,
@@ -121,16 +121,13 @@ class UsedItemsTracker(EMProtocol):
     self.outGraph = self.generateOutputsGraphRec(self.getObjId())
 
   def getUsedItemsStep(self):
-    particleSets = self.getInputParticles()
-    self.particlesSet = self.joinSetsOfParticles(particleSets)
-    partSamplingRate = self.particlesSet.getSamplingRate()
-    firstParticlesCodes = self.getFurthestCodesFromNode(self.outGraph, self.particlesCodes[0],
-                                                        nodeConditions=[('objType', 'SetOfParticles'),
-                                                                        ('samplingRate', partSamplingRate)])
-    firstParticlesSets = self.getCodesSets(firstParticlesCodes)
+    particleSets, self.particlesCodes = self.getUsedParticles()
+    self.particlesSet = self.joinSets(particleSets)
+
+    originalParticlesSets, originalParticlesCodes = self.getOriginalParticles()
     print('Used particles code: ', self.particlesCodes)
-    print('Original particles code: ', firstParticlesCodes)
-    self.notParticlesSet = self.getUnused(particleSets, firstParticlesSets)
+    print('Original particles code: ', originalParticlesCodes)
+    self.notParticlesSet = self.getUnused(particleSets, originalParticlesSets)
 
     if self.trackParticles.get():
       print('\nTracking used particles')
@@ -139,8 +136,7 @@ class UsedItemsTracker(EMProtocol):
 
     if self.trackMics.get():
       print('\nTracking used micrographs')
-      #todo: join the sets of particles or join the created outs
-      micSets = self.getInputMicrographs()
+      micSets = self.getOriginalMicrographs()
 
       micDic = self.buildMicDic(micSets)
       self.micCountDic, micDic = self.countParticlesPerMic(self.particlesSet, micDic)
@@ -151,17 +147,16 @@ class UsedItemsTracker(EMProtocol):
 
       if self.trackCTFs.get():
         print('\nTracking used CTFs')
-        ctfSets = self.getInputCTFs()
+        ctfSets = self.getUsedCTFs()
+        self.ctfSet = self.joinSets(ctfSets)
+        self.createMicScoreOutput(self.micCountDic, ctfSet=self.ctfSet)
 
-        self.ctfSet = self.filterFilenamesSets(ctfSets)
         self.outputCTF = self.buildSetOfCTF(self.ctfSet, ctfSets)
         self._defineOutputs(usedCTFs=self.outputCTF)
 
-        self.createMicScoreOutput(self.micCountDic, ctfSet=self.ctfSet)
-
       if self.trackCoordinates.get():
         print('\nTracking used coordinates')
-        coordSets = self.getInputCoordinates()
+        coordSets = self.getOriginalCoordinates()
         downSamplingFactor = self.getDownsampling(self.outputMics, self.particlesSet)
 
         coords = self.getParticleCoordinates(self.particlesSet)
@@ -225,45 +220,60 @@ class UsedItemsTracker(EMProtocol):
   def exportAsJpg(self, itemPath, jpgPath):
     self._ih.convert(itemPath, jpgPath)
 
-  def getInputParticles(self):
-    if self.inputParticles.get() is None:
-      self.particlesCodes = self.getFurthestCodesFromNode(self.outGraph, 'root',
-                                                          nodeConditions=[('objType', 'SetOfParticles')])
-      particleSets = self.getCodesSets(self.particlesCodes)
-    else:
-      self.particlesCodes = \
-        ['{}.{}'.format(self.inputParticles.getObjValue().strId(), self.inputParticles.getExtended())]
-      particleSets = [self.inputParticles.get()]
-    return particleSets
+  def getUsedParticles(self):
+    particlesCodes = self.getFurthestCodesFromNode(self.outGraph, 'root',
+                                                   nodeConditions=[('objType', 'SetOfParticles')])
+    particleSets = self.getCodesSets(particlesCodes)
+    return particleSets, particlesCodes
 
-  def getInputMicrographs(self):
-    if self.inputMicrographs.get() is None:
+  def getOriginalParticles(self):
+    if self.originalParticles.get() is None:
+      partSamplingRate = self.particlesSet.getSamplingRate()
+      originalParticlesCodes = self.getFurthestCodesFromNode(self.outGraph, self.particlesCodes[0],
+                                                          nodeConditions=[('objType', 'SetOfParticles'),
+                                                                          ('samplingRate', partSamplingRate)])
+      particleSets = self.getCodesSets(originalParticlesCodes)
+    else:
+      originalParticlesCodes = \
+        ['{}.{}'.format(self.originalParticles.getObjValue().strId(), self.originalParticles.getExtended())]
+      particleSets = [self.originalParticles.get()]
+    return particleSets, originalParticlesCodes
+
+  def getOriginalMicrographs(self):
+    if self.originalMicrographs.get() is None:
       micCodes = self.getClosestCodesFromNode(self.outGraph, 'root',
                                               nodeConditions=[('objType', 'SetOfMicrographs')])
       print('original mics codes: ', micCodes)
       micSets = self.getCodesSets(micCodes)
     else:
-      micSets = [self.inputMicrographs.get()]
+      micSets = [self.originalMicrographs.get()]
     return micSets
 
-  def getInputCTFs(self):
-    if self.inputCTFs.get() is None:
-      ctfCodes = self.getFurthestCodesFromNode(self.outGraph, 'root',
+  def getUsedCTFs(self):
+    ctfCodes = self.getFurthestCodesFromNode(self.outGraph, 'root',
+                                            nodeConditions=[('objType', 'SetOfCTF')])
+    print('Used CTF codes: ', ctfCodes)
+    ctfSets = self.getCodesSets(ctfCodes)
+    return ctfSets
+
+  def getOriginalCTFs(self):
+    if self.originalCTFs.get() is None:
+      ctfCodes = self.getClosestCodesFromNode(self.outGraph, 'root',
                                               nodeConditions=[('objType', 'SetOfCTF')])
       print('Original CTF codes: ', ctfCodes)
       ctfSets = self.getCodesSets(ctfCodes)
     else:
-      ctfSets = [self.inputCTFs.get()]
+      ctfSets = [self.originalCTFs.get()]
     return ctfSets
 
-  def getInputCoordinates(self):
-    if self.inputCoordinates.get() is None:
+  def getOriginalCoordinates(self):
+    if self.originalCoordinates.get() is None:
       coordCodes = self.getClosestCodesFromNode(self.outGraph, 'root',
                                                 nodeConditions=[('objType', 'SetOfCoordinates')])
       print('Original Coordinate codes: ', coordCodes)
       coordSets = self.getCodesSets(coordCodes)
     else:
-      coordSets = [self.inputCoordinates.get()]
+      coordSets = [self.originalCoordinates.get()]
     return coordSets
 
   def getLongestPath(self, outGraph, node1, node2):
@@ -324,11 +334,11 @@ class UsedItemsTracker(EMProtocol):
         ids.add(part.getObjId())
     return ids
 
-  def getUnused(self, usedParticlesSets, firstParticlesSets):
+  def getUnused(self, usedParticlesSets, originalParticlesSets):
     usedParticlesIds = self.joinParticleSetsIds(usedParticlesSets)
     notParticles, notUsedIds = [], []
 
-    for particleSet in firstParticlesSets:
+    for particleSet in originalParticlesSets:
       for part in particleSet:
         if not part.getObjId() in usedParticlesIds and not part.getObjId() in notUsedIds:
           cPart = part.clone()
@@ -336,16 +346,16 @@ class UsedItemsTracker(EMProtocol):
           notUsedIds.append(cPart.getObjId())
 
     notParticlesSet = self.createScipionSet(notParticles, '_unused')
-    notParticlesSet.copyInfo(firstParticlesSets[0])
+    notParticlesSet.copyInfo(originalParticlesSets[0])
     return notParticlesSet
 
-  def joinSetsOfParticles(self, particlesSets):
-    if len(particlesSets) == 1:
-      return particlesSets[0]
-    elif len(particlesSets) > 1:
+  def joinSets(self, sets):
+    if len(sets) == 1:
+      return sets[0]
+    elif len(sets) > 1:
       #todo: efectively join sets of particles
-      print('Warning: several sets of used particles detected, outputing just ', particlesSets[0])
-      return particlesSets[0]
+      print('Warning: several sets of used particles detected, outputing just ', sets[0])
+      return sets[0]
 
   def getDownsampling(self, iniSet, finalSet):
     return finalSet.getSamplingRate() / iniSet.getSamplingRate()
@@ -426,17 +436,6 @@ class UsedItemsTracker(EMProtocol):
 
     micCountDic = dict(sorted(micCountDic.items()))
     return micCountDic, nMicDic
-
-  def filterFilenamesSets(self, ctfSets):
-    newCtfSet, filebases = [], []
-    for ctfSet in ctfSets:
-      for ctf in ctfSet:
-        ctfFile = ctf.getPsdFile()
-        filebase = os.path.basename(ctfFile)
-        if not filebase in filebases:
-          newCtfSet.append(ctf.clone())
-          filebases.append(filebase)
-    return newCtfSet
 
   def getNodesIds(self, nodes):
     labs = []
