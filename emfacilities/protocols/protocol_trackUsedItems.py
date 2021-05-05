@@ -26,10 +26,12 @@
 # **************************************************************************
 
 from pwem.protocols.protocol import EMProtocol
-from pwem.objects import Micrograph
+import pyworkflow.utils as pwutils
+from pwem.objects import CTFModel, Micrograph, Particle
 from pyworkflow.protocol import params
-import copy, os
+import os, shutil
 import networkx as nx
+from pwem import emlib
 
 class UsedItemsTracker(EMProtocol):
   """
@@ -37,6 +39,7 @@ class UsedItemsTracker(EMProtocol):
   generate a final volume
   """
   _label = 'Track used items'
+  _ih = emlib.image.ImageHandler()
 
   def __init__(self, **kwargs):
     EMProtocol.__init__(self, **kwargs)
@@ -47,6 +50,9 @@ class UsedItemsTracker(EMProtocol):
                   pointerClass='Volume', allowsNull=False,
                   label="Input volumes",
                   help='Select the sets of volumes to track their used items')
+    form.addParam('saveJPG', params.BooleanParam, default=False,
+                  label="Save images as JPG",
+                  help='Save micrographs and particles as jpg')
 
     form.addSection(label='Tracking')
     form.addParam('trackParticles', params.BooleanParam, default=True,
@@ -101,10 +107,13 @@ class UsedItemsTracker(EMProtocol):
 
   # --------------------------- INSERT steps functions ----------------------
   def _insertAllSteps(self):
-      self._insertFunctionStep('getTracksStep')
+      self._insertFunctionStep('getOutputGraphStep')
       self._insertFunctionStep('getUsedItemsStep')
 
-  def getTracksStep(self):
+      if self.saveJPG.get():
+        self._insertFunctionStep('saveJPGsStep')
+
+  def getOutputGraphStep(self):
     self.project = self.getProject()
 
     self.inpDic, self.outDic = self.buildInputsDic(self.project), self.buildOutputsDic(self.project)
@@ -113,59 +122,109 @@ class UsedItemsTracker(EMProtocol):
 
   def getUsedItemsStep(self):
     particleSets = self.getInputParticles()
-    particlesSet = self.joinSetsOfParticles(particleSets)
-    partSamplingRate = particlesSet.getSamplingRate()
+    self.particlesSet = self.joinSetsOfParticles(particleSets)
+    partSamplingRate = self.particlesSet.getSamplingRate()
     firstParticlesCodes = self.getFurthestCodesFromNode(self.outGraph, self.particlesCodes[0],
                                                         nodeConditions=[('objType', 'SetOfParticles'),
                                                                         ('samplingRate', partSamplingRate)])
     firstParticlesSets = self.getCodesSets(firstParticlesCodes)
+    print('Used particles code: ', self.particlesCodes)
     print('Original particles code: ', firstParticlesCodes)
-    notParticlesSet = self.getUnused(particleSets, firstParticlesSets)
+    self.notParticlesSet = self.getUnused(particleSets, firstParticlesSets)
 
     if self.trackParticles.get():
       print('\nTracking used particles')
-      self._defineOutputs(usedParticles=particlesSet)
-      self._defineOutputs(unusedParticles=notParticlesSet)
+      self._defineOutputs(usedParticles=self.particlesSet)
+      self._defineOutputs(unusedParticles=self.notParticlesSet)
 
     if self.trackMics.get():
       print('\nTracking used micrographs')
       #todo: join the sets of particles or join the created outs
-      particlesSet = self.joinSetsOfParticles(particleSets)
       micSets = self.getInputMicrographs()
 
       micDic = self.buildMicDic(micSets)
-      micCountDic = self.countParticlesPerMic(particlesSet, micDic)
-      outFile = self._getExtraPath('micScores.tsv')
-      self.createMicScoreOutput(micCountDic, outFile)
-      print('Number of used particles per micrographs written in ', outFile)
+      self.micCountDic, micDic = self.countParticlesPerMic(self.particlesSet, micDic)
+      self.createMicScoreOutput(self.micCountDic)
 
-      outputMics = self.buildSetOfMics(micDic, micSets)
-      self._defineOutputs(usedMicrographs=outputMics)
+      self.outputMics = self.buildSetOfMics(micDic, micSets)
+      self._defineOutputs(usedMicrographs=self.outputMics)
 
       if self.trackCTFs.get():
         print('\nTracking used CTFs')
         ctfSets = self.getInputCTFs()
 
-        ctfSet = self.filterFilenamesSets(ctfSets)
-        outputCTF = self.buildSetOfCTF(ctfSet, ctfSets)
-        self._defineOutputs(usedCTFs=outputCTF)
+        self.ctfSet = self.filterFilenamesSets(ctfSets)
+        self.outputCTF = self.buildSetOfCTF(self.ctfSet, ctfSets)
+        self._defineOutputs(usedCTFs=self.outputCTF)
+
+        self.createMicScoreOutput(self.micCountDic, ctfSet=self.ctfSet)
 
       if self.trackCoordinates.get():
         print('\nTracking used coordinates')
         coordSets = self.getInputCoordinates()
-        downSamplingFactor = self.getDownsampling(outputMics, particlesSet)
+        downSamplingFactor = self.getDownsampling(self.outputMics, self.particlesSet)
 
-        coords = self.getParticleCoordinates(particlesSet)
+        coords = self.getParticleCoordinates(self.particlesSet)
         coords = self.scaleCoords(coords, downSamplingFactor)
-        outputCoordinates = self.buildSetOfCoordinates(outputMics, coords, coordSets, '_used')
+        outputCoordinates = self.buildSetOfCoordinates(self.outputMics, coords, coordSets, '_used')
         self._defineOutputs(usedCoordinates=outputCoordinates)
 
-        notCoords = self.getParticleCoordinates(notParticlesSet)
+        notCoords = self.getParticleCoordinates(self.notParticlesSet)
         notCoords = self.scaleCoords(notCoords, downSamplingFactor)
-        notOutputCoordinates = self.buildSetOfCoordinates(outputMics, notCoords, coordSets, '_unused')
+        notOutputCoordinates = self.buildSetOfCoordinates(self.outputMics, notCoords, coordSets, '_unused')
         self._defineOutputs(unusedCoordinates=notOutputCoordinates)
 
-  # --------------------------- STEPS functions -----------------------------
+  def saveJPGsStep(self):
+    if self.trackParticles.get():
+      self.saveSetAsJPG(self.particlesSet, self._getExtraPath('usedParticles'))
+
+    if self.trackMics.get():
+      self.saveSetAsJPG(self.outputMics, self._getExtraPath('usedMics'))
+      self.createMicScoreOutput(self.micCountDic, jpg=True)
+
+      if self.trackCTFs.get():
+        self.saveSetAsJPG(self.outputCTF, self._getExtraPath('usedCTFs'))
+        self.createMicScoreOutput(self.micCountDic, ctfSet=self.ctfSet, jpg=True)
+
+  # --------------------------- UTILS functions -----------------------------
+  def saveSetAsJPG(self, scipionSet, outDir):
+    if os.path.exists(outDir):
+      shutil.rmtree(outDir)
+    os.mkdir(outDir)
+
+    for item in scipionSet:
+      cItem = item.clone()
+      if isinstance(cItem, Particle):
+        itemId = cItem.getObjId()
+        itemPath = cItem.getLocation()
+        itemName = cItem.getBaseName()
+        jpgPath = outDir + '/' + pwutils.replaceExt(itemName, 'jpg').replace('.jpg', '_{}.jpg'.format(itemId))
+
+      elif isinstance(cItem, Micrograph):
+        itemPath = cItem.getLocation()
+        itemName = cItem.getBaseName()
+        jpgPath = outDir + '/' + pwutils.replaceExt(itemName, 'jpg')
+
+      elif isinstance(cItem, CTFModel):
+        itemPath = cItem.getPsdFile()
+        itemPath = self.convertPSDFile(itemPath)
+        itemName = itemPath.split('/')[-1]
+        jpgPath = outDir + '/' + pwutils.replaceExt(itemName, 'jpg')
+
+      self.exportAsJpg(itemPath, jpgPath)
+
+  def convertPSDFile(self, psdFile):
+    psd = self._ih.read(psdFile)
+    psd.convertPSD()
+
+    psdName = psdFile.split('/')[-1]
+    outFile = self._getTmpPath(psdName)
+    psd.write(outFile)
+    return outFile
+
+  def exportAsJpg(self, itemPath, jpgPath):
+    self._ih.convert(itemPath, jpgPath)
+
   def getInputParticles(self):
     if self.inputParticles.get() is None:
       self.particlesCodes = self.getFurthestCodesFromNode(self.outGraph, 'root',
@@ -181,6 +240,7 @@ class UsedItemsTracker(EMProtocol):
     if self.inputMicrographs.get() is None:
       micCodes = self.getClosestCodesFromNode(self.outGraph, 'root',
                                               nodeConditions=[('objType', 'SetOfMicrographs')])
+      print('original mics codes: ', micCodes)
       micSets = self.getCodesSets(micCodes)
     else:
       micSets = [self.inputMicrographs.get()]
@@ -190,6 +250,7 @@ class UsedItemsTracker(EMProtocol):
     if self.inputCTFs.get() is None:
       ctfCodes = self.getFurthestCodesFromNode(self.outGraph, 'root',
                                               nodeConditions=[('objType', 'SetOfCTF')])
+      print('Original CTF codes: ', ctfCodes)
       ctfSets = self.getCodesSets(ctfCodes)
     else:
       ctfSets = [self.inputCTFs.get()]
@@ -199,6 +260,7 @@ class UsedItemsTracker(EMProtocol):
     if self.inputCoordinates.get() is None:
       coordCodes = self.getClosestCodesFromNode(self.outGraph, 'root',
                                                 nodeConditions=[('objType', 'SetOfCoordinates')])
+      print('Original Coordinate codes: ', coordCodes)
       coordSets = self.getCodesSets(coordCodes)
     else:
       coordSets = [self.inputCoordinates.get()]
@@ -322,13 +384,36 @@ class UsedItemsTracker(EMProtocol):
       outputMics.append(mic)
     return outputMics
 
-  def createMicScoreOutput(self, micCountDic, outFile):
+  def createMicScoreOutput(self, micCountDic, ctfSet=None, jpg=False):
+    outFile = self._getExtraPath('micScores.tsv')
     with open(outFile, 'w') as f:
-      for micFile in micCountDic:
-        f.write('{}\t{}\n'.format(micFile, micCountDic[micFile]))
+      if ctfSet is None:
+        f.write('Micrograph filename\tNumber of particles\n')
+        for micFile in micCountDic:
+          if jpg:
+            micName = pwutils.replaceExt(micFile, 'jpg').split('/')[-1]
+          else:
+            micName = micFile.split('/')[-1]
+          f.write('{}\t{}\n'.format(micName, micCountDic[micFile]))
+
+      else:
+        f.write('Micrograph filename\tNumber of particles\tPSD file\t'
+                'DefocusU\tDefocusV\n')
+        for ctf in ctfSet:
+          mic = ctf.getMicrograph()
+          micFile = mic.getFileName()
+          if jpg:
+            micName = pwutils.replaceExt(micFile, 'jpg').split('/')[-1]
+            psdName = pwutils.replaceExt(ctf.getPsdFile(), 'jpg').split('/')[-1]
+          else:
+            micName, psdName = micFile.split('/')[-1], ctf.getPsdFile().split('/')[-1]
+          f.write('{}\t{}\t{}\t{}\t{}\n'.format(micName, micCountDic[micFile],
+                                                psdName, ctf.getDefocusU(), ctf.getDefocusV()))
+
 
   def countParticlesPerMic(self, particlesSet, micDic):
-    micCountDic = {}
+    micCountDic, nMicDic = {}, {}
+
     for part in particlesSet:
       micId = part.getMicId()
       if micId in micDic:
@@ -337,9 +422,10 @@ class UsedItemsTracker(EMProtocol):
           micCountDic[micFile] += 1
         else:
           micCountDic[micFile] = 1
+          nMicDic[micId] = micFile
 
     micCountDic = dict(sorted(micCountDic.items()))
-    return micCountDic
+    return micCountDic, nMicDic
 
   def filterFilenamesSets(self, ctfSets):
     newCtfSet, filebases = [], []
@@ -464,52 +550,6 @@ class UsedItemsTracker(EMProtocol):
     objType = outObj.__str__().split()[0]
     #print('Code: {}\nType: {}'.format(code, objType))
     return objType
-
-  def getUpperSetCodes(self, allOutCodes, setType = None):
-    '''Select the set code which contain a setType object at Upper level (counting from earlier protocols)'''
-    upper = -10000
-    upperCodes = set([])
-    for codeTrack in allOutCodes:
-      for i in range(-1, -len(codeTrack), -1):
-        if i < upper: break
-
-        code = codeTrack[i]
-        codeType = self.getCodeType(code)
-        if codeType == setType:
-          if i == upper:
-            upperCodes.add(code)
-          elif i > upper:
-            upperCodes, upper = {code}, i
-
-    return upperCodes
-
-  def getLowerSetCodes(self, allOutCodes, setType = None):
-    '''Select the set code which contain a setType object at lower level (counting from earlier protocols)'''
-    lower = 10000
-    lowerCodes = set([])
-    for codeTrack in allOutCodes:
-      for i in range(-1, -len(codeTrack), -1):
-        if i > lower: break
-
-        code = codeTrack[i]
-        codeType = self.getCodeType(code)
-        if codeType == setType:
-          if i == lower:
-            lowerCodes.add(code)
-          elif i < lower:
-            lowerCodes, lower = {code}, i
-
-    return lowerCodes
-
-  def filterTracks(self, tracks, codes):
-    '''Filter the tracks which do not contain the specified codes'''
-    ntracks = []
-    for t in tracks:
-      for code in codes:
-        if code in t:
-          ntracks.append(t)
-          break
-    return ntracks
 
   def getCodesSets(self, codes):
     sets = []
