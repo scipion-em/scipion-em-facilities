@@ -148,7 +148,7 @@ class ProtMonitor2dStreamer(ProtMonitor):
             micId = particle.getMicId()
             partId = particle.getObjId()
             subset.append(particle)
-            self.info("micId: %03d, particle: %05s, size: %s"
+            self.debug("micId: %03d, particle: %05s, size: %s"
                       % (micId, partId, subset.getSize()))
 
             # Check the following after finding particles of a new micrograph
