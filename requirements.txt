@@ -3,3 +3,7 @@ nvidia-ml-py3
 pytz
 paramiko
 influxdb
+joblib
+networkx
+numpy
+scipion-em-xmipp
