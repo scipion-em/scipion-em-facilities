@@ -96,12 +96,14 @@ class ReportHtml:
         """ Returns the path of the customized template at
         config/execution.summary.html or the standard scipion HTML template"""
         # Try if there is a customized template
-        template = os.path.join(basename(pwutils.Config.SCIPION_CONFIG),
+        template = os.path.join(os.path.dirname(pwutils.Config.SCIPION_CONFIG),
                                 'execution.summary.html')
 
         if not os.path.exists(template):
+            print("Customized HTML template not found at %s." % template)
             template = os.path.join(Plugin.getPluginTemplateDir(),
                                     'execution.summary.template.html')
+            print("Using provided one at %s." % template)
         else:
             print("Customized HTML template found at %s." % template)
         return template
@@ -158,6 +160,15 @@ class ReportHtml:
             - ext: extension of the thumbnail images. Defaults to png.
             - micIdSet: mic indexes to use
         """
+        def getMicSet(alignedProt):
+            # TODO get this output names from Protocol constants
+            if hasattr(alignedProt, 'outputMicrographsDoseWeighted'):
+                return alignedProt.outputMicrographsDoseWeighted
+            elif hasattr(alignedProt, 'outputMicrographs'):
+                return alignedProt.outputMicrographs
+            else:
+                return None
+
         # get psd thumbs from ctfData
         if ctfData is not None:
             for i in range(thumbsDone, len(ctfData[PSD_PATH])):
@@ -171,8 +182,8 @@ class ReportHtml:
         if self.alignProtocol is not None:
             getMicFromCTF = False
             updatedProt = getUpdatedProtocol(self.alignProtocol)
-            if hasattr(updatedProt, 'outputMicrographs'):
-                outputSet = updatedProt.outputMicrographs
+            outputSet = getMicSet(updatedProt)
+            if outputSet is not None:
                 if micIdSet is None:
                     micIdSet = list(outputSet.getIdSet())
             else:

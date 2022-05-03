@@ -32,7 +32,7 @@ import pwem
 
 from .constants import *
 
-__version__ = "3.0.0"
+__version__ = "3.0.3"
 _logo = "scipion_icon.gif"
 _references = ["delaRosaTrevin201693"]
 
