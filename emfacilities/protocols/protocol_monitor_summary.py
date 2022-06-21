@@ -144,7 +144,7 @@ class ProtMonitorSummary(ProtMonitor):
                       default=False,
                       help="Use grafana+influx vs apache for reports")
         form.addParam('publishCmd', params.StringParam, default='',
-                      condition='doInflux == False',
+                      condition='doInflux == True',
                       label="Publish command",
                       help="Specify a command to publish the template. "
                            "You can use the special token %(REPORT_FOLDER)s "
