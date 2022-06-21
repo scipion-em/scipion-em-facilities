@@ -214,6 +214,12 @@ class ProtMonitorSummary(ProtMonitor):
         # create report dir
         pwutils.makePath(self.reportDir)
 
+        pathRepoSummary = self._getPath("pathRepo.txt")
+        pathRepoSummary = open(pathRepoSummary, "w")
+        pathRepoSummary.write("HTML path to summary: " + self.reportPath)
+        pathRepoSummary.close()
+
+
     def _getAlignProtocol(self):
         for protPointer in self.inputProtocols:
             prot = protPointer.get()
@@ -324,3 +330,14 @@ class ProtMonitorSummary(ProtMonitor):
             htmlReport.setUp()
 
         return htmlReport
+    def _summary(self):
+        summary = []
+        pathRepoSummary = self._getPath("pathRepo.txt")
+        if not os.path.exists(pathRepoSummary):
+            summary.append("No summary file yet.")
+        else:
+            pathRepoSummary = open(pathRepoSummary, "r")
+            for line in pathRepoSummary.readlines():
+                summary.append(line.rstrip())
+            pathRepoSummary.close()
+        return summary
