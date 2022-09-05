@@ -149,7 +149,7 @@ class ReportHtml:
                 and self.alignProtocol._doComputeMicThumbnail()):
             self.micThumbSymlinks = True
 
-    def getThumbPaths(self, thumbsDone=0, ctfData=None, ext='png', micIdSet=None):
+    def getThumbPaths(self, thumbsDone=0, ctfData=None, ext='jpg', micIdSet=None):
         """Adds to self.thumbPaths the paths to the report thumbnails
            that come from the alignment and/or ctf protocol.
 
@@ -271,9 +271,7 @@ class ReportHtml:
                 if self.micThumbSymlinks:
                     pwutils.copyFile(self.thumbPaths[MIC_PATH][i], dstImgPath)
                 else:
-                    ih.computeThumbnail(self.thumbPaths[MIC_PATH][i],
-                                        dstImgPath, scaleFactor=micScaleFactor,
-                                        flipOnY=True)
+                    ih.convert(self.thumbPaths[MIC_PATH][i], pwutils.replaceExt(dstImgPath, "jpg"))
 
             # shift plots
             if SHIFT_THUMBS in self.thumbPaths:
@@ -293,15 +291,13 @@ class ReportHtml:
                             psdImg1 = ih.read(srcImgPath)
                             psdImg1.convertPSD()
                             psdImg1.write(dstImgPath)
-                            ih.computeThumbnail(dstImgPath, dstImgPath,
-                                                scaleFactor=1, flipOnY=True)
+                            ih.convert(dstImgPath, pwutils.replaceExt(dstImgPath, "jpg"))
                         else:
                             pwutils.copyFile(srcImgPath, dstImgPath)
                 else:
                     dstImgPath = join(self.reportDir, self.thumbPaths[PSD_THUMBS][i])
                     if not exists(dstImgPath):
-                        ih.computeThumbnail(self.thumbPaths[PSD_PATH][i],
-                                            dstImgPath, scaleFactor=1, flipOnY=True)
+                        ih.convert(self.thumbPaths[PSD_PATH][i], pwutils.replaceExt(dstImgPath, "jpg"))
 
         return
 

@@ -444,37 +444,18 @@ class ReportInflux:
                 tags['section'] = 'ctf'
                 pointsDict = {}
                 source.append(point['shiftPlotPathLocal']) # shift plot
-                source.append(point['psdPathLocalPng'])    # psd image
-                source.append(point['micPathLocalPng'])    # micrograph
+                source.append(pwutils.replaceExt(point['psdPathLocalPng'], 'jpg'))    # psd image
+                source.append(pwutils.replaceExt(point['micPathLocalPng'], 'jpg'))    # micrograph
 
-                # default value 512
-                try:
-                    X, Y, Z, N = self.ih.getDimensions(point['psdPathLocal'])
-                except:
-                    print("file %s does not exist"% point['psdPathLocal'])
-                if X > 512:
-                    scaleFactor = X // 512
-                else:
-                    scaleFactor = 1
+                self.ih.convert(point['psdPathLocal'], pwutils.replaceExt(point['psdPathLocalPng'], 'jpg'))
 
-                self.ih.computeThumbnail(point['psdPathLocal'], point['psdPathLocalPng'],
-                                    scaleFactor=scaleFactor, flipOnY=True)
-
-                X, Y, Z, N = self.ih.getDimensions(point['micPathLocal'])
-                if X > 512:
-                    scaleFactor = X // 512
-                else:
-                    scaleFactor = 1
-                self.ih.computeThumbnail(point['micPathLocal'], point['micPathLocalPng'],
-                                    scaleFactor=scaleFactor, flipOnY=True)
+                self.ih.convert(point['micPathLocal'], pwutils.replaceExt(point['micPathLocalPng'], 'jpg'))
 
                 # add files to transfer list
                 target.append(os.path.join(self.projectName,
                                            basename(point['shiftPlotPathLocal'])))
-                target.append(os.path.join(self.projectName,
-                                           basename(point['psdPathLocalPng'])))
-                target.append(os.path.join(self.projectName,
-                                           basename(point['micPathLocalPng'])))
+                target.append(os.path.join(self.projectName, basename(pwutils.replaceExt(point['psdPathLocalPng'], 'jpg'))))
+                target.append(os.path.join(self.projectName, basename(pwutils.replaceExt(point['micPathLocalPng'], 'jpg'))))
                 #
                 point['transferImage'] = True
                 pointsDict['time'] = point['time']
@@ -482,6 +463,8 @@ class ReportInflux:
                 del point['time']
                 del point['section']
                 del point['id']
+                point['micPath'] = point['micPath'].replace('.png', '.jpg')
+                point['psdPath'] = point['psdPath'].replace('.png', '.jpg')
                 pointsDict['fields'] = point
                 pointsDict['tags'] = tags
                 pointsDict['measurement'] = self.projectName
