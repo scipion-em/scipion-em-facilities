@@ -442,8 +442,8 @@ class SystemMonitorPlotter(EmPlotter):
 
 
     def animate(self, i=0):  # do NOT remove i, i is a counter
-                             # each call to animate sends increases the
-                             # value by 1. It is not used here but
+                             # each call to animate  increases the
+                             # value of i by 1. 'i' is not used here but
                              # is a mandatory argument to the function
         if self.stop:
             return
