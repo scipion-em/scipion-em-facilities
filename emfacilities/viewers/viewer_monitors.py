@@ -40,6 +40,10 @@ from pwem.viewers.plotter import EmPlotter
 import emfacilities.protocols as monitorProt
 from emfacilities.protocols.protocol_monitor_system import MonitorSystem
 
+# anim is a object created by FuncAnimation. 
+# The object created by FuncAnimation must be assigned to a global 
+# variable apparently; if it's assigned to a local variable,  nothing will happen.
+anim = None 
 
 class ProtMonitorCTFViewer(pwviewer.Viewer):
     _environments = [pwviewer.DESKTOP_TKINTER]
@@ -71,7 +75,7 @@ class CtfMonitorPlotter(EmPlotter):
         self.stop = False
 
     def _getTitle(self):
-        return ("Use scrool wheel to change view window (win=%d)\n "
+        return ("Use mouse scroll wheel to change view window (win=%d)\n "
                 "S stops, C continues plotting" % self.win)
 
     def onscroll(self, event):
@@ -90,7 +94,6 @@ class CtfMonitorPlotter(EmPlotter):
         EmPlotter.show(self)
 
     def press(self, event):
-
         sys.stdout.flush()
         if event.key == 'S':
             self.stop = True
@@ -180,7 +183,7 @@ class MovieGainMonitorPlotter(EmPlotter):
         self.stop = False
 
     def _getTitle(self):
-        return ("Use scrool wheel to change view window (win=%d)\n "
+        return ("Use scroll wheel to change view window (win=%d)\n "
                 "S stops, C continues plotting" % self.win)
 
     def onscroll(self, event):
@@ -324,13 +327,12 @@ class SystemMonitorPlotter(EmPlotter):
         self.nifName = nifName
 
     def _getTitle(self):
-        return ("Use scrool wheel to change view window (win=%d)\n "
+        return ("Use scroll wheel to change view window (win=%d)\n "
                 "S stops, C continues plotting. Toggle ON/OFF GPU_X "
                 "by pressing X\n"
                 "c/n/d toggle ON-OFF cpu/network/disk usage\n" % self.win)
 
     def onscroll(self, event):
-
         if event.button == 'up':
             self.win += self.step
         else:
@@ -344,7 +346,8 @@ class SystemMonitorPlotter(EmPlotter):
         self.animate()
         EmPlotter.show(self)
 
-    def press(self, event):
+    def onpress(self, event):
+
         def numericKey(key):
             self.colorChanged = True
             number = int(key)
@@ -437,11 +440,13 @@ class SystemMonitorPlotter(EmPlotter):
         active_fig_managers = plt._pylab_helpers.Gcf.figs.values()
         return fig not in active_fig_managers
 
-    def animate(self, i=0):  # do NOT remove i
 
+    def animate(self, i=0):  # do NOT remove i, i is a counter
+                             # each call to animate sends increases the
+                             # value by 1. It is not used here but
+                             # is a mandatory argument to the function
         if self.stop:
             return
-
         data = self.monitor.getData()
         self.x = data['idValues']
         for k, v in self.lines.items():
@@ -461,6 +466,24 @@ class SystemMonitorPlotter(EmPlotter):
         self.ax.legend(loc=2).get_frame().set_alpha(0.5)
 
     def paint(self, labels):
+        # The object created by FuncAnimation, that is 'anim', must be assigned to a global variable 
+        # apparently; if it's assigned to a local variable, nothing will happen.
+        global anim
+        def on_press(event):
+            """I have no idea why but  mpl_connect fails
+             if a direct call to self.onpress is done"""
+            self.onpress(event)
+
+        def on_scroll(event):
+            """I have no idea why but this mpl_connect fails
+             if a direct call to self.onscroll is done"""
+            self.onscroll(event)
+
+        def animate(i=0):
+            """I have no idea why but this mpl_connect fails
+             if a direct call to self.animate is done"""
+            self.animate(i)
+
         for label in labels:
             labelValue = self.monitor.getData()[label]
             color = self.color[label]
@@ -468,11 +491,13 @@ class SystemMonitorPlotter(EmPlotter):
                                               color=color)
         self.ax.legend()
         anim = animation.FuncAnimation(
-            self.fig, self.animate,
-            interval=self.monitor.samplingInterval * 1000)  # miliseconds
+            self.fig, animate,
+            interval=1000)  # miliseconds
+#            interval=self.monitor.samplingInterval * 1000)  # miliseconds
 
-        self.fig.canvas.mpl_connect('scroll_event', self.onscroll)
-        self.fig.canvas.mpl_connect('key_press_event', self.press)
+
+        self.fig.canvas.mpl_connect('scroll_event', on_scroll)
+        self.fig.canvas.mpl_connect('key_press_event', on_press)
         EmPlotter.show(self)
 
     def show(self):
