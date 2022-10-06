@@ -492,8 +492,7 @@ class SystemMonitorPlotter(EmPlotter):
         self.ax.legend()
         anim = animation.FuncAnimation(
             self.fig, animate,
-            interval=1000)  # miliseconds
-#            interval=self.monitor.samplingInterval * 1000)  # miliseconds
+            interval=self.monitor.samplingInterval * 1000)  # miliseconds
 
 
         self.fig.canvas.mpl_connect('scroll_event', on_scroll)
