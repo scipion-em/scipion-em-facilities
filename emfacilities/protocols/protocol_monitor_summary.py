@@ -91,9 +91,7 @@ class ProtMonitorSummary(ProtMonitor):
                       help="Raise alarm if astigmatism (defocusU-defocusV)is greater than given "
                            "value")
 
-        form.addParam('monitorTime', params.FloatParam, default=30000,
-                      label="Total Logging time (min)",
-                      help="Log during this interval")
+
 
         form.addSection('System Monitor')
         form.addParam('cpuAlert', params.FloatParam, default=101,

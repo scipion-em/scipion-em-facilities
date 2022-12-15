@@ -247,6 +247,7 @@
                             <TH>Name</TH>
                             <TH>Output</TH>
                             <TH>Number</TH>
+                            <TH>Rate</TH>
                         </TR>
                     </TABLE>
                 </DIV>
@@ -349,11 +350,11 @@
 
             // For each protocol property
             $.each(report.runs, function(index, value){
-                var line = "<TR class='protocolLine'><TD>" + value.protocolName + "</TD><TD colspan='2'></TD></TR>";
+                var line = "<TR class='protocolLine'><TD>" + value.protocolName + "</TD><TD colspan='3'></TD></TR>";
                 $(runsTable).append(line);
 
                 $.each(value.output, function(index, value){
-                    var outputLine = "<TR><TD></TD><TD>" + value.name + "</TD><TD class='center'>" + value.size + "</TD></TR>";
+                    var outputLine = "<TR><TD></TD><TD>" + value.name + "</TD><TD class='center'>" + value.size + "</TD><TD>" + value.rate + "</TD></TR>";
                     $(runsTable).append(outputLine);
 
                 });
