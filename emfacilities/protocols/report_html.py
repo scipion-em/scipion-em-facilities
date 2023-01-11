@@ -32,7 +32,7 @@ from os.path import join, exists, abspath, basename
 import numpy as np
 import multiprocessing
 from datetime import datetime
-from statistics import median, stdev
+from statistics import median, mean
 
 from pyworkflow.protocol import getUpdatedProtocol
 import pyworkflow.utils as pwutils
@@ -102,8 +102,8 @@ class ReportHtml:
 
         self.publishCmd = publishCmd
         self.refreshSecs = kwargs.get('refreshSecs', 60)
-        self.one_minute_freq_operator = self.refreshSecs / 60
-        self.five_minute_freq_operator = self.refreshSecs / 300
+        self.one_minute_freq_operator = self.refreshSecs / 60.0
+        self.five_minute_freq_operator = self.refreshSecs / 300.0
 
     def _getHTMLTemplatePath(self):
         """ Returns the path of the customized template at
@@ -349,21 +349,28 @@ class ReportHtml:
             itemsAdded = self.itemsAddedAlign
             diffItemsAdded = self.diffItemsAddedAlign
         try:
-            diffItemsAdded.append(itemsAdded[-1] - itemsAdded[-2])
-            medianDiffItems = median(diffItemsAdded)
+            diffItemsAdded.append(float(itemsAdded[-1] - itemsAdded[-2]))
+            medianDiffItems = mean(diffItemsAdded[:-1])
             threshold = self.thresholdRate * medianDiffItems
-            if medianDiffItems - threshold > diffItemsAdded[-1]:
-                statusRate = ' ↑'
-            elif medianDiffItems + threshold < diffItemsAdded[-1]:
-                statusRate = ' ↓'
+            threshold = self.thresholdRate * medianDiffItems
+            if medianDiffItems + threshold < diffItemsAdded[-1]:
+                print(medianDiffItems - threshold, diffItemsAdded[-1] )
+                statusRate = '<b> ↑ </b>'
+            elif medianDiffItems - threshold > diffItemsAdded[-1]:
+                print(medianDiffItems - threshold, diffItemsAdded[-1] )
+                statusRate = '<b> ↓  </b>'
             else:
-                statusRate = ' -'
-            rate = round(diffItemsAdded[1] * self.one_minute_freq_operator, 2)
-            rate, statusRate = self.estimateTimeRate(rate, statusRate)
+                print(medianDiffItems - threshold, diffItemsAdded[-1] )
+                statusRate = '<b> -  </b>'
+            rateFreq = round(diffItemsAdded[-1] * self.one_minute_freq_operator, 2)
+            rate, statusRate = self.estimateTimeRate(rateFreq, statusRate)
+            print('itemsAdded: {}\ndiffItemsAdded: {}\nmedianDiffItems: {} threshold:{}\nrateFreq: {}, rate: {}, statusRate: {}\n'.format(
+                itemsAdded, diffItemsAdded, medianDiffItems, threshold, rateFreq, rate, statusRate))
+
             return rate, statusRate
         except Exception as e:
             print('e: {}'.format(e))
-            return 'NAN', ' '
+            return '-', ' '
 
     def estimateTimeRate(self, diffItem, statusRate):
         rate1m = round(diffItem * self.one_minute_freq_operator, 2)
@@ -372,7 +379,8 @@ class ReportHtml:
             print('ZERO')
             rate = ''
             statusRate = 'No items added last {} secs'.format(self.refreshSecs)
-        rate = str(rate1m) + ' items/min'
+        else:
+            rate = str(rate1m) + ' items/min'
         #rate = str(rate5m) + ' items/5 mins'
         return rate, statusRate
 
