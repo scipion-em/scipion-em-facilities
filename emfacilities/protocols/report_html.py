@@ -358,7 +358,7 @@ class ReportHtml:
             elif medianDiffItems - threshold > diffItemsAdded[-1]:
                 statusRate = '<b> ↓  </b>'
             else:
-                statusRate = '<b> -  </b>'
+                statusRate = '<b> --  </b>'
             rateFreq = round(diffItemsAdded[-1] * self.one_minute_freq_operator, 2)
             rate, statusRate = self.estimateTimeRate(rateFreq, statusRate)
             # print('itemsAdded: {}\ndiffItemsAdded: {}\nmedianDiffItems: {} threshold:{}\nrateFreq: {}, rate: {}, statusRate: {}\n'.format(
