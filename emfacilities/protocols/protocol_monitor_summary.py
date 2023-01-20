@@ -91,9 +91,7 @@ class ProtMonitorSummary(ProtMonitor):
                       help="Raise alarm if astigmatism (defocusU-defocusV)is greater than given "
                            "value")
 
-        form.addParam('monitorTime', params.FloatParam, default=30000,
-                      label="Total Logging time (min)",
-                      help="Log during this interval")
+
 
         form.addSection('System Monitor')
         form.addParam('cpuAlert', params.FloatParam, default=101,
@@ -144,7 +142,6 @@ class ProtMonitorSummary(ProtMonitor):
                       default=False,
                       help="Use grafana+influx vs apache for reports")
         form.addParam('publishCmd', params.StringParam, default='',
-                      condition='doInflux == False',
                       label="Publish command",
                       help="Specify a command to publish the template. "
                            "You can use the special token %(REPORT_FOLDER)s "
@@ -213,6 +210,12 @@ class ProtMonitorSummary(ProtMonitor):
         self.reportPath = os.path.join(self.reportDir, 'index.html')
         # create report dir
         pwutils.makePath(self.reportDir)
+
+        pathRepoSummary = self._getPath("pathRepo.txt")
+        pathRepoSummary = open(pathRepoSummary, "w")
+        pathRepoSummary.write("HTML path to summary: " + self.reportPath)
+        pathRepoSummary.close()
+
 
     def _getAlignProtocol(self):
         for protPointer in self.inputProtocols:
@@ -324,3 +327,14 @@ class ProtMonitorSummary(ProtMonitor):
             htmlReport.setUp()
 
         return htmlReport
+    def _summary(self):
+        summary = []
+        pathRepoSummary = self._getPath("pathRepo.txt")
+        if not os.path.exists(pathRepoSummary):
+            summary.append("No summary file yet.")
+        else:
+            pathRepoSummary = open(pathRepoSummary, "r")
+            for line in pathRepoSummary.readlines():
+                summary.append(line.rstrip())
+            pathRepoSummary.close()
+        return summary

@@ -32,6 +32,7 @@ from os.path import join, exists, abspath, basename
 import numpy as np
 import multiprocessing
 from datetime import datetime
+from statistics import median, mean
 
 from pyworkflow.protocol import getUpdatedProtocol
 import pyworkflow.utils as pwutils
@@ -77,6 +78,16 @@ class ReportHtml:
         self.movieGainMonitor = movieGainMonitor
         self.lastThumbIndex = 0
         self.thumbsReady = 0
+        self.itemsAddedMovies = []
+        self.itemsAddedAlign = []
+        self.itemsAddedCTF = []
+
+        self.diffItemsAddedMovies = []
+        self.diffItemsAddedAlign = []
+        self.diffItemsAddedCTF = []
+
+        self.thresholdRate = 0.1
+
         self.thumbPaths = {MIC_THUMBS: [],
                            PSD_THUMBS: [],
                            SHIFT_THUMBS: [],
@@ -91,6 +102,8 @@ class ReportHtml:
 
         self.publishCmd = publishCmd
         self.refreshSecs = kwargs.get('refreshSecs', 60)
+        self.one_minute_freq_operator = self.refreshSecs / 60.0
+        self.five_minute_freq_operator = self.refreshSecs / 300.0
 
     def _getHTMLTemplatePath(self):
         """ Returns the path of the customized template at
@@ -149,7 +162,7 @@ class ReportHtml:
                 and self.alignProtocol._doComputeMicThumbnail()):
             self.micThumbSymlinks = True
 
-    def getThumbPaths(self, thumbsDone=0, ctfData=None, ext='png', micIdSet=None):
+    def getThumbPaths(self, thumbsDone=0, ctfData=None, ext='jpg', micIdSet=None):
         """Adds to self.thumbPaths the paths to the report thumbnails
            that come from the alignment and/or ctf protocol.
 
@@ -271,9 +284,7 @@ class ReportHtml:
                 if self.micThumbSymlinks:
                     pwutils.copyFile(self.thumbPaths[MIC_PATH][i], dstImgPath)
                 else:
-                    ih.computeThumbnail(self.thumbPaths[MIC_PATH][i],
-                                        dstImgPath, scaleFactor=micScaleFactor,
-                                        flipOnY=True)
+                    ih.convert(self.thumbPaths[MIC_PATH][i], pwutils.replaceExt(dstImgPath, "jpg"))
 
             # shift plots
             if SHIFT_THUMBS in self.thumbPaths:
@@ -293,15 +304,13 @@ class ReportHtml:
                             psdImg1 = ih.read(srcImgPath)
                             psdImg1.convertPSD()
                             psdImg1.write(dstImgPath)
-                            ih.computeThumbnail(dstImgPath, dstImgPath,
-                                                scaleFactor=1, flipOnY=True)
+                            ih.convert(dstImgPath, pwutils.replaceExt(dstImgPath, "jpg"))
                         else:
                             pwutils.copyFile(srcImgPath, dstImgPath)
                 else:
                     dstImgPath = join(self.reportDir, self.thumbPaths[PSD_THUMBS][i])
                     if not exists(dstImgPath):
-                        ih.computeThumbnail(self.thumbPaths[PSD_PATH][i],
-                                            dstImgPath, scaleFactor=1, flipOnY=True)
+                        ih.convert(self.thumbPaths[PSD_PATH][i], pwutils.replaceExt(dstImgPath, "jpg"))
 
         return
 
@@ -327,6 +336,50 @@ class ReportHtml:
         # zipped.append((aboveThresh, "> %0.1f" % (maxDefocus)))
 
         return zipped
+
+    def rateCalculation(self, protocol):
+        statusRate = ''
+        if protocol == 'importMovies':
+            itemsAdded = self.itemsAddedMovies
+            diffItemsAdded = self.diffItemsAddedMovies
+        elif protocol == 'CTF':
+            itemsAdded = self.itemsAddedCTF
+            diffItemsAdded = self.diffItemsAddedCTF
+        elif protocol == 'Align':
+            itemsAdded = self.itemsAddedAlign
+            diffItemsAdded = self.diffItemsAddedAlign
+        try:
+            diffItemsAdded.append(float(itemsAdded[-1] - itemsAdded[-2]))
+            medianDiffItems = mean(diffItemsAdded[:-1])
+            threshold = self.thresholdRate * medianDiffItems
+            if medianDiffItems + threshold < diffItemsAdded[-1]:
+                statusRate = '<b> ↑ </b>'
+                #statusRate = '<b style="color:#15c51f";> ↑ </b>' #Why does it not work???
+            elif medianDiffItems - threshold > diffItemsAdded[-1]:
+                statusRate = '<b> ↓  </b>'
+            else:
+                statusRate = '<b> --  </b>'
+            rateFreq = round(diffItemsAdded[-1] * self.one_minute_freq_operator, 2)
+            rate, statusRate = self.estimateTimeRate(rateFreq, statusRate)
+            # print('itemsAdded: {}\ndiffItemsAdded: {}\nmedianDiffItems: {} threshold:{}\nrateFreq: {}, rate: {}, statusRate: {}\n'.format(
+            #     itemsAdded, diffItemsAdded, medianDiffItems, threshold, rateFreq, rate, statusRate))
+
+            return rate, statusRate
+        except Exception as e:
+            #print('e: {}'.format(e))
+            return '-', ' '
+
+    def estimateTimeRate(self, diffItem, statusRate):
+        rate1m = round(diffItem * self.one_minute_freq_operator, 2)
+        rate5m = round(diffItem * self.five_minute_freq_operator, 2)
+        if round(rate1m, 2) == 0.00 or round(rate5m, 1) == 0.00:
+            print('ZERO')
+            rate = ''
+            statusRate = 'No items added last {} secs'.format(self.refreshSecs)
+        else:
+            rate = str(rate1m) + ' items/min'
+        #rate = str(rate5m) + ' items/5 mins'
+        return rate, statusRate
 
     def getTimeSeries(self, data):
         from .protocol_monitor_ctf import (PHASE_SHIFT, TIME_STAMP,
@@ -368,6 +421,7 @@ class ReportHtml:
         return list(zip(values, binEdges))
 
     def generate(self, finished):
+        self.movieStatus = "-"
         reportTemplate = self.getHTMLReportText()
 
         if not reportTemplate:
@@ -384,29 +438,50 @@ class ReportHtml:
                 acquisitionLines += ','
 
             acquisitionLines += '{propertyName:"%s", propertyValue:"%s"}' % item
-
+        protocolName = ''
         runLines = ''
         wasProtocol = None
         for obj in self.provider.getObjects():
-
             # If it's a protocol
             isProtocol = True if obj.name else False
 
             if isProtocol:
+                protocolName = obj.name
                 if runLines != '':
                     runLines += ']},'
                 runLines += '{protocolName: "%s", output:[' % obj.name
             else:
-                if not wasProtocol:
-                    runLines += ','
-                runLines += '{name: "%s",  size:"%s"}' % (obj.output,
-                                                          obj.outSize)
+                try:
+                    if not wasProtocol:
+                        runLines += ','
+                    if obj.output.find('outputMovies') != -1 and \
+                            protocolName.find("import movies") != -1:#TODOO: si cambia el nombre del protocolo ya no entra
+                        self.itemsAddedMovies.append(obj.outSize)
+                        rate, statusRate = self.rateCalculation('importMovies')
+                    elif obj.output.find('outputCTF') != -1 and \
+                        protocolName.find("CTF") != -1 or \
+                            protocolName.find("ctf") != -1:
+                        self.itemsAddedCTF.append(obj.outSize)
+                        rate, statusRate = self.rateCalculation('CTF')
+                    elif protocolName.find("Align") != -1 or\
+                        protocolName.find("align") != -1:
+                        if obj.output.find("outputMicrographs") != -1:
+                            #print('obj.output: {}'.format(obj.output))
+                            self.itemsAddedAlign.append(obj.outSize)
+                        rate, statusRate = self.rateCalculation('Align')
+                    else:
+                        break
+                    runLines += '{name: "%s",  size: "%s", rate: "%s"}' % (
+                        obj.output,
+                        obj.outSize,
+                        str(statusRate) + ' ' + str(rate))
+                except Exception as e:
+                    print(e)
 
             wasProtocol = isProtocol
-
         # End the runLines JSON object
         runLines += ']}'
-
+        print(runLines, "\n")
         # Ctf monitor chart data
         data = {} if self.ctfMonitor is None else self.ctfMonitor.getData()
 
