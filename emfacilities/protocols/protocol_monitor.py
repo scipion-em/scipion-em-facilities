@@ -56,6 +56,10 @@ class ProtMonitor(EMProtocol):
                       label="Sampling Interval (sec)",
                       help="Take one sample each *samplingInterval* seconds")
 
+        form.addParam('monitorTime', params.FloatParam, default=34560,
+                      label="Total Logging time (min)",
+                      help="Log during this interval. 21 days by default")
+
     def _sendMailParams(self, form):
         g = form.addGroup('Email settings')
 
