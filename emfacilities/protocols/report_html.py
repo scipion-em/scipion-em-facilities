@@ -39,7 +39,6 @@ import pyworkflow.utils as pwutils
 
 from pwem.emlib.image import ImageHandler
 
-from emfacilities import Plugin
 from .summary_provider import SummaryProvider
 
 # --------------------- CONSTANTS -----------------------------------
@@ -114,7 +113,7 @@ class ReportHtml:
 
         if not os.path.exists(template):
             print("Customized HTML template not found at %s." % template)
-            template = os.path.join(Plugin.getPluginTemplateDir(),
+            template = os.path.join(self.protocol.getPlugin().getPluginTemplateDir(),
                                     'execution.summary.template.html')
             print("Using provided one at %s." % template)
         else:

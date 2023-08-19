@@ -1,8 +1,9 @@
-version 3.0.4
+V3.0.5
+- Fix: TypeError: getPluginTemplateDir() missing 1 required positional argument: 'self'
+V3.0.4
 - new protocol track used items 
 - fixing important bugs in the html
 - New rate column to track the pace of the acquisition
 - Get rid of the dependency to eman2 for the thumbnails generation
 
-17-september-2019 - First version of em as a plugin
 
