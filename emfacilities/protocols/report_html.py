@@ -36,6 +36,7 @@ from statistics import median, mean
 
 from pyworkflow.protocol import getUpdatedProtocol
 import pyworkflow.utils as pwutils
+from pwem.utils import runProgram
 
 from pwem.emlib.image import ImageHandler
 
@@ -58,7 +59,7 @@ SHIFT_THUMBS = 'imgShiftThumbs'
 MIC_ID = 'micId'
 DEFOCUS_HIST_BIN_WIDTH = 0.5
 RESOLUTION_HIST_BIN_WIDTH = 0.5
-
+THUMBNAIL_FACTOR = 0.1
 
 class ReportHtml:
     """ Create an html report with a summary of the processing.
@@ -263,6 +264,21 @@ class ReportHtml:
                     if PSD_PATH in self.thumbPaths:
                         self.thumbPaths.pop(PSD_PATH, None)
 
+
+    def createThumbnail(self, pathOriginal, destPath):
+        # currentDir = os.getcwd()
+        # relativePath = os.path.join(currentDir, pathOriginal)
+        # path = os.path.splitext(os.path.basename(pathOriginal))[0] +  "_THUMB.jpg"
+        # outPath = os.path.join(self._getExtraPath(), path)
+        # outPath = os.path.join(currentDir, outPath)
+
+        args = '-i "%s" ' % self._getExtraPath(pathOriginal)
+        args += '-o "%s" ' % destPath
+        args += '--factor {}'.format(THUMBNAIL_FACTOR)
+
+        runProgram('xmipp_image_resize', args)
+
+
     def generateReportImages(self, firstThumbIndex=0, micScaleFactor=6):
         """ Function to generate thumbnails for the report. Uses data from
         self.thumbPaths.
@@ -284,7 +300,9 @@ class ReportHtml:
                 if self.micThumbSymlinks:
                     pwutils.copyFile(self.thumbPaths[MIC_PATH][i], dstImgPath)
                 else:
-                    ih.convert(self.thumbPaths[MIC_PATH][i], pwutils.replaceExt(dstImgPath, "jpg"))
+                    self.createThumbnail(self.thumbPaths[PSD_PATH][i],
+                                         pwutils.replaceExt(dstImgPath, "jpg"))
+                    #ih.convert(self.thumbPaths[MIC_PATH][i], pwutils.replaceExt(dstImgPath, "jpg"))
 
             # shift plots
             if SHIFT_THUMBS in self.thumbPaths:
@@ -304,13 +322,15 @@ class ReportHtml:
                             psdImg1 = ih.read(srcImgPath)
                             psdImg1.convertPSD()
                             psdImg1.write(dstImgPath)
-                            ih.convert(dstImgPath, pwutils.replaceExt(dstImgPath, "jpg"))
+                            self.createThumbnail(dstImgPath, pwutils.replaceExt(dstImgPath, "jpg"))
+                            #ih.convert(dstImgPath, pwutils.replaceExt(dstImgPath, "jpg"))
                         else:
                             pwutils.copyFile(srcImgPath, dstImgPath)
                 else:
                     dstImgPath = join(self.reportDir, self.thumbPaths[PSD_THUMBS][i])
                     if not exists(dstImgPath):
-                        ih.convert(self.thumbPaths[PSD_PATH][i], pwutils.replaceExt(dstImgPath, "jpg"))
+                        self.createThumbnail(self.thumbPaths[PSD_PATH][i], pwutils.replaceExt(dstImgPath,"jpg"))
+                        #ih.convert(self.thumbPaths[PSD_PATH][i], pwutils.replaceExt(dstImgPath, "jpg"))
 
         return
 
