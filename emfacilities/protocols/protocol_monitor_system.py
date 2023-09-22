@@ -87,9 +87,9 @@ class ProtMonitorSystem(ProtMonitor):
                       help="Raise alarm if swap allocated is greater "
                            "than given percentage")
 
-        form.addParam('monitorTime', params.FloatParam, default=300,
-                      label="Total Logging time (min)",
-                      help="Log during this interval")
+        #form.addParam('monitorTime', params.FloatParam, default=300,
+        #              label="Total Logging time (min)",
+        #              help="Log during this interval")
 
         ProtMonitor._sendMailParams(self, form)
         group = form.addGroup('GPU')
