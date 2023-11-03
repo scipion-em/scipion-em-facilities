@@ -568,14 +568,10 @@ class ReportHtml:
             self.info("Publishing the report:")
             cmd = self.publishCmd % {'REPORT_FOLDER': self.reportDir}
             self.info(cmd)
-            # os.system(cmd)
             p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE,
                                  stderr=subprocess.PIPE)
             output, err = p.communicate()
-            self.info('Hello')
             self.info(output)
-            self.info(err)
-
             if err is not None:
-                self.info(err)
+                self.info('Error publishing the report: {}'.format(err))
         return reportFinished
