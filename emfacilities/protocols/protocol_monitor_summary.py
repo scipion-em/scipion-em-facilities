@@ -356,4 +356,4 @@ class ProtMonitorSummary(ProtMonitor):
                 errors.append('The publish command {} is wrong, please check it{}'.format(cmd, err.decode("utf-8")))
 
 
-            return errors
+        return errors
