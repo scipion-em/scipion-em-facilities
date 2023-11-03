@@ -343,15 +343,16 @@ class ProtMonitorSummary(ProtMonitor):
 
     def validate(self):
         errors = []
-        self.reportDir = os.path.abspath(
-            self._getExtraPath(self.getProject().getShortName()))
-        pwutils.makePath(self.reportDir)
+        if self.publishCmd:
+            self.reportDir = os.path.abspath(
+                self._getExtraPath(self.getProject().getShortName()))
+            pwutils.makePath(self.reportDir)
 
-        cmd = self.publishCmd % {'REPORT_FOLDER': self.reportDir}
-        p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE,
-                             stderr=subprocess.PIPE)
-        output, err = p.communicate()
-        if err is not None:
-            errors.append('Error publishing the report: {}'.format(err))
+            cmd = self.publishCmd % {'REPORT_FOLDER': self.reportDir}
+            p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE,
+                                 stderr=subprocess.PIPE)
+            output, err = p.communicate()
+            if err is not None:
+                errors.append('Error publishing the report: {}'.format(err))
 
-        return errors
+            return errors
