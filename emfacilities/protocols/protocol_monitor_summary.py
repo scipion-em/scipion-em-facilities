@@ -343,7 +343,7 @@ class ProtMonitorSummary(ProtMonitor):
 
     def validate(self):
         errors = []
-        if self.publishCmd:
+        if self.publishCmd.get() != '':
             self.reportDir = os.path.abspath(
                 self._getExtraPath(self.getProject().getShortName()))
             pwutils.makePath(self.reportDir)
