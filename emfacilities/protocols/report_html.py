@@ -571,7 +571,7 @@ class ReportHtml:
             p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE,
                                  stderr=subprocess.PIPE)
             output, err = p.communicate()
-            self.info(output.decode("utf-8") )
+            self.info('{}\n'.format(output.decode("utf-8")))
             if err.decode("utf-8") != '':
                 self.info('Error publishing the report: {}'.format(err.decode("utf-8") ))
         return reportFinished
