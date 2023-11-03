@@ -343,7 +343,11 @@ class ProtMonitorSummary(ProtMonitor):
 
     def validate(self):
         errors = []
-        cmd = self.publishCmd % {'REPORT_FOLDER': self.publishCmd.get()}
+        self.reportDir = os.path.abspath(
+            self._getExtraPath(self.getProject().getShortName()))
+        self.reportPath = os.path.join(self.reportDir, 'index.html')
+
+        cmd = self.publishCmd % {'REPORT_FOLDER': self.reportDir}
         p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE,
                              stderr=subprocess.PIPE)
         output, err = p.communicate()
