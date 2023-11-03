@@ -572,6 +572,8 @@ class ReportHtml:
             p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE,
                                  stderr=subprocess.PIPE)
             output, err = p.communicate()
+            self.info('Hello')
+            self.indo(output)
             if err is not None:
                 self.info(err)
         return reportFinished
