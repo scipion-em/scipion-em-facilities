@@ -573,7 +573,9 @@ class ReportHtml:
                                  stderr=subprocess.PIPE)
             output, err = p.communicate()
             self.info('Hello')
-            self.indo(output)
+            self.info(output)
+            self.info(err)
+
             if err is not None:
                 self.info(err)
         return reportFinished
