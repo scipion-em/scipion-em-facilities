@@ -348,11 +348,12 @@ class ProtMonitorSummary(ProtMonitor):
                 self._getExtraPath(self.getProject().getShortName()))
             pwutils.makePath(self.reportDir)
 
-            cmd = self.publishCmd % {'REPORT_FOLDER': self.reportDir}
+            cmd = str(self.publishCmd) % {'REPORT_FOLDER': self.reportDir}
             p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE,
                                  stderr=subprocess.PIPE)
             output, err = p.communicate()
             if err is not None:
-                errors.append('Error publishing the report: {}'.format(err))
+                errors.append('The publish command is wrong, please check it\n{}'.format(err))
+
 
             return errors
