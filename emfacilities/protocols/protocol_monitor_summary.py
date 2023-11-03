@@ -352,7 +352,7 @@ class ProtMonitorSummary(ProtMonitor):
             p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE,
                                  stderr=subprocess.PIPE)
             output, err = p.communicate()
-            if err.decode("utf-8") =='':
+            if err.decode("utf-8") != '':
                 errors.append('The publish command {} is wrong, please check it{}'.format(cmd, err.decode("utf-8")))
 
 
