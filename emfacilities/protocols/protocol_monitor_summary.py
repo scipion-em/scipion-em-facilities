@@ -352,7 +352,7 @@ class ProtMonitorSummary(ProtMonitor):
             p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE,
                                  stderr=subprocess.PIPE)
             output, err = p.communicate()
-            if err is not None:
+            if err =='' or err==b'':
                 errors.append('The publish command {} is wrong, please check it{}'.format(cmd, err))
 
 
