@@ -32,6 +32,7 @@ from pyworkflow import VERSION_1_1
 
 from pwem.protocols import ProtCTFMicrographs, ProtAlignMovies
 from pwem import Domain
+import subprocess
 
 from .report_influx import ReportInflux
 from .report_html import ReportHtml
@@ -338,3 +339,15 @@ class ProtMonitorSummary(ProtMonitor):
                 summary.append(line.rstrip())
             pathRepoSummary.close()
         return summary
+
+
+    def validate(self):
+        errors = []
+        cmd = self.publishCmd % {'REPORT_FOLDER': self.publishCmd.get()}
+        p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE,
+                             stderr=subprocess.PIPE)
+        output, err = p.communicate()
+        if err is not None:
+            errors.append('Error publishing the report: {}'.format(err))
+
+        return errors
