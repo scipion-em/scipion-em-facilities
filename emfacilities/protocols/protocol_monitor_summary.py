@@ -353,7 +353,7 @@ class ProtMonitorSummary(ProtMonitor):
                                  stderr=subprocess.PIPE)
             output, err = p.communicate()
             if err is not None:
-                errors.append('The publish command is wrong, please check it\n{}'.format(err))
+                errors.append('The publish command is wrong, please check it{}'.format(err))
 
 
             return errors
