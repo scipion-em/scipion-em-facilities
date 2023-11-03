@@ -569,7 +569,7 @@ class ReportHtml:
             cmd = self.publishCmd % {'REPORT_FOLDER': self.reportDir}
             self.info(cmd)
             os.system(cmd)
-            p = subprocess.Popen(cmd, shell=False, stdout=subprocess.PIPE,
+            p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE,
                                  stderr=subprocess.PIPE)
             output, err = p.communicate()
             if err is not None:
