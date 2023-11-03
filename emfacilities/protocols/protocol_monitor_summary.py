@@ -350,10 +350,10 @@ class ProtMonitorSummary(ProtMonitor):
 
             cmd = str(self.publishCmd) % {'REPORT_FOLDER': self.reportDir}
             p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE,
-                                 stderr=subprocess.PIPE).decode("utf-8")
+                                 stderr=subprocess.PIPE)
             output, err = p.communicate()
-            if err =='':
-                errors.append('The publish command {} is wrong, please check it{}'.format(cmd, err))
+            if err.decode("utf-8") =='':
+                errors.append('The publish command {} is wrong, please check it{}'.format(cmd, err.decode("utf-8")))
 
 
             return errors
