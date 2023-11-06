@@ -1,3 +1,8 @@
+V3.0.6
+- Monitor summary: validation for publish command
+- Monitor summary: verbose error if publish command fails
+- Updated workflow template
+
 V3.0.5
 - Fix: TypeError: getPluginTemplateDir() missing 1 required positional argument: 'self'
 V3.0.4
