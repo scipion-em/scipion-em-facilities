@@ -151,6 +151,8 @@ class UsedItemsTracker(EMProtocol):
     if self.saveJPG.get():
       self._insertFunctionStep('saveJPGsStep', prerequisites=allSteps)
 
+
+
   def getOutputGraphStep(self):
     self.project = self.getProject()
 
