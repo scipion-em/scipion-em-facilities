@@ -30,7 +30,7 @@ import pyworkflow.utils as pwutils
 import pyworkflow.protocol.params as params
 from pyworkflow import VERSION_1_1
 
-from pwem.protocols import ProtCTFMicrographs, ProtAlignMovies
+from pwem.protocols import ProtCTFMicrographs, ProtAlignMovies, ProtParticlePicking #protocol_particles_picking
 from pwem import Domain
 import subprocess
 
@@ -40,6 +40,18 @@ from .protocol_monitor import ProtMonitor, Monitor
 from .protocol_monitor_ctf import MonitorCTF
 from .protocol_monitor_movie_gain import MonitorMovieGain
 from .protocol_monitor_system import MonitorSystem
+
+from pwem import emlib, Domain
+from pwem.protocols import EMProtocol
+from pwem.objects import Class2D, Class3D, Image, CTFModel, Volume, Micrograph, Movie, Particle, SetOfCoordinates
+from pyworkflow.protocol import params
+from pyworkflow.object import String, Set
+import pyworkflow.utils as pwutils
+from .. import Plugin
+from pyworkflow.project import config
+from PIL import Image as ImagePIL
+from PIL import ImageDraw
+import subprocess
 
 
 class ProtMonitorSummary(ProtMonitor):
@@ -135,7 +147,6 @@ class ProtMonitorSummary(ProtMonitor):
 
         form.addSection('Mail settings')
         ProtMonitor._sendMailParams(self, form)
-
         form.addSection('HTML Report')
 
         form.addParam("doInflux", params.BooleanParam,
@@ -146,7 +157,7 @@ class ProtMonitorSummary(ProtMonitor):
                       label="Publish command",
                       help="Specify a command to publish the template. "
                            "You can use the special token %(REPORT_FOLDER)s "
-                           "that will be replaced with the report folder. "
+                           "that will be replaced with the report folder."
                            "For example: \n"
                            "rsync -avL %(REPORT_FOLDER)s "
                            "scipion@webserver:public_html/")
@@ -217,6 +228,12 @@ class ProtMonitorSummary(ProtMonitor):
         pathRepoSummary.write("HTML path to summary: " + self.reportPath)
         pathRepoSummary.close()
 
+    def _getPickingProtocol(self):
+        for protPointer in self.inputProtocols:
+            prot = protPointer.get()
+            if isinstance(prot, ProtParticlePicking):
+                return prot
+        return None
 
     def _getAlignProtocol(self):
         for protPointer in self.inputProtocols:
@@ -224,6 +241,71 @@ class ProtMonitorSummary(ProtMonitor):
             if isinstance(prot, ProtAlignMovies):
                 return prot
         return None
+
+    """def _plotMicroParticle(self , output):
+        self.outputName = output.getObjName()
+        outputDict = {}
+        outputDict[self.OUTPUT_NAME] = output.getObjName()
+        outputDict[self.OUTPUT_TYPE] = output.getClassName()
+
+        items = []
+
+        # If output is a Set get a list with all items
+        if isinstance(output, Set):
+            outputDict[self.OUTPUT_SIZE] = output.getSize()
+            count = 0
+            if isinstance(output, SetOfCoordinates):
+                coordinatesDict = {}
+                for micrograph in output.getMicrographs(): # get the first three micrographs
+                    count += 1
+                    # apply a low pass filter
+                    args = " -i %s -o %s --fourier low_pass %f" % (micrograph.getLocation()[1], self._getTmpPath(os.path.basename(micrograph.getFileName())), 0.05)
+                    getEnviron = Domain.importFromPlugin('xmipp3', 'Plugin', doRaise=True).getEnviron
+                    self.runJob('xmipp_transform_filter', args, env=getEnviron())
+                    # save jpg
+                    repPath = self.getTopLevelPath(self.DIR_IMAGES, '%s_%s' % (self.outputName, pwutils.replaceBaseExt(micrograph.getFileName(), 'jpg')))
+                    self._ih.convert(self._getTmpPath(os.path.basename(micrograph.getFileName())), os.path.join(self.getProject().path, repPath))
+                    coordinatesDict[micrograph.getMicName()] = {'path': repPath, 'Xdim': micrograph.getXDim(), 'Ydim': micrograph.getYDim()}
+
+                    items.append({self.ITEM_REPRESENTATION: repPath})
+                    if count == 3: break;
+
+                for coordinate in output: # for each micrograph, get its coordinates
+                    if coordinate.getMicName() in coordinatesDict:
+                        coordinatesDict[coordinate.getMicName()].setdefault('coords', []).append([coordinate.getX(), coordinate.getY()])
+
+                for micrograph, values in coordinatesDict.items(): # draw coordinates in micrographs jpgs
+                    if 'coords' in values:
+                        image = ImagePIL.open(values['path']).convert('RGB')
+                        W_mic = values['Xdim']
+                        H_mic = values['Ydim']
+                        W_jpg, H_jpg = image.size
+                        draw = ImageDraw.Draw(image)
+                        r = W_jpg / 256
+                        for coord in values['coords']:
+                            x = coord[0] * (W_jpg / W_mic)
+                            y = coord[1] * (H_jpg / H_mic)
+                            draw.ellipse((x - r, y - r, x + r, y + r), fill=(0, 255, 0))
+                        image.save(values['path'], quality=95)
+                        print("image saved")
+
+            else:
+                for item in output.iterItems():
+                    itemDict = self.getItemDict(item)
+                    items.append(itemDict)
+                    count += 1
+                    # In some types get only a limited number of items
+                    if (isinstance(item, Micrograph) or isinstance(item, Movie) or isinstance(item, CTFModel)) and count == 3: break;
+                    if isinstance(item, Particle) and count == 15: break;
+
+        # If it is a single object then only one item is present
+        else:
+            items.append(self.getItemDict(output))
+
+        outputDict[self.OUTPUT_ITEMS] = items
+
+        return outputDict"""
+
 
     def _getCtfProtocol(self):
         for protPointer in self.inputProtocols:
@@ -305,8 +387,9 @@ class ProtMonitorSummary(ProtMonitor):
                                doDiskIO=self.doDiskIO.get(),
                                nif=MonitorSystem.getNifsNameList()[
                                    self.netInterfaces.get()])
-
+        
         return sysMon
+    
 
     def getReportPath(self):
         return self.reportPath
@@ -316,6 +399,8 @@ class ProtMonitorSummary(ProtMonitor):
         ctfMonitor = ctfMonitor or self.createCtfMonitor()
         sysMonitor = sysMonitor or self.createSystemMonitor()
         movieGainMonitor = movieGainMonitor or self.createMovieGainMonitor()
+
+        #self._plotMicroParticle(self)
         self.createReportDir()
         if self.doInflux:
             htmlReport = ReportInflux(self, ctfMonitor, sysMonitor, movieGainMonitor,
@@ -327,7 +412,73 @@ class ProtMonitorSummary(ProtMonitor):
                                 refreshSecs=self.samplingInterval.get())
             htmlReport.setUp()
 
+
         return htmlReport
+    
+    """def getMicroGraphs(self):
+        self.outputName = output.getObjName()
+        outputDict = {}
+        outputDict[self.OUTPUT_NAME] = output.getObjName()
+        outputDict[self.OUTPUT_TYPE] = output.getClassName()
+
+        items = []
+
+        # If output is a Set get a list with all items
+        if isinstance(output, Set):
+            outputDict[self.OUTPUT_SIZE] = output.getSize()
+            count = 0
+            if isinstance(output, SetOfCoordinates):
+                coordinatesDict = {}
+                for micrograph in output.getMicrographs(): # get the first three micrographs
+                    count += 1
+                    # apply a low pass filter
+                    args = " -i %s -o %s --fourier low_pass %f" % (micrograph.getLocation()[1], self._getTmpPath(os.path.basename(micrograph.getFileName())), 0.05)
+                    getEnviron = Domain.importFromPlugin('xmipp3', 'Plugin', doRaise=True).getEnviron
+                    self.runJob('xmipp_transform_filter', args, env=getEnviron())
+                    # save jpg
+                    repPath = self.getTopLevelPath(self.DIR_IMAGES, '%s_%s' % (self.outputName, pwutils.replaceBaseExt(micrograph.getFileName(), 'jpg')))
+                    self._ih.convert(self._getTmpPath(os.path.basename(micrograph.getFileName())), os.path.join(self.getProject().path, repPath))
+                    coordinatesDict[micrograph.getMicName()] = {'path': repPath, 'Xdim': micrograph.getXDim(), 'Ydim': micrograph.getYDim()}
+
+                    items.append({self.ITEM_REPRESENTATION: repPath})
+                    if count == 3: break;
+
+                for coordinate in output: # for each micrograph, get its coordinates
+                    if coordinate.getMicName() in coordinatesDict:
+                        coordinatesDict[coordinate.getMicName()].setdefault('coords', []).append([coordinate.getX(), coordinate.getY()])
+
+                for micrograph, values in coordinatesDict.items(): # draw coordinates in micrographs jpgs
+                    if 'coords' in values:
+                        image = ImagePIL.open(values['path']).convert('RGB')
+                        W_mic = values['Xdim']
+                        H_mic = values['Ydim']
+                        W_jpg, H_jpg = image.size
+                        draw = ImageDraw.Draw(image)
+                        r = W_jpg / 256
+                        for coord in values['coords']:
+                            x = coord[0] * (W_jpg / W_mic)
+                            y = coord[1] * (H_jpg / H_mic)
+                            draw.ellipse((x - r, y - r, x + r, y + r), fill=(0, 255, 0))
+                        image.save(values['path'], quality=95)
+
+            else:
+                for item in output.iterItems():
+                    itemDict = self.getItemDict(item)
+                    items.append(itemDict)
+                    count += 1
+                    # In some types get only a limited number of items
+                    if (isinstance(item, Micrograph) or isinstance(item, Movie) or isinstance(item, CTFModel)) and count == 3: break;
+                    if isinstance(item, Particle) and count == 15: break;
+
+        # If it is a single object then only one item is present
+        else:
+            items.append(self.getItemDict(output))
+
+        outputDict[self.OUTPUT_ITEMS] = items
+
+        return outputDict"""
+    
+
     def _summary(self):
         summary = []
         pathRepoSummary = self._getPath("pathRepo.txt")
