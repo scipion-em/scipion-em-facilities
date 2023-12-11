@@ -50,6 +50,7 @@ from .summary_provider import SummaryProvider
 MIC_PATH = 'imgMicPath'
 PSD_PATH = 'imgPsdPath'
 SHIFT_PATH = 'imgShiftPath'
+PICK_PATH = 'imgPickPath'
 # These constants are the name of the folders where thumbnails
 # for the html report will be stored. They are also the keys to
 # used in the execution.summary.template.html to read data (where
@@ -57,6 +58,7 @@ SHIFT_PATH = 'imgShiftPath'
 MIC_THUMBS = 'imgMicThumbs'
 PSD_THUMBS = 'imgPsdThumbs'
 SHIFT_THUMBS = 'imgShiftThumbs'
+PICK_THUMBS = 'imgPickThumbs'
 MIC_ID = 'micId'
 DEFOCUS_HIST_BIN_WIDTH = 0.5
 RESOLUTION_HIST_BIN_WIDTH = 0.5
@@ -95,15 +97,16 @@ class ReportHtml:
         self.thumbPaths = {MIC_THUMBS: [],
                            PSD_THUMBS: [],
                            SHIFT_THUMBS: [],
+                           PICK_THUMBS:[],
                            MIC_PATH: [],
                            SHIFT_PATH: [],
                            PSD_PATH: [],
-                           MIC_ID: []}#,
-                           #COORD: []}
+                           PICK_PATH:[],
+                           MIC_ID: [],
+                           }
         self.coordSet = []
         # Get the html template to be used, by default use the one
         # in scipion/config/templates
-        print("inside template")
         self.template = self._getHTMLTemplatePath()
 
         self.publishCmd = publishCmd
@@ -168,26 +171,21 @@ class ReportHtml:
                 and self.alignProtocol._doComputeMicThumbnail()):
             self.micThumbSymlinks = True
 
-    def getCoordset(pickingprotocol):
+    def getCoordset(self):
         # TODO get this output names from Protocol constants
-            print("inside function78")
-            if hasattr(pickingprotocol, 'outputCoordinates'):
-                print("inside function77")
-                return pickingprotocol.outputCoordinates
-                
-            elif hasattr(pickingprotocol, 'outputCoordinates'):
-                print("inside function80")
-                return pickingprotocol.outputCoordinates
+            if hasattr(self.picking, 'outputCoordinates'):
+                return self.picking.outputCoordinates 
+            elif hasattr(self.picking, 'outputCoordinates'):
+                return self.picking.outputCoordinates
             else:
-                print("inside function81")
                 return None
             
-    def getboxsice(pickingprotocol):
+    def getboxsice(self):
         # TODO get this output names from Protocol constants
-            if hasattr(pickingprotocol, 'boxsize'):
-                return pickingprotocol.boxsize
-            elif hasattr(pickingprotocol, 'boxsize'):
-                return pickingprotocol.boxsize
+            if hasattr(self.picking, 'boxsize'):
+                return self.picking.boxsize
+            elif hasattr(self.picking, 'boxsize'):
+                return self.picking.boxsize
             else:
                 return None
 
@@ -259,6 +257,11 @@ class ReportHtml:
             self.thumbPaths[MIC_PATH].append(srcMicFn)
             self.thumbPaths[MIC_THUMBS].append(micThumbFn)
 
+            if self.picking is not None:
+                micThumbFn = join(PICK_THUMBS, pwutils.replaceExt(basename(srcMicFn), ext))
+                self.thumbPaths[PICK_PATH].append(srcMicFn)
+                self.thumbPaths[PICK_THUMBS].append(micThumbFn)
+
             shiftPlot = (getattr(mic, 'plotCart', None) or getattr(mic, 'plotGlobal', None))
             if shiftPlot is not None:
                 shiftPath = "" if shiftPlot is None else abspath(shiftPlot.getFileName())
@@ -296,7 +299,8 @@ class ReportHtml:
                     if PSD_PATH in self.thumbPaths:
                         self.thumbPaths.pop(PSD_PATH, None)
 
-    def _plotMicroParticle(self):
+
+    """def _plotMicroParticle(self):
         self.outputName = output.getObjName()
         outputDict = {}
         outputDict[self.OUTPUT_NAME] = output.getObjName()
@@ -320,6 +324,8 @@ class ReportHtml:
                     repPath = self.getTopLevelPath(self.DIR_IMAGES, '%s_%s' % (self.outputName, pwutils.replaceBaseExt(micrograph.getFileName(), 'jpg')))
                     self._ih.convert(self._getTmpPath(os.path.basename(micrograph.getFileName())), os.path.join(self.getProject().path, repPath))
                     coordinatesDict[micrograph.getMicName()] = {'path': repPath, 'Xdim': micrograph.getXDim(), 'Ydim': micrograph.getYDim()}
+                    
+                    self._getExtraPath()
 
                     items.append({self.ITEM_REPRESENTATION: repPath})
                     if count == 3: break;
@@ -358,42 +364,50 @@ class ReportHtml:
 
         outputDict[self.OUTPUT_ITEMS] = items
 
-        return outputDict
+        return outputDict"""
+    
     def plotParticlePicking(self):
+        """
+        Function to plot 2D particle Picking
+        """
         
-        print("inside function")
-        coord=self.getCoordset(self.picking)
+        coord=self.getCoordset()
 
-        boxsize=self.getboxsice(self.picking)
+        boxsize=self.getboxsice()
 
-        #mic=self.getCoordset().getMicrographs()
-
-        print("inside function2")
+        mic=self.getCoordset().getMicrographs()
         coordinatesDict = {}
-        print("inside function34")
-        print("cooroddoeodoasd",coord)
-        for coordinate in coord: # for each micrograph, get its coordinates
-                    print("inside function6")
-                    if coordinate.getMicName() in coordinatesDict:
-                        print("coordenadas dentro")
-                        coordinatesDict[coordinate.getMicName()].setdefault('coords', []).append([coordinate.getX(), coordinate.getY()])
-                        print("primera coordenada",coord)
-        print("inside function4")
 
-        """for micrograph, values in coordinatesDict.items(): # draw coordinates in micrographs jpgs
+        i=0
+        numMics = len(self.thumbPaths[MIC_PATH])
+
+        for micrograph in mic:
+            
+            if i<=numMics:
+                repPath =  join(self.reportDir, self.thumbPaths[MIC_THUMBS][i])
+                coordinatesDict[micrograph.getMicName()] = { 'path': repPath,'Xdim': micrograph.getXDim(), 'Ydim': micrograph.getYDim()}
+            i=i+1
+            
+        for coordinate in coord: # for each micrograph, get its coordinates
+                    if coordinate.getMicName() in coordinatesDict:
+                        coordinatesDict[coordinate.getMicName()].setdefault('coords', []).append([coordinate.getX(), coordinate.getY()])
+             
+        for micrograph, values in coordinatesDict.items(): # draw coordinates in micrographs jpgs
                 if 'coords' in values:
                     image = ImagePIL.open(values['path']).convert('RGB')
                     W_mic = values['Xdim']
                     H_mic = values['Ydim']
                     W_jpg, H_jpg = image.size
                     draw = ImageDraw.Draw(image)
-                    r = W_jpg / 256
+                    print("w_phge",W_jpg)
+                    r = int(boxsize)/2 
+                    border_color = (0, 255, 0)  # Set the border color here
                     for coord in values['coords']:
                         x = coord[0] * (W_jpg / W_mic)
                         y = coord[1] * (H_jpg / H_mic)
-                        draw.ellipse((x - r, y - r, x + r, y + r), fill=(0, 255, 0))
+                        draw.ellipse((x - r, y - r, x + r, y + r),outline=border_color)
                     image.save(values['path'], quality=95)
-                    print("image saved")"""
+                    print("image saved")
         
 
     def generateReportImages(self, firstThumbIndex=0, micScaleFactor=6):
@@ -413,11 +427,16 @@ class ReportHtml:
             print('Generating images for mic %d' % (i+1))
             # mic thumbnails
             dstImgPath = join(self.reportDir, self.thumbPaths[MIC_THUMBS][i])
+
             if not exists(dstImgPath):
                 if self.micThumbSymlinks:
                     pwutils.copyFile(self.thumbPaths[MIC_PATH][i], dstImgPath)
                 else:
                     ih.convert(self.thumbPaths[MIC_PATH][i], pwutils.replaceExt(dstImgPath, "jpg"))
+
+
+
+
 
             # shift plots
             if SHIFT_THUMBS in self.thumbPaths:
