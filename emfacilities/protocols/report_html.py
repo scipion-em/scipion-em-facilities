@@ -101,7 +101,7 @@ class ReportHtml:
                            MIC_PATH: [],
                            SHIFT_PATH: [],
                            PSD_PATH: [],
-                           PICK_PATH:[],
+                           PICK_PATH: [],
                            MIC_ID: [],
                            }
         self.coordSet = []
@@ -188,7 +188,6 @@ class ReportHtml:
                 return self.picking.boxsize
             else:
                 return None
-
 
     def getThumbPaths(self, thumbsDone=0, ctfData=None, ext='jpg', micIdSet=None):
         """Adds to self.thumbPaths the paths to the report thumbnails
@@ -303,43 +302,38 @@ class ReportHtml:
         """
         Function to plot 2D particle Picking
         """
-        
-        coord=self.getCoordset()
-
-        boxsize=self.getboxsice()
-
-        mic=self.getCoordset().getMicrographs()
+        coord = self.getCoordset()
+        boxsize = self.getboxsice()
+        mic = self.getCoordset().getMicrographs()
         coordinatesDict = {}
-
-        i=0
+        i = 0
         numMics = len(self.thumbPaths[MIC_PATH])
 
         for micrograph in mic:
-            
-            if i<=numMics:
-                repPath =  join(self.reportDir, self.thumbPaths[MIC_THUMBS][i])
-                coordinatesDict[micrograph.getMicName()] = { 'path': repPath,'Xdim': micrograph.getXDim(), 'Ydim': micrograph.getYDim()}
-            i=i+1
+            if i <= numMics:
+                repPath = join(self.reportDir, self.thumbPaths[MIC_THUMBS][i])
+                coordinatesDict[micrograph.getMicName()] = {'path': repPath, 'Xdim': micrograph.getXDim(),
+                                                            'Ydim': micrograph.getYDim()}
+            i = i+1
             
         for coordinate in coord: # for each micrograph, get its coordinates
-                    if coordinate.getMicName() in coordinatesDict:
-                        coordinatesDict[coordinate.getMicName()].setdefault('coords', []).append([coordinate.getX(), coordinate.getY()])
+            if coordinate.getMicName() in coordinatesDict:
+                coordinatesDict[coordinate.getMicName()].setdefault('coords', []).append([coordinate.getX(), coordinate.getY()])
              
         for micrograph, values in coordinatesDict.items(): # draw coordinates in micrographs jpgs
-                if 'coords' in values:
-                    image = ImagePIL.open(values['path']).convert('RGB')
-                    W_mic = values['Xdim']
-                    H_mic = values['Ydim']
-                    W_jpg, H_jpg = image.size
-                    draw = ImageDraw.Draw(image)
-                    r = int(boxsize)/2 
-                    border_color = (0, 255, 0)  # Set the border color here
-                    for coord in values['coords']:
-                        x = coord[0] * (W_jpg / W_mic)
-                        y = coord[1] * (H_jpg / H_mic)
-                        draw.ellipse((x - r, y - r, x + r, y + r),outline=border_color)
-                    image.save(values['path'], quality=95)
-        
+            if 'coords' in values:
+                image = ImagePIL.open(values['path']).convert('RGB')
+                W_mic = values['Xdim']
+                H_mic = values['Ydim']
+                W_jpg, H_jpg = image.size
+                draw = ImageDraw.Draw(image)
+                r = int(boxsize)/2
+                border_color = (0, 255, 0)  # Set the border color here
+                for coord in values['coords']:
+                    x = coord[0] * (W_jpg / W_mic)
+                    y = coord[1] * (H_jpg / H_mic)
+                    draw.ellipse((x - r, y - r, x + r, y + r), outline=border_color)
+                image.save(values['path'], quality=95)
 
     def generateReportImages(self, firstThumbIndex=0, micScaleFactor=6):
         """ Function to generate thumbnails for the report. Uses data from
@@ -364,10 +358,6 @@ class ReportHtml:
                     pwutils.copyFile(self.thumbPaths[MIC_PATH][i], dstImgPath)
                 else:
                     ih.convert(self.thumbPaths[MIC_PATH][i], pwutils.replaceExt(dstImgPath, "jpg"))
-
-
-
-
 
             # shift plots
             if SHIFT_THUMBS in self.thumbPaths:
@@ -470,7 +460,6 @@ class ReportHtml:
 
         # Get timeStamp
         ts = data[TIME_STAMP]
-
         timeSeries = dict()
 
         # Get phaseShift
@@ -605,7 +594,7 @@ class ReportHtml:
         thumbsLoading = numMics - self.thumbsReady
         for k in [MIC_THUMBS, SHIFT_THUMBS, PSD_THUMBS]:
             if k in self.thumbPaths:
-                data[k] = self.thumbPaths[k][:self.thumbsReady] + ['']*thumbsLoading ## aqui va el mic con las coord
+                data[k] = self.thumbPaths[k][:self.thumbsReady] + ['']*thumbsLoading
 
         data[MIC_ID] = self.thumbPaths[MIC_ID]
 

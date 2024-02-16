@@ -30,7 +30,7 @@ import pyworkflow.utils as pwutils
 import pyworkflow.protocol.params as params
 from pyworkflow import VERSION_1_1
 
-from pwem.protocols import ProtCTFMicrographs, ProtAlignMovies, ProtParticlePickingAuto #protocol_particles_picking
+from pwem.protocols import ProtCTFMicrographs, ProtAlignMovies, ProtParticlePickingAuto
 from pwem import Domain
 import subprocess
 
@@ -40,25 +40,6 @@ from .protocol_monitor import ProtMonitor, Monitor
 from .protocol_monitor_ctf import MonitorCTF
 from .protocol_monitor_movie_gain import MonitorMovieGain
 from .protocol_monitor_system import MonitorSystem
-
-from pwem import emlib, Domain
-from pwem.protocols import EMProtocol
-from pwem.objects import Class2D, Class3D, Image, CTFModel, Volume, Micrograph, Movie, Particle, SetOfCoordinates
-from pyworkflow.protocol import params
-from pyworkflow.object import String, Set
-import pyworkflow.utils as pwutils
-from .. import Plugin
-from pyworkflow.project import config
-from PIL import Image as ImagePIL
-from PIL import ImageDraw
-import subprocess
-
-from pyworkflow.protocol.constants import STATUS_NEW
-from pyworkflow.protocol.params import PointerParam
-from pyworkflow.utils.properties import Message
-
-from pwem.protocols import ProtProcessMovies
-from pwem.objects import SetOfMicrographs, SetOfMovies
 
 
 class ProtMonitorSummary(ProtMonitor):
@@ -73,7 +54,6 @@ class ProtMonitorSummary(ProtMonitor):
 
     def __init__(self, **kwargs):
         ProtMonitor.__init__(self, **kwargs)
-
         self.reportDir = ''
         self.reportPath = ''
 
@@ -111,12 +91,12 @@ class ProtMonitorSummary(ProtMonitor):
                       label="Raise Alarm if astigmatism >",
                       help="Raise alarm if astigmatism (defocusU-defocusV)is greater than given "
                            "value")
+
         form.addSection('System Monitor')
         form.addParam('cpuAlert', params.FloatParam, default=101,
                       label="Raise Alarm if CPU > XX%",
                       help="Raise alarm if memory allocated is greater "
                            "than given percentage")
-
         form.addParam('memAlert', params.FloatParam, default=101,
                       label="Raise Alarm if Memory > XX%",
                       help="Raise alarm if cpu allocated is greater "
@@ -153,7 +133,6 @@ class ProtMonitorSummary(ProtMonitor):
         form.addSection('Mail settings')
         ProtMonitor._sendMailParams(self, form)
         form.addSection('HTML Report')
-
         form.addParam("doInflux", params.BooleanParam,
                       label="use grafana/influx",
                       default=False,
@@ -166,8 +145,6 @@ class ProtMonitorSummary(ProtMonitor):
                            "For example: \n"
                            "rsync -avL %(REPORT_FOLDER)s "
                            "scipion@webserver:public_html/")
-        
-  
 
     # --------------------------- INSERT steps functions ---------------------
     def _insertAllSteps(self):
@@ -209,23 +186,12 @@ class ProtMonitorSummary(ProtMonitor):
                 sysMonitorFinished = sysMonitor.step()
                 htmlFinished = reportHtml.generate(finished)
 
-                
-                """def __init__2(self, **kwargs):
-
-                    ProtProcessMovies.__init__(self, **kwargs)
-                __init__2(self)
-                movie = self.inputMovies.get()[1].clone()
-                alignment = movie.getAlignment()
-
-                # getShifts() returns the absolute shifts from a certain reference
-                shiftListX, shiftListY = alignment.getShifts()
-                print("lista de shitfts",shiftListX,"esta es la x")"""
                 if sysMonitorFinished and htmlFinished:
                     finished = True
                     reportHtml.generate(finished)
 
             except Exception as ex:
-                print("An error happened:",ex)
+                print("An error happened:", ex)
                 import traceback
                 traceback.print_exc()
 
@@ -355,7 +321,6 @@ class ProtMonitorSummary(ProtMonitor):
         sysMonitor = sysMonitor or self.createSystemMonitor()
         movieGainMonitor = movieGainMonitor or self.createMovieGainMonitor()
 
-        #self._plotMicroParticle(self)
         self.createReportDir()
         if self.doInflux:
             htmlReport = ReportInflux(self, ctfMonitor, sysMonitor, movieGainMonitor,
@@ -366,7 +331,6 @@ class ProtMonitorSummary(ProtMonitor):
                                 self.publishCmd.get(),
                                 refreshSecs=self.samplingInterval.get())
             htmlReport.setUp()
-
 
         return htmlReport
 
