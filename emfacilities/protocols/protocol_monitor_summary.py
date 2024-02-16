@@ -30,7 +30,7 @@ import pyworkflow.utils as pwutils
 import pyworkflow.protocol.params as params
 from pyworkflow import VERSION_1_1
 
-from pwem.protocols import ProtCTFMicrographs, ProtAlignMovies
+from pwem.protocols import ProtCTFMicrographs, ProtAlignMovies, ProtParticlePickingAuto
 from pwem import Domain
 import subprocess
 
@@ -92,14 +92,11 @@ class ProtMonitorSummary(ProtMonitor):
                       help="Raise alarm if astigmatism (defocusU-defocusV)is greater than given "
                            "value")
 
-
-
         form.addSection('System Monitor')
         form.addParam('cpuAlert', params.FloatParam, default=101,
                       label="Raise Alarm if CPU > XX%",
                       help="Raise alarm if memory allocated is greater "
                            "than given percentage")
-
         form.addParam('memAlert', params.FloatParam, default=101,
                       label="Raise Alarm if Memory > XX%",
                       help="Raise alarm if cpu allocated is greater "
@@ -135,9 +132,7 @@ class ProtMonitorSummary(ProtMonitor):
 
         form.addSection('Mail settings')
         ProtMonitor._sendMailParams(self, form)
-
         form.addSection('HTML Report')
-
         form.addParam("doInflux", params.BooleanParam,
                       label="use grafana/influx",
                       default=False,
@@ -146,7 +141,7 @@ class ProtMonitorSummary(ProtMonitor):
                       label="Publish command",
                       help="Specify a command to publish the template. "
                            "You can use the special token %(REPORT_FOLDER)s "
-                           "that will be replaced with the report folder. "
+                           "that will be replaced with the report folder."
                            "For example: \n"
                            "rsync -avL %(REPORT_FOLDER)s "
                            "scipion@webserver:public_html/")
@@ -190,12 +185,13 @@ class ProtMonitorSummary(ProtMonitor):
                 # when sysmonitor done all protocols done
                 sysMonitorFinished = sysMonitor.step()
                 htmlFinished = reportHtml.generate(finished)
+
                 if sysMonitorFinished and htmlFinished:
                     finished = True
                     reportHtml.generate(finished)
 
             except Exception as ex:
-                print("An error happened:")
+                print("An error happened:", ex)
                 import traceback
                 traceback.print_exc()
 
@@ -217,6 +213,13 @@ class ProtMonitorSummary(ProtMonitor):
         pathRepoSummary.write("HTML path to summary: " + self.reportPath)
         pathRepoSummary.close()
 
+    def _getPickingProtocol(self):
+        for protPointer in self.inputProtocols:
+            prot = protPointer.get()
+            print(type(prot))
+            if isinstance(prot, ProtParticlePickingAuto):
+                return prot
+        return None
 
     def _getAlignProtocol(self):
         for protPointer in self.inputProtocols:
@@ -305,8 +308,9 @@ class ProtMonitorSummary(ProtMonitor):
                                doDiskIO=self.doDiskIO.get(),
                                nif=MonitorSystem.getNifsNameList()[
                                    self.netInterfaces.get()])
-
+        
         return sysMon
+    
 
     def getReportPath(self):
         return self.reportPath
@@ -316,6 +320,7 @@ class ProtMonitorSummary(ProtMonitor):
         ctfMonitor = ctfMonitor or self.createCtfMonitor()
         sysMonitor = sysMonitor or self.createSystemMonitor()
         movieGainMonitor = movieGainMonitor or self.createMovieGainMonitor()
+
         self.createReportDir()
         if self.doInflux:
             htmlReport = ReportInflux(self, ctfMonitor, sysMonitor, movieGainMonitor,
@@ -328,6 +333,7 @@ class ProtMonitorSummary(ProtMonitor):
             htmlReport.setUp()
 
         return htmlReport
+
     def _summary(self):
         summary = []
         pathRepoSummary = self._getPath("pathRepo.txt")
