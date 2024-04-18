@@ -29,6 +29,7 @@
 import json
 import os
 from os.path import join, exists, abspath, basename
+from pathlib import Path
 import numpy as np
 import subprocess
 import multiprocessing
@@ -181,7 +182,11 @@ class ReportHtml:
                 return alignedProt.outputMicrographs
             else:
                 return None
-
+        def getMovieSet(alignedProt):
+            if hasattr(alignedProt, 'outputMovies'):
+                return alignedProt.outputMovies
+            else:
+                return None
         # get psd thumbs from ctfData
         if ctfData is not None:
             for i in range(thumbsDone, len(ctfData[PSD_PATH])):
@@ -196,6 +201,7 @@ class ReportHtml:
             getMicFromCTF = False
             updatedProt = getUpdatedProtocol(self.alignProtocol)
             outputSet = getMicSet(updatedProt)
+            outputMovie = getMovieSet(updatedProt)
             if outputSet is not None:
                 if micIdSet is None:
                     micIdSet = list(outputSet.getIdSet())
@@ -213,7 +219,8 @@ class ReportHtml:
                 return
         else:
             return
-
+        if self.picking is not None:
+            updatedProt = getUpdatedProtocol(self.picking)
         for micId in micIdSet[thumbsDone:]:
             mic = outputSet[micId]
             if getMicFromCTF:
@@ -225,7 +232,6 @@ class ReportHtml:
             micThumbFn = join(MIC_THUMBS, pwutils.replaceExt(basename(srcMicFn), ext))
             self.thumbPaths[MIC_PATH].append(srcMicFn)
             self.thumbPaths[MIC_THUMBS].append(micThumbFn)
-
             shiftPlot = (getattr(mic, 'plotCart', None) or getattr(mic, 'plotGlobal', None))
             if shiftPlot is not None:
                 shiftPath = "" if shiftPlot is None else abspath(shiftPlot.getFileName())
@@ -262,7 +268,91 @@ class ReportHtml:
                         self.thumbPaths.pop(PSD_THUMBS, None)
                     if PSD_PATH in self.thumbPaths:
                         self.thumbPaths.pop(PSD_PATH, None)
+    
+    def serialEmFile(self):
+        """
+        Function that writes the parameters that will be used by SerialEM
+        to see if they are out of range
+        """
+        import json
+        original_path = Path(self.reportDir)
 
+        data = {} if self.ctfMonitor is None else self.ctfMonitor.getData()
+
+        # Find the 'extra' in the path and modify it
+        while original_path.name != 'extra':
+            original_path = original_path.parent
+
+        # Replace 'extra' and its follows with '/tmp'
+        modified_path = original_path / 'tmp'
+
+        # Create the folder if it doesn't exist
+        modified_path.mkdir(parents=True, exist_ok=True)
+
+        # Define the text file path within the modified folder
+        file_mic = modified_path / "defocus.txt"
+        file_phase  = modified_path / "phase.txt"
+
+        def getMicSet(alignedProt):
+            # TODO get this output names from Protocol constants
+            if hasattr(alignedProt, 'outputMicrographsDoseWeighted'):
+                return alignedProt.outputMicrographsDoseWeighted
+            elif hasattr(alignedProt, 'outputMicrographs'):
+                return alignedProt.outputMicrographs
+            else:
+                return None
+        def getMovieSet(alignedProt):
+            if hasattr(alignedProt, 'outputMovies'):
+                return alignedProt.outputMovies
+            else:
+                return None
+        updatedProt = getUpdatedProtocol(self.alignProtocol)
+        outputSet = getMicSet(updatedProt)
+        outputSetMovies = getMovieSet(updatedProt)
+
+        mic = outputSet[2]
+        mic2 = outputSet[4]
+        movie1= outputSetMovies[1]
+        
+        #print("shift de EM",mic.getAlignment().getShifts())
+        #print(" movie1 ",outputSetMovies[1].getAlignment().getShifts()) #.getShifts())
+
+
+        #print(" otro22222 ",mic.getShiftsFromOrigin())
+
+        #print("micrograph type",getUpdatedProtocol(self.alignProtocol.outputMicrographs))
+        mic=self.getCoordset().getMicrographs()
+
+        mic_number=0
+        defocus_values = {}
+        phases = {}
+        print(self.thumbPaths[MIC_THUMBS])
+        for mic in self.thumbPaths[MIC_THUMBS]:# micro name
+            defocus_U = data['defocusU'][mic_number]
+            defocus_V = data['defocusV'][mic_number]
+
+            # Append defocus values to the defocus_values dictionary
+            if mic in defocus_values:
+                # If the mic exists, append the defocus values to its list
+                defocus_values[mic].append((defocus_U, defocus_V))
+            else:
+                # If the mic doesn't exist, create a new list with the defocus values
+                defocus_values[mic] = [(defocus_U, defocus_V)]
+
+            # Retrieve the shifts
+            shifts = outputSetMovies[mic_number + 1].getAlignment().getShifts()
+            
+            # Serialize the shifts directly into JSON format
+            phases[mic_number + 1] = shifts
+
+            mic_number += 1
+        with open(file_mic, 'w') as file:
+            json.dump(defocus_values,file)
+            file.write('\n') 
+        with open(file_phase, 'w') as file:
+                json.dump(phases, file)
+                file.write('\n') 
+                
     def generateReportImages(self, firstThumbIndex=0, micScaleFactor=6):
         """ Function to generate thumbnails for the report. Uses data from
         self.thumbPaths.
@@ -528,6 +618,8 @@ class ReportHtml:
 
         reportFinished = self.thumbsReady == numMics
 
+        if data:
+            self.serialEmFile()
         def convert(o):
             if isinstance(o, np.int64): return int(o)
             raise TypeError

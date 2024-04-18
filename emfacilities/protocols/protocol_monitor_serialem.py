@@ -1,0 +1,178 @@
+# -*- coding: utf-8 -*-
+# **************************************************************************
+# *
+# * Authors:    
+# *
+# * Unidad de  Bioinformatica of Centro Nacional de Biotecnologia , CSIC
+# *
+# * This program is free software; you can redistribute it and/or modify
+# * it under the terms of the GNU General Public License as published by
+# * the Free Software Foundation; either version 2 of the License, or
+# * (at your option) any later version.
+# *
+# * This program is distributed in the hope that it will be useful,
+# * but WITHOUT ANY WARRANTY; without even the implied warranty of
+# * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# * GNU General Public License for more details.
+# *
+# * You should have received a copy of the GNU General Public License
+# * along with this program; if not, write to the Free Software
+# * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
+# * 02111-1307  USA
+# *
+# *  All comments concerning this program package may be sent to the
+# *  e-mail address 'scipion@cnb.csic.es'
+# *
+# **************************************************************************
+import os.path
+import os
+
+from pathlib import Path
+import numpy as np
+import json
+import pandas as pd
+
+import pyworkflow.utils as pwutils
+import pyworkflow.protocol.params as params
+from pyworkflow import VERSION_1_1
+
+from .protocol_monitor import ProtMonitor, Monitor
+from .protocol_monitor_summary import ProtMonitorSummary
+from pyworkflow.protocol.params import PointerParam
+
+
+
+class ProtMonitorSerialEm(ProtMonitor):
+    """ Stores values for SerialEM to read ,
+        out of the ranges defined
+    """
+    _label = 'monitor SerialEm'
+    _lastUpdateVersion = VERSION_1_1
+
+    def __init__(self, **kwargs):
+        ProtMonitor.__init__(self, **kwargs)
+        self.fileDir = ''
+        self.filePath = ''
+        self.data = pd.DataFrame()
+
+    def _defineParams(self, form):  
+
+        form.addSection('SerialEm')
+        form.addParam('monitorProt', PointerParam,
+                      pointerClass=ProtMonitorSummary,
+                      label='Trigger data protocol',
+                      help='')
+        form.addParam('filesPath', params.PathParam,
+                      label="SerialEM File directory",
+                      help="Directory to store the SerialEM txt.\n\n"
+                           "The path can also contain wildcards to select"
+                           "from several folders. \n\n"
+                           "Examples:\n"
+                           "  ~/project/data/day??_files/\n"
+                           "Each '?' represents one unknown character\n\n"
+                           "  ~/project/data/day*_files/\n"
+                           "'*' represents any number of unknown characters\n\n"
+                           "  ~/project/data/day##_files/\n"
+                           "'##' represents two digits that will be used as "
+                           "file ID\n\n"
+                           "NOTE: wildcard characters ('*', '?', '#') "
+                           "cannot appear in the actual path.)")
+        
+        form.addParam('maxGlobalShift', params.FloatParam, default=1000,
+                      label="maxGlobalShift in a micrograph allowed",
+                      help="")
+        form.addParam('maxFrameShift', params.FloatParam, default=100,
+                      label="Max Frame Shift allowed ",
+                      help="maxFrameShift")
+        form.addParam('maxDefocusU', params.FloatParam, default=0.0,
+                      label="Max Defocus U allowed",
+                      help="maxDefocusU")
+        form.addParam('maxDefocusV', params.FloatParam, default=0.0,
+                      label="Max Defocus V allowed",
+                      help="maxDefocusV")
+        
+        form.addParam('thresholdshift', params.FloatParam, default=10,
+                      label="threshold shift ",
+                      help="")
+        form.addParam('threshold defocus', params.FloatParam, default=5,
+                      label="threshold defocus",
+                      help="")
+    
+
+    # --------------------------- INSERT steps functions ---------------------
+    def _insertAllSteps(self):
+        self._insertFunctionStep('monitorStep1')
+
+    # --------------------------- STEPS functions ----------------------------
+    def monitorStep1(self):
+        
+        self.fileDir=self.monitorProt.get()._getExtraPath()
+        self.filePath = Path(str(self.filesPath)) / "serialEM.csv"
+        
+        data_dict = {'maxGlobalShift': 0, 'maxFrameShift': 0, 'maxDefocusU': 0, 'maxDefocusV': 0}
+        self.data = pd.DataFrame(data_dict, index=[0])
+
+        def readFile(self):
+            original_path = Path(self.fileDir)
+
+            # Get the file paths
+            file_mic = original_path / "tmp" / "defocus.txt"
+            file_phase = original_path / "tmp" / "phase.txt"
+
+            with open(file_mic, 'r') as mic_file:
+                defocus_data = json.load(mic_file)
+
+            # Load phases from file_phase
+            with open(file_phase, 'r') as phase_file: 
+                phase_data = json.load(phase_file)
+
+            return phase_data,defocus_data
+        
+        def checkFile(self):
+
+            all_phases,defocus_values = readFile(self)
+            for mic, values in defocus_values.items():
+                for defocus_U, defocus_V in values:
+                    print(f"Defocus_U: {defocus_U}, Defocus_V: {defocus_V}")
+                    if defocus_U >= self.maxDefocusU :  # 5 si se van Para el desenfoque
+                        self.data['maxDefocusU'] =1
+
+                    if defocus_V >= self.maxDefocusV :
+                        self.data['maxDefocusV'] =1
+
+            threshold=0
+            for mic,phase_list in all_phases.items():
+                # Define arrays to store shift values for X and Y
+                shiftArrayX = phase_list[0]  # X shifts are at the first position
+                shiftArrayY = phase_list[1] 
+
+                # Compute frame shifts for X and Y
+                frameShiftX = np.abs(np.diff(shiftArrayX))
+                frameShiftY = np.abs(np.diff(shiftArrayY))
+
+                # Calculate maximum shifts for X and Y
+                maxShiftX = np.max(frameShiftX) if len(frameShiftX) > 0 else 0
+                maxShiftY = np.max(frameShiftY) if len(frameShiftY) > 0 else 0
+
+                maxShiftM = max(shiftArrayX[0]-shiftArrayX[-1], shiftArrayY[0]-shiftArrayY[-1])
+
+                maxShiftBetweenFrames = max(np.max(frameShiftX), np.max(frameShiftY))
+
+                if maxShiftM >= self.maxGlobalShift : 
+                    if threshold > self.thresholdshift :
+                        self.data['maxGlobalShift'] = 1
+
+                if maxShiftM < 0:
+                    self.data['maxGlobalShift'] = -1
+
+                if maxShiftBetweenFrames >= self.maxFrameShift:
+                    self.data['maxFrameShift'] = 1
+
+
+            self.data.to_csv(self.filePath, sep='\t', index=False)
+        
+        checkFile(self)
+        return None
+        
+
+
