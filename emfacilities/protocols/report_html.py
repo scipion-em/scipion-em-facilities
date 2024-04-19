@@ -307,20 +307,8 @@ class ReportHtml:
             else:
                 return None
         updatedProt = getUpdatedProtocol(self.alignProtocol)
-        outputSet = getMicSet(updatedProt)
         outputSetMovies = getMovieSet(updatedProt)
 
-        mic = outputSet[2]
-        mic2 = outputSet[4]
-        movie1= outputSetMovies[1]
-        
-        #print("shift de EM",mic.getAlignment().getShifts())
-        #print(" movie1 ",outputSetMovies[1].getAlignment().getShifts()) #.getShifts())
-
-
-        #print(" otro22222 ",mic.getShiftsFromOrigin())
-
-        #print("micrograph type",getUpdatedProtocol(self.alignProtocol.outputMicrographs))
         mic=self.getCoordset().getMicrographs()
 
         mic_number=0
