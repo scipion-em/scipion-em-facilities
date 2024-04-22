@@ -134,7 +134,7 @@ class ProtMonitorSerialEm(ProtMonitor):
             for values in defocus_values.items():
                 for defocus_U, defocus_V in values:
                     print(f"Defocus_U: {defocus_U}, Defocus_V: {defocus_V}")
-                    if defocus_U >= self.maxDefocusU :  # 5 si se van Para el desenfoque
+                    if defocus_U >= self.maxDefocusU :  
                         self.data['maxDefocusU'] =1
 
                     if defocus_V >= self.maxDefocusV :
