@@ -130,7 +130,7 @@ class ProtMonitorSerialEm(ProtMonitor):
         
         def checkFile():
 
-            all_phases,defocus_values = readFile(self)
+            all_phases,defocus_values = readFile()
             for values in defocus_values.items():
                 for defocus_U, defocus_V in values:
                     print(f"Defocus_U: {defocus_U}, Defocus_V: {defocus_V}")
