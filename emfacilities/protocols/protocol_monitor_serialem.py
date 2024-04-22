@@ -80,7 +80,7 @@ class ProtMonitorSerialEm(ProtMonitor):
         
         form.addParam('maxGlobalShift', params.FloatParam, default=1000,
                       label="maxGlobalShift in a micrograph allowed",
-                      help="")
+                      help="maxGlobalShift")
         form.addParam('maxFrameShift', params.FloatParam, default=100,
                       label="Max Frame Shift allowed ",
                       help="maxFrameShift")
@@ -91,12 +91,12 @@ class ProtMonitorSerialEm(ProtMonitor):
                       label="Max Defocus V allowed",
                       help="maxDefocusV")
         
-        form.addParam('thresholdshift', params.FloatParam, default=10,
-                      label="threshold shift ",
-                      help="")
-        form.addParam('threshold defocus', params.FloatParam, default=5,
-                      label="threshold defocus",
-                      help="")
+        form.addParam('thresholdShift', params.FloatParam, default=10,
+                      label="threshold shift allowed",
+                      help="allow to surpass the treshold stablished")
+        form.addParam('thresholdDefocus', params.FloatParam, default=5,
+                      label="threshold defocus allowed",
+                      help="allow to surpass the treshold stablished")
     
 
     # --------------------------- INSERT steps functions ---------------------
@@ -112,7 +112,7 @@ class ProtMonitorSerialEm(ProtMonitor):
         data_dict = {'maxGlobalShift': 0, 'maxFrameShift': 0, 'maxDefocusU': 0, 'maxDefocusV': 0}
         self.data = pd.DataFrame(data_dict, index=[0])
 
-        def readFile(self):
+        def readFile():
             original_path = Path(self.fileDir)
 
             # Get the file paths
@@ -128,10 +128,10 @@ class ProtMonitorSerialEm(ProtMonitor):
 
             return phase_data,defocus_data
         
-        def checkFile(self):
+        def checkFile():
 
             all_phases,defocus_values = readFile(self)
-            for mic, values in defocus_values.items():
+            for values in defocus_values.items():
                 for defocus_U, defocus_V in values:
                     print(f"Defocus_U: {defocus_U}, Defocus_V: {defocus_V}")
                     if defocus_U >= self.maxDefocusU :  # 5 si se van Para el desenfoque
@@ -141,7 +141,7 @@ class ProtMonitorSerialEm(ProtMonitor):
                         self.data['maxDefocusV'] =1
 
             threshold=0
-            for mic,phase_list in all_phases.items():
+            for phase_list in all_phases.items():
                 # Define arrays to store shift values for X and Y
                 shiftArrayX = phase_list[0]  # X shifts are at the first position
                 shiftArrayY = phase_list[1] 
@@ -149,10 +149,6 @@ class ProtMonitorSerialEm(ProtMonitor):
                 # Compute frame shifts for X and Y
                 frameShiftX = np.abs(np.diff(shiftArrayX))
                 frameShiftY = np.abs(np.diff(shiftArrayY))
-
-                # Calculate maximum shifts for X and Y
-                maxShiftX = np.max(frameShiftX) if len(frameShiftX) > 0 else 0
-                maxShiftY = np.max(frameShiftY) if len(frameShiftY) > 0 else 0
 
                 maxShiftM = max(shiftArrayX[0]-shiftArrayX[-1], shiftArrayY[0]-shiftArrayY[-1])
 
@@ -171,7 +167,7 @@ class ProtMonitorSerialEm(ProtMonitor):
 
             self.data.to_csv(self.filePath, sep='\t', index=False)
         
-        checkFile(self)
+        checkFile()
         return None
         
 

@@ -182,11 +182,6 @@ class ReportHtml:
                 return alignedProt.outputMicrographs
             else:
                 return None
-        def getMovieSet(alignedProt):
-            if hasattr(alignedProt, 'outputMovies'):
-                return alignedProt.outputMovies
-            else:
-                return None
         # get psd thumbs from ctfData
         if ctfData is not None:
             for i in range(thumbsDone, len(ctfData[PSD_PATH])):
@@ -201,7 +196,6 @@ class ReportHtml:
             getMicFromCTF = False
             updatedProt = getUpdatedProtocol(self.alignProtocol)
             outputSet = getMicSet(updatedProt)
-            outputMovie = getMovieSet(updatedProt)
             if outputSet is not None:
                 if micIdSet is None:
                     micIdSet = list(outputSet.getIdSet())
@@ -219,8 +213,6 @@ class ReportHtml:
                 return
         else:
             return
-        if self.picking is not None:
-            updatedProt = getUpdatedProtocol(self.picking)
         for micId in micIdSet[thumbsDone:]:
             mic = outputSet[micId]
             if getMicFromCTF:
@@ -293,14 +285,6 @@ class ReportHtml:
         file_mic = modified_path / "defocus.txt"
         file_phase  = modified_path / "phase.txt"
 
-        def getMicSet(alignedProt):
-            # TODO get this output names from Protocol constants
-            if hasattr(alignedProt, 'outputMicrographsDoseWeighted'):
-                return alignedProt.outputMicrographsDoseWeighted
-            elif hasattr(alignedProt, 'outputMicrographs'):
-                return alignedProt.outputMicrographs
-            else:
-                return None
         def getMovieSet(alignedProt):
             if hasattr(alignedProt, 'outputMovies'):
                 return alignedProt.outputMovies
@@ -308,8 +292,6 @@ class ReportHtml:
                 return None
         updatedProt = getUpdatedProtocol(self.alignProtocol)
         outputSetMovies = getMovieSet(updatedProt)
-
-        mic=self.getCoordset().getMicrographs()
 
         mic_number=0
         defocus_values = {}
