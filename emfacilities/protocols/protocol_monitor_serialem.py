@@ -31,9 +31,11 @@ from pathlib import Path
 import numpy as np
 import json
 import pandas as pd
+import time
 
 import pyworkflow.utils as pwutils
 import pyworkflow.protocol.params as params
+from pyworkflow.protocol.constants import STATUS_FINISHED
 from pyworkflow import VERSION_1_1
 
 from .protocol_monitor import ProtMonitor, Monitor
@@ -101,12 +103,12 @@ class ProtMonitorSerialEm(ProtMonitor):
 
     # --------------------------- INSERT steps functions ---------------------
     def _insertAllSteps(self):
-        self._insertFunctionStep('monitorStep1')
+        self._insertFunctionStep('monitorStep')
 
     # --------------------------- STEPS functions ----------------------------
-    def monitorStep1(self):
+    def monitorStep(self):
         
-        self.fileDir=self.monitorProt.get()._getExtraPath()
+        self.fileDir = self.monitorProt.get()._getExtraPath()
         self.filePath = Path(str(self.filesPath)) / "serialEM.csv"
         
         data_dict = {'maxGlobalShift': 0, 'maxFrameShift': 0, 'maxDefocusU': 0, 'maxDefocusV': 0}
@@ -126,19 +128,19 @@ class ProtMonitorSerialEm(ProtMonitor):
             with open(file_phase, 'r') as phase_file: 
                 phase_data = json.load(phase_file)
 
-            return phase_data,defocus_data
+            return phase_data, defocus_data
         
         def checkFile():
 
-            all_phases,defocus_values = readFile()
+            all_phases, defocus_values = readFile()
             for values in defocus_values.items():
                 for defocus_U, defocus_V in values:
                     print(f"Defocus_U: {defocus_U}, Defocus_V: {defocus_V}")
-                    if defocus_U >= self.maxDefocusU :  # 5 si se van Para el desenfoque
-                        self.data['maxDefocusU'] =1
+                    if defocus_U >= self.maxDefocusU:
+                        self.data['maxDefocusU'] = 1
 
-                    if defocus_V >= self.maxDefocusV :
-                        self.data['maxDefocusV'] =1
+                    if defocus_V >= self.maxDefocusV:
+                        self.data['maxDefocusV'] = 1
 
             threshold=0
             for phase_list in all_phases.items():
@@ -154,8 +156,8 @@ class ProtMonitorSerialEm(ProtMonitor):
 
                 maxShiftBetweenFrames = max(np.max(frameShiftX), np.max(frameShiftY))
 
-                if maxShiftM >= self.maxGlobalShift : 
-                    if threshold > self.thresholdshift :
+                if maxShiftM >= self.maxGlobalShift:
+                    if threshold > self.thresholdshift:
                         self.data['maxGlobalShift'] = 1
 
                 if maxShiftM < 0:
@@ -167,7 +169,10 @@ class ProtMonitorSerialEm(ProtMonitor):
 
             self.data.to_csv(self.filePath, sep='\t', index=False)
         
-        checkFile()
+        while self.monitorProt.get().getStatus() != STATUS_FINISHED:
+            checkFile()
+            time.sleep(60)
+
         return None
         
 
