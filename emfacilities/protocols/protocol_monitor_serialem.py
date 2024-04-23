@@ -62,8 +62,9 @@ class ProtMonitorSerialEm(ProtMonitor):
         form.addSection('SerialEm')
         form.addParam('monitorProt', PointerParam,
                       pointerClass=ProtMonitorSummary,
-                      label='Trigger data protocol',
-                      help='')
+                      label='monitor summary data protocol',
+                      help="connnect with the monitor summary to"
+                           "extract the necesary info")
         form.addParam('filesPath', params.PathParam,
                       label="SerialEM File directory",
                       help="Directory to store the SerialEM txt.\n\n"
@@ -121,19 +122,25 @@ class ProtMonitorSerialEm(ProtMonitor):
             file_mic = original_path / "tmp" / "defocus.txt"
             file_phase = original_path / "tmp" / "phase.txt"
 
-            with open(file_mic, 'r') as mic_file:
-                defocus_data = json.load(mic_file)
+            try:
+                with open(file_mic, 'r') as mic_file:
+                    defocus_data = json.load(mic_file)
 
-            # Load phases from file_phase
-            with open(file_phase, 'r') as phase_file: 
-                phase_data = json.load(phase_file)
+                # Load phases from file_phase
+                with open(file_phase, 'r') as phase_file: 
+                    phase_data = json.load(phase_file)
+            except:
+                print("waiting for files to be created")
+                return None,None
 
             return phase_data, defocus_data
         
         def checkFile():
 
             all_phases, defocus_values = readFile()
-            for values in defocus_values.items():
+            while defocus_values== None:
+                all_phases, defocus_values = readFile()
+            for mic,values in defocus_values.items():
                 for defocus_U, defocus_V in values:
                     print(f"Defocus_U: {defocus_U}, Defocus_V: {defocus_V}")
                     if defocus_U >= self.maxDefocusU:
@@ -143,7 +150,7 @@ class ProtMonitorSerialEm(ProtMonitor):
                         self.data['maxDefocusV'] = 1
 
             threshold=0
-            for phase_list in all_phases.items():
+            for mic,phase_list in all_phases.items():
                 # Define arrays to store shift values for X and Y
                 shiftArrayX = phase_list[0]  # X shifts are at the first position
                 shiftArrayY = phase_list[1] 
