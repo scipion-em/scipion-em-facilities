@@ -75,7 +75,7 @@ class ProtMonitorSerialEm(ProtMonitor):
                            "  ~/project/data/day??_files/\n"
                            "Each '?' represents one unknown character\n\n"
                            "  ~/project/data/day*_files/\n"
-                           "'*' represents any number of unknown characters\n\n"
+                           "'*'self.monitorProt.get().getStatus() represents any number of unknown characters\n\n"
                            "  ~/project/data/day##_files/\n"
                            "'##' represents two digits that will be used as "
                            "file ID\n\n"
@@ -92,21 +92,21 @@ class ProtMonitorSerialEm(ProtMonitor):
                       help="maximun Frame Shift between two consecutive"
                             "Frames of a movie, if parameter is surpassed"
                             "writes 1 to the file")
-        form.addParam('maxDefocusU', params.FloatParam, default=40000,
-                      label="Max Defocus U allowed",
-                      help="maximun Defocus U (Angstrong) allowed in a micrograph"
+        form.addParam('maxDefocus', params.FloatParam, default=35000,
+                      label="Max Defocus  allowed",
+                      help="insert positive values maximun Defocus U (Angstrong) allowed in a micrograph"
                             "if the parameter is surpassed writes 1 "
                             "to the file")
-        form.addParam('maxDefocusV', params.FloatParam, default=35000,
-                      label="Max Defocus V allowed",
-                      help="maximun Defocus V (Angstrong) allowed in a micrograph"
-                            "if the parameter is surpassed writes 1"
+        form.addParam('minDefocus', params.FloatParam, default=5000,
+                      label="Min Defocus allowed",
+                      help="insert positive values maximun DUpdateefocus V (Angstrong) allowed in a micrograph"
+                            "if the parameter is surpassed writes -1"
                              "to the file")
         form.addParam('thresholdShift', params.FloatParam, default=10,
                       label="threshold shift allowed",
-                      help="allow to surpass the treshold stablished")
-        form.addParam('thresholdDefocus', params.FloatParam, default=5,
-                      label="threshold defocus allowed",
+                      help="allow to surpass the treshold stablished")# TOLERANCIA ASTIGMANISTO SI
+        form.addParam('astigmatism', params.FloatParam, default=1.05,
+                      label="astigmatism tolerance",
                       help="allow to surpass the treshold stablished")
     # --------------------------- INSERT steps functions ---------------------
     def _insertAllSteps(self):
@@ -118,7 +118,7 @@ class ProtMonitorSerialEm(ProtMonitor):
         self.fileDir = self.monitorProt.get()._getExtraPath()
         self.filePath = Path(str(self.filesPath)) / "serialEM.csv"
         
-        data_dict = {'maxGlobalShift': 0, 'maxFrameShift': 0, 'maxDefocusU': 0, 'maxDefocusV': 0}
+        data_dict = {'maxGlobalShift': 0, 'maxFrameShift': 0, 'maxDefocusU': 0, 'astigmatism': 0}
         self.data = pd.DataFrame(data_dict, index=[0])
 
         def readFile():
@@ -149,12 +149,21 @@ class ProtMonitorSerialEm(ProtMonitor):
                 time.sleep(60)
             for mic,values in defocus_values.items():
                 for defocus_U, defocus_V in values:
-                    if defocus_U >= self.maxDefocusU.get():
+                    if defocus_U >= self.maxDefocus.get():
                         self.data['maxDefocusU'] = 1
                         print("Defocus_U exceeded range",defocus_U)
-                    if defocus_V >= self.maxDefocusV.get():
-                        self.data['maxDefocusV'] = 1
-                        print("defocus_V exceeded range",defocus_V)
+                    if defocus_U <= self.minDefocus.get():
+                        self.data['maxDefocusU'] = -1
+                        print("Defocus_U exceeded range",defocus_U)
+                    if defocus_U >= defocus_V:
+                        ratio = defocus_U / defocus_V
+                    else:
+                        ratio = defocus_V / defocus_U  
+
+                    if ratio >= self.astigmatism.get():
+                        self.data['astigmatism'] = 1
+                        print("astigmatism exceeded range",ratio) 
+                    
 
             threshold=0
             for mic,phase_list in all_phases.items():
@@ -171,7 +180,7 @@ class ProtMonitorSerialEm(ProtMonitor):
                 maxShiftBetweenFrames = max(np.max(frameShiftX), np.max(frameShiftY))
 
                 if maxShiftM >= self.maxGlobalShift.get():
-                    if threshold > self.thresholdshift:
+                    if threshold > self.thresholdshift.get():
                         self.data['maxGlobalShift'] = 1
                         print("maxGlobalShift exceeded range",maxShiftM)
 
