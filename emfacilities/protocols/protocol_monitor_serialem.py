@@ -56,6 +56,7 @@ class ProtMonitorSerialEm(ProtMonitor):
         self.fileDir = ''
         self.filePath = ''
         self.data = pd.DataFrame()
+        self.checkStatus = False
 
     def _defineParams(self, form):  
 
@@ -81,35 +82,32 @@ class ProtMonitorSerialEm(ProtMonitor):
                            "NOTE: wildcard characters ('*', '?', '#') "
                            "cannot appear in the actual path.)")
         
-        form.addParam('maxGlobalShift', params.FloatParam, default=1000,
+        form.addParam('maxGlobalShift', params.FloatParam, default=20,
                       label="maxGlobalShift in a micrograph allowed",
                       help="maximun Global Shift between frames of a "
                             "movie allowed, if parameter is surpassed"
                             "writes 1 to the file")
-        form.addParam('maxFrameShift', params.FloatParam, default=100,
+        form.addParam('maxFrameShift', params.FloatParam, default=5,
                       label="Max Frame Shift allowed ",
                       help="maximun Frame Shift between two consecutive"
                             "Frames of a movie, if parameter is surpassed"
                             "writes 1 to the file")
-        form.addParam('maxDefocusU', params.FloatParam, default=0.0,
+        form.addParam('maxDefocusU', params.FloatParam, default=40000,
                       label="Max Defocus U allowed",
-                      help="maximun Defocus U (Amstrong) allowed in a micrograph"
+                      help="maximun Defocus U (Angstrong) allowed in a micrograph"
                             "if the parameter is surpassed writes 1 "
                             "to the file")
-        form.addParam('maxDefocusV', params.FloatParam, default=0.0,
+        form.addParam('maxDefocusV', params.FloatParam, default=35000,
                       label="Max Defocus V allowed",
-                      help="maximun Defocus V (Amstrong) allowed in a micrograph"
+                      help="maximun Defocus V (Angstrong) allowed in a micrograph"
                             "if the parameter is surpassed writes 1"
                              "to the file")
-        
         form.addParam('thresholdShift', params.FloatParam, default=10,
                       label="threshold shift allowed",
                       help="allow to surpass the treshold stablished")
         form.addParam('thresholdDefocus', params.FloatParam, default=5,
                       label="threshold defocus allowed",
                       help="allow to surpass the treshold stablished")
-    
-
     # --------------------------- INSERT steps functions ---------------------
     def _insertAllSteps(self):
         self._insertFunctionStep('monitorStep')
@@ -185,8 +183,9 @@ class ProtMonitorSerialEm(ProtMonitor):
 
             self.data.to_csv(self.filePath, sep='\t', index=False)
         
-        while self.monitorProt.get().getStatus() != STATUS_FINISHED:
+        while self.checkStatus != STATUS_FINISHED:
             checkFile()
+            self.checkStatus = self.monitorProt.get().getStatus()
             time.sleep(60)
 
         return None
