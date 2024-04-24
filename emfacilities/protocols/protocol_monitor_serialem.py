@@ -103,12 +103,12 @@ class ProtMonitorSerialEm(ProtMonitor):
                       help="insert positive values maximun DUpdateefocus V (Angstrong) allowed in a micrograph"
                             "if the parameter is surpassed writes -1"
                              "to the file")
-        form.addParam('thresholdShift', params.FloatParam, default=10,
-                      label="threshold shift allowed",
-                      help="allow to surpass the treshold stablished")# TOLERANCIA ASTIGMANISTO SI
         form.addParam('astigmatism', params.FloatParam, default=1.05,
                       label="astigmatism tolerance",
                       help="allow to surpass the treshold stablished")
+        form.addParam('activatewriting', params.BooleanParam, default=True,
+                      label="activate writing in file",
+                      help="writes in the file inside the folder")
     # --------------------------- INSERT steps functions ---------------------
     def _insertAllSteps(self):
         self._insertFunctionStep('monitorStep')
@@ -119,7 +119,7 @@ class ProtMonitorSerialEm(ProtMonitor):
         self.fileDir = self.monitorProt.get()._getExtraPath()
         self.filePath = Path(str(self.filesPath)) / "serialEM.csv"
         
-        data_dict = {'maxGlobalShift': 0, 'maxFrameShift': 0, 'maxDefocusU': 0, 'astigmatism': 0}
+        data_dict = {'maxGlobalShift': 0, 'maxFrameShift': 0, 'rangeDefocus': 0, 'astigmatism': 0}
         self.data = pd.DataFrame(data_dict, index=[0])
 
         def readFile():
@@ -165,8 +165,6 @@ class ProtMonitorSerialEm(ProtMonitor):
                         self.data['astigmatism'] = 1
                         print("astigmatism exceeded range",ratio) 
                     
-
-            threshold=0
             for mic,phase_list in all_phases.items():
                 # Define arrays to store shift values for X and Y
                 shiftArrayX = phase_list[0]  # X shifts are at the first position
@@ -181,7 +179,7 @@ class ProtMonitorSerialEm(ProtMonitor):
                 maxShiftBetweenFrames = max(np.max(frameShiftX), np.max(frameShiftY))
 
                 if maxShiftM >= self.maxGlobalShift.get():
-                    if threshold > self.thresholdshift.get():
+                    if self.activatewriting.get():
                         self.data['maxGlobalShift'] = 1
                         print("maxGlobalShift exceeded range",maxShiftM)
 
