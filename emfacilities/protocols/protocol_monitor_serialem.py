@@ -150,10 +150,10 @@ class ProtMonitorSerialEm(ProtMonitor):
             for mic,values in defocus_values.items():
                 for defocus_U, defocus_V in values:
                     print(f"Defocus_U: {defocus_U}, Defocus_V: {defocus_V}")
-                    if defocus_U >= self.maxDefocusU:
+                    if defocus_U >= self.maxDefocusU.get():
                         self.data['maxDefocusU'] = 1
 
-                    if defocus_V >= self.maxDefocusV:
+                    if defocus_V >= self.maxDefocusV.get():
                         self.data['maxDefocusV'] = 1
 
             threshold=0
@@ -170,14 +170,14 @@ class ProtMonitorSerialEm(ProtMonitor):
 
                 maxShiftBetweenFrames = max(np.max(frameShiftX), np.max(frameShiftY))
 
-                if maxShiftM >= self.maxGlobalShift:
+                if maxShiftM >= self.maxGlobalShift.get():
                     if threshold > self.thresholdshift:
                         self.data['maxGlobalShift'] = 1
 
-                if maxShiftM < -self.maxGlobalShift:
+                if maxShiftM < -self.maxGlobalShift.get():
                     self.data['maxGlobalShift'] = -1
 
-                if maxShiftBetweenFrames >= self.maxFrameShift:
+                if maxShiftBetweenFrames >= self.maxFrameShift.get():
                     self.data['maxFrameShift'] = 1
 
 
