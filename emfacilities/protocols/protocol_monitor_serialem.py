@@ -83,16 +83,24 @@ class ProtMonitorSerialEm(ProtMonitor):
         
         form.addParam('maxGlobalShift', params.FloatParam, default=1000,
                       label="maxGlobalShift in a micrograph allowed",
-                      help="maxGlobalShift")
+                      help="maximun Global Shift between frames of a "
+                            "movie allowed, if parameter is surpassed"
+                            "writes 1 to the file")
         form.addParam('maxFrameShift', params.FloatParam, default=100,
                       label="Max Frame Shift allowed ",
-                      help="maxFrameShift")
+                      help="maximun Frame Shift between two consecutive"
+                            "Frames of a movie, if parameter is surpassed"
+                            "writes 1 to the file")
         form.addParam('maxDefocusU', params.FloatParam, default=0.0,
                       label="Max Defocus U allowed",
-                      help="maxDefocusU")
+                      help="maximun Defocus U (Amstrong) allowed in a micrograph"
+                            "if the parameter is surpassed writes 1 "
+                            "to the file")
         form.addParam('maxDefocusV', params.FloatParam, default=0.0,
                       label="Max Defocus V allowed",
-                      help="maxDefocusV")
+                      help="maximun Defocus V (Amstrong) allowed in a micrograph"
+                            "if the parameter is surpassed writes 1"
+                             "to the file")
         
         form.addParam('thresholdShift', params.FloatParam, default=10,
                       label="threshold shift allowed",
@@ -140,6 +148,7 @@ class ProtMonitorSerialEm(ProtMonitor):
             all_phases, defocus_values = readFile()
             while defocus_values== None:
                 all_phases, defocus_values = readFile()
+                time.sleep(60)
             for mic,values in defocus_values.items():
                 for defocus_U, defocus_V in values:
                     print(f"Defocus_U: {defocus_U}, Defocus_V: {defocus_V}")
