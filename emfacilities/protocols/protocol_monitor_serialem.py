@@ -149,12 +149,12 @@ class ProtMonitorSerialEm(ProtMonitor):
                 time.sleep(60)
             for mic,values in defocus_values.items():
                 for defocus_U, defocus_V in values:
-                    print(f"Defocus_U: {defocus_U}, Defocus_V: {defocus_V}")
                     if defocus_U >= self.maxDefocusU.get():
                         self.data['maxDefocusU'] = 1
-
+                        print("Defocus_U exceeded range",defocus_U)
                     if defocus_V >= self.maxDefocusV.get():
                         self.data['maxDefocusV'] = 1
+                        print("defocus_V exceeded range",defocus_V)
 
             threshold=0
             for mic,phase_list in all_phases.items():
@@ -173,12 +173,15 @@ class ProtMonitorSerialEm(ProtMonitor):
                 if maxShiftM >= self.maxGlobalShift.get():
                     if threshold > self.thresholdshift:
                         self.data['maxGlobalShift'] = 1
+                        print("maxGlobalShift exceeded range",maxShiftM)
 
                 if maxShiftM < -self.maxGlobalShift.get():
                     self.data['maxGlobalShift'] = -1
+                    print("maxGlobalShift exceeded range",maxShiftM)
 
                 if maxShiftBetweenFrames >= self.maxFrameShift.get():
                     self.data['maxFrameShift'] = 1
+                    print("maxFrameShift exceeded range",maxShiftBetweenFrames)
 
 
             self.data.to_csv(self.filePath, sep='\t', index=False)
