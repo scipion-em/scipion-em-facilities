@@ -35,14 +35,14 @@ import time
 
 import pyworkflow.utils as pwutils
 import pyworkflow.protocol.params as params
-from pyworkflow.protocol.constants import STATUS_FINISHED
+from pyworkflow.protocol.constants import STATUS_FINISHED,STATUS_FAILED,STATUS_ABORTED
 from pyworkflow import VERSION_1_1
 
 from .protocol_monitor import ProtMonitor, Monitor
 from .protocol_monitor_summary import ProtMonitorSummary
 from pyworkflow.protocol.params import PointerParam
 
-
+STATUS_STOP = [STATUS_FINISHED,STATUS_FAILED,STATUS_ABORTED]
 
 class ProtMonitorSerialEm(ProtMonitor):
     """ Stores values for SerialEM to read ,
@@ -183,10 +183,10 @@ class ProtMonitorSerialEm(ProtMonitor):
 
             self.data.to_csv(self.filePath, sep='\t', index=False)
         
-        while self.checkStatus != STATUS_FINISHED:
+        while self.checkStatus not in STATUS_STOP :
             checkFile()
             self.checkStatus = self.monitorProt.get().getStatus()
-            if self.checkStatus == STATUS_FINISHED:
+            if self.checkStatus in STATUS_STOP:
                 continue
             time.sleep(60)
 
