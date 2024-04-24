@@ -174,7 +174,7 @@ class ProtMonitorSerialEm(ProtMonitor):
                     if threshold > self.thresholdshift:
                         self.data['maxGlobalShift'] = 1
 
-                if maxShiftM < 0:
+                if maxShiftM < -self.maxGlobalShift:
                     self.data['maxGlobalShift'] = -1
 
                 if maxShiftBetweenFrames >= self.maxFrameShift:
@@ -186,6 +186,8 @@ class ProtMonitorSerialEm(ProtMonitor):
         while self.checkStatus != STATUS_FINISHED:
             checkFile()
             self.checkStatus = self.monitorProt.get().getStatus()
+            if self.checkStatus == STATUS_FINISHED:
+                continue
             time.sleep(60)
 
         return None
