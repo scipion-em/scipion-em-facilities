@@ -26,6 +26,7 @@
 # **************************************************************************
 import os.path
 import os
+import sys
 
 from pathlib import Path
 import numpy as np
@@ -35,14 +36,14 @@ import time
 
 import pyworkflow.utils as pwutils
 import pyworkflow.protocol.params as params
-from pyworkflow.protocol.constants import STATUS_FINISHED,STATUS_FAILED,STATUS_ABORTED
+from pyworkflow.protocol.constants import STATUS_FINISHED, STATUS_FAILED, STATUS_ABORTED
 from pyworkflow import VERSION_1_1
 
 from .protocol_monitor import ProtMonitor, Monitor
 from .protocol_monitor_summary import ProtMonitorSummary
 from pyworkflow.protocol.params import PointerParam
 
-STATUS_STOP = [STATUS_FINISHED,STATUS_FAILED,STATUS_ABORTED]
+STATUS_STOP = [STATUS_FINISHED, STATUS_FAILED, STATUS_ABORTED]
 
 class ProtMonitorSerialEm(ProtMonitor):
     """ Stores values for SerialEM to read ,
@@ -56,7 +57,7 @@ class ProtMonitorSerialEm(ProtMonitor):
         self.fileDir = ''
         self.filePath = ''
         self.data = pd.DataFrame()
-        self.checkStatus = False
+        self.checkStatus = None
 
     def _defineParams(self, form):  
 
@@ -195,12 +196,17 @@ class ProtMonitorSerialEm(ProtMonitor):
 
             self.data.to_csv(self.filePath, sep='\t', index=False)
         
-        while self.checkStatus not in STATUS_STOP :
+        while self.checkStatus not in STATUS_STOP:
             checkFile()
             self.checkStatus = self.monitorProt.get().getStatus()
+            self.info('Checking protocol status: %s' % self.checkStatus)
+
             if self.checkStatus in STATUS_STOP:
+                self.info('Finishing protocol')
                 continue
+
             time.sleep(60)
+            sys.stdout.flush()
 
         return None
         
