@@ -1,6 +1,6 @@
 # **************************************************************************
 # *
-# * Authors:     Daniel Marchan [1]
+# * Authors:     Daniel Marchan (da.marchan@cnb.csic.es) [1]
 # *
 # * [1] Unidad de  Bioinformatica of Centro Nacional de Biotecnologia , CSIC
 # *
@@ -39,7 +39,7 @@ class ProtVolumeExtractor(EMProtocol):
     or by a reference ID
     """
 
-    _label = "best volume extractor"
+    _label = "volume extractor"
 
     _possibleOutputs = {OUTPUT_PARTICLES: emobj.SetOfParticles,
                         OUTPUT_VOLUME: emobj.Volume}
@@ -95,16 +95,14 @@ class ProtVolumeExtractor(EMProtocol):
         if self.selectBig.get():  # Select the class with the bigger number of particles
             # For each class (order by number of items)
             for clazz in self.inputClasses.get().iterItems(orderBy="_size", direction="DESC"):
-                classExtract = clazz
-                self.info('The biggest 3D class have id %d with size %d' % (classExtract.getObjId(),
-                                                                            classExtract.getSize()))
+                referenceID = clazz.getObjId()
                 break
         else:  # Select the class corresponding to the reference ID
             referenceID = self.volumeID.get()
-            classExtract = self.inputClasses.get().getItem("id", referenceID)
-            self.info('The selected 3D class have id %d with size %d' % (classExtract.getObjId(),
-                                                                         classExtract.getSize()))
-        self._extractElementsFromClass(classExtract)
+
+        clazz = self.inputClasses.get().getItem("id", referenceID)
+        self.info('The selected 3D class have id %d with size %d' % (clazz.getObjId(), clazz.getSize()))
+        self._extractElementsFromClass(clazz)
 
     def _extractElementsFromClass(self, clazz):
         """ Extract the elements (particles and/or volume) from the 3D class and create the output """
@@ -114,7 +112,6 @@ class ProtVolumeExtractor(EMProtocol):
         if outputParticles is not None:
             # Go through all items and append them
             for image in clazz:
-            #for image in clazz.iterItems():
                 newImage = image.clone()
                 outputParticles.append(newImage)
 
