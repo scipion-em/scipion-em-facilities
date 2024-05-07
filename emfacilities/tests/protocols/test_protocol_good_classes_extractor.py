@@ -24,7 +24,7 @@ from pyworkflow.tests import BaseTest, setupTestProject, DataSet
 from pwem.protocols.protocol_import import ProtImportParticles
 import pwem.protocols as emprot
 from pyworkflow.object import Pointer
-from pwem.protocols.protocol_good_class_extractor import ProtGoodClassesExtractor
+from emfacilities.protocols.protocol_good_classes_extractor import ProtGoodClassesExtractor
 
 
 class TestGoodClassesExtractor(BaseTest):
