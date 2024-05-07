@@ -34,7 +34,7 @@ import pyworkflow.protocol.params as params
 from pyworkflow.object import Set
 from pyworkflow.protocol import ProtStreamingBase, STEPS_PARALLEL
 from pwem.protocols import EMProtocol
-from pwem.objects import SetOfParticles
+from pwem.objects import SetOfParticles, SetOfAverages, SetOfClasses2D
 
 
 OUTPUT_PARTICLES = "outputParticles"
@@ -184,15 +184,17 @@ class ProtGoodClassesExtractor(EMProtocol, ProtStreamingBase):
         Select only the good Classes from the Averages or from the IDs list
         """
         if self.mode == self.LIST_CLASSES:
-            self.goodClassesIDs = self.inputGoodClasses.get().getIdSet()
+            inputRefs = self.inputGoodClasses.get()
+            if isinstance(inputRefs, SetOfClasses2D):
+                self.goodClassesIDs = inputRefs.getIdSet()
+            else:
+                self.goodClassesIDs = inputRefs.getUniqueValues('_index')
         else:
             self.goodClassesIDs = self._getGoodIds()
 
         self.info('Good classes IDs:')
         self.info(self.goodClassesIDs)
         self.selectGood = False
-        # Change to list of filenames? For the moment it matched so not needed
-        # inputGoodClasses.get().getUniqueValues('filename'), clazz.getRepresentative()._filename, clazz.getObjName()
 
     def closeOutputStep(self):
         self.info("Size of good particles output: %d" % len(self.goodParticles))
