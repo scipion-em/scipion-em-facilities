@@ -64,7 +64,7 @@ class ProtMonitorSerialEm(ProtMonitor):
         form.addSection('SerialEm')
         form.addParam('monitorProt', PointerParam,
                       pointerClass=ProtMonitorSummary,
-                      label='monitor summary data protocol',
+                      label='Monitor summary data protocol',
                       help="connnect with the monitor summary to"
                            "extract the necesary info")
         form.addParam('filesPath', params.PathParam,
@@ -84,7 +84,7 @@ class ProtMonitorSerialEm(ProtMonitor):
                            "cannot appear in the actual path.)")
         
         form.addParam('maxGlobalShift', params.FloatParam, default=20,
-                      label="maxGlobalShift in a micrograph allowed",
+                      label="MaxGlobalShift in a micrograph allowed",
                       help="maximun Global Shift between frames of a "
                             "movie allowed, if parameter is surpassed"
                             "writes 1 to the file")
@@ -94,7 +94,7 @@ class ProtMonitorSerialEm(ProtMonitor):
                             "Frames of a movie, if parameter is surpassed"
                             "writes 1 to the file")
         form.addParam('maxDefocus', params.FloatParam, default=35000,
-                      label="Max Defocus  allowed",
+                      label="Max Defocus allowed",
                       help="insert positive values maximun Defocus U (Angstrong) allowed in a micrograph"
                             "if the parameter is surpassed writes 1 "
                             "to the file")
@@ -104,11 +104,18 @@ class ProtMonitorSerialEm(ProtMonitor):
                             "if the parameter is surpassed writes -1"
                              "to the file")
         form.addParam('astigmatism', params.FloatParam, default=1.05,
-                      label="astigmatism tolerance",
+                      label="Astigmatism tolerance",
                       help="allow to surpass the treshold stablished")
         form.addParam('activatewriting', params.BooleanParam, default=True,
-                      label="activate writing in file",
+                      label="Activate writing in file",
                       help="writes in the file inside the folder")
+        form.addParam('aci', params.FloatParam, default=5,
+                      label="Aci",
+                      help="number of micrographs per photo taken")
+        form.addParam('setaci', params.FloatParam, default=2,
+                      label="Number of acis",
+                      help="Number of acis consecutively surpassed to activate"
+                            "astigmatism correction")
     # --------------------------- INSERT steps functions ---------------------
     def _insertAllSteps(self):
         self._insertFunctionStep('monitorStep')
@@ -148,6 +155,8 @@ class ProtMonitorSerialEm(ProtMonitor):
             while defocus_values== None:
                 all_phases, defocus_values = readFile()
                 time.sleep(60)
+            acicount=0 
+            micount=0 # count the number of mics
             for mic,values in defocus_values.items():
                 for defocus_U, defocus_V in values:
                     if defocus_U >= self.maxDefocus.get():
@@ -162,9 +171,17 @@ class ProtMonitorSerialEm(ProtMonitor):
                         ratio = defocus_V / defocus_U  
 
                     if ratio >= self.astigmatism.get():
-                        self.data['astigmatism'] = 1
-                        print("astigmatism exceeded range",ratio) 
+                        acicount=acicount+1
+                        if self.aci.get()*self.setaci.get()*0.2 >= acicount:
+                            self.data['astigmatism'] = 1
+                            print("astigmatism exceeded range",ratio) 
                     
+                    micount=micount+1
+
+                    if micount> self.aci.get()*self.setaci.get():
+                        acicount=0
+                        micount=0
+
             for mic,phase_list in all_phases.items():
                 # Define arrays to store shift values for X and Y
                 shiftArrayX = phase_list[0]  # X shifts are at the first position
