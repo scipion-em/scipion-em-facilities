@@ -109,12 +109,12 @@ class ProtMonitorSerialEm(ProtMonitor):
         form.addParam('activatewriting', params.BooleanParam, default=True,
                       label="Activate writing in file",
                       help="writes in the file inside the folder")
-        form.addParam('aci', params.FloatParam, default=5,
-                      label="Aci",
+        form.addParam('afis', params.FloatParam, default=5,
+                      label="AFIS",
                       help="number of micrographs per photo taken")
-        form.addParam('setaci', params.FloatParam, default=2,
-                      label="Number of acis",
-                      help="Number of acis consecutively surpassed to activate"
+        form.addParam('setafis', params.FloatParam, default=2,
+                      label="Number of AFIS",
+                      help="Number of AFIS consecutively surpassed to activate"
                             "astigmatism correction")
     # --------------------------- INSERT steps functions ---------------------
     def _insertAllSteps(self):
@@ -155,31 +155,39 @@ class ProtMonitorSerialEm(ProtMonitor):
             while defocus_values== None:
                 all_phases, defocus_values = readFile()
                 time.sleep(60)
-            acicount=0 
+            afiscount=0 
             micount=0 # count the number of mics
+            evaluated_afis = set()
             for mic,values in defocus_values.items():
                 for defocus_U, defocus_V in values:
-                    if defocus_U >= self.maxDefocus.get():
+                    afis_key = f"{mic}_{defocus_U}_{defocus_V}"  # Create a unique key for the AFIS values
+                    
+                    if defocus_U >= self.maxDefocus.get() and  afis_key not in evaluated_afis: 
                         self.data['maxDefocusU'] = 1
                         print("Defocus_U exceeded range",defocus_U)
-                    if defocus_U <= self.minDefocus.get():
+                        
+                    if defocus_U <= self.minDefocus.get() and  afis_key not in evaluated_afis:
                         self.data['maxDefocusU'] = -1
                         print("Defocus_U exceeded range",defocus_U)
-                    if defocus_U >= defocus_V:
+                        
+                    if defocus_U >= defocus_V and  afis_key not in evaluated_afis:
                         ratio = defocus_U / defocus_V
                     else:
-                        ratio = defocus_V / defocus_U  
-
-                    if ratio >= self.astigmatism.get():
-                        acicount=acicount+1
-                        if self.aci.get()*self.setaci.get()*0.2 >= acicount:
+                        ratio = defocus_V / defocus_U
+                          
+                    if ratio >= self.astigmatism.get() and  afis_key not in evaluated_afis :
+                        afiscount=afiscount+1
+                        if self.afis.get()*self.setafis.get()*0.2 >= afiscount :
                             self.data['astigmatism'] = 1
-                            print("astigmatism exceeded range",ratio) 
+                            print("astigmatism exceeded range",ratio)
+    
+                    if afis_key not in evaluated_afis:  # Check if the AFIS values have not been evaluated before
+                        evaluated_afis.add(afis_key) 
                     
                     micount=micount+1
 
-                    if micount> self.aci.get()*self.setaci.get():
-                        acicount=0
+                    if micount> self.afis.get()*self.setafis.get():
+                        afiscount=0
                         micount=0
 
             for mic,phase_list in all_phases.items():
