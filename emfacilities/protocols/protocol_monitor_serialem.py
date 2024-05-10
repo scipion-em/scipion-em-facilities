@@ -170,7 +170,7 @@ class ProtMonitorSerialEm(ProtMonitor):
                         self.data['maxDefocusU'] = -1
                         print("Defocus_U exceeded range",defocus_U)
                         
-                    if defocus_U >= defocus_V and  afis_key not in evaluated_afis:
+                    if defocus_U >= defocus_V and  afis_key not in evaluated_afis:                      
                         ratio = defocus_U / defocus_V
                     else:
                         ratio = defocus_V / defocus_U
@@ -189,7 +189,7 @@ class ProtMonitorSerialEm(ProtMonitor):
                     if micount> self.afis.get()*self.setafis.get():
                         afiscount=0
                         micount=0
-
+            evaluated_mic=set
             for mic,phase_list in all_phases.items():
                 # Define arrays to store shift values for X and Y
                 shiftArrayX = phase_list[0]  # X shifts are at the first position
@@ -202,20 +202,24 @@ class ProtMonitorSerialEm(ProtMonitor):
                 maxShiftM = max(shiftArrayX[0]-shiftArrayX[-1], shiftArrayY[0]-shiftArrayY[-1])
 
                 maxShiftBetweenFrames = max(np.max(frameShiftX), np.max(frameShiftY))
+                
+                mic_key = f"{mic}_{shiftArrayX}_{shiftArrayY}"  # Create a unique key for the mic values
 
-                if maxShiftM >= self.maxGlobalShift.get():
+                if maxShiftM >= self.maxGlobalShift.get() and mic_key not in evaluated_mic :
                     if self.activatewriting.get():
                         self.data['maxGlobalShift'] = 1
                         print("maxGlobalShift exceeded range",maxShiftM)
 
-                if maxShiftM < -self.maxGlobalShift.get():
+                if maxShiftM < -self.maxGlobalShift.get() and mic_key not in evaluated_mic :
                     self.data['maxGlobalShift'] = -1
                     print("maxGlobalShift exceeded range",maxShiftM)
 
-                if maxShiftBetweenFrames >= self.maxFrameShift.get():
+                if maxShiftBetweenFrames >= self.maxFrameShift.get() and mic_key not in evaluated_mic :
                     self.data['maxFrameShift'] = 1
                     print("maxFrameShift exceeded range",maxShiftBetweenFrames)
-
+                
+                if mic_key not in evaluated_mic:  # Check if the mic values have not been evaluated before
+                        evaluated_mic.add(mic_key) 
 
             self.data.to_csv(self.filePath, sep='\t', index=False)
         
