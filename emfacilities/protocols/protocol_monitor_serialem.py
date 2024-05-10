@@ -189,7 +189,7 @@ class ProtMonitorSerialEm(ProtMonitor):
                     if micount> self.afis.get()*self.setafis.get():
                         afiscount=0
                         micount=0
-            evaluated_mic=set
+
             for mic,phase_list in all_phases.items():
                 # Define arrays to store shift values for X and Y
                 shiftArrayX = phase_list[0]  # X shifts are at the first position
@@ -203,23 +203,19 @@ class ProtMonitorSerialEm(ProtMonitor):
 
                 maxShiftBetweenFrames = max(np.max(frameShiftX), np.max(frameShiftY))
                 
-                mic_key = f"{mic}_{shiftArrayX}_{shiftArrayY}"  # Create a unique key for the mic values
-
-                if maxShiftM >= self.maxGlobalShift.get() and mic_key not in evaluated_mic :
+                if maxShiftM >= self.maxGlobalShift.get() :
                     if self.activatewriting.get():
                         self.data['maxGlobalShift'] = 1
                         print("maxGlobalShift exceeded range",maxShiftM)
 
-                if maxShiftM < -self.maxGlobalShift.get() and mic_key not in evaluated_mic :
+                if maxShiftM < -self.maxGlobalShift.get()  :
                     self.data['maxGlobalShift'] = -1
                     print("maxGlobalShift exceeded range",maxShiftM)
 
-                if maxShiftBetweenFrames >= self.maxFrameShift.get() and mic_key not in evaluated_mic :
+                if maxShiftBetweenFrames >= self.maxFrameShift.get() :
                     self.data['maxFrameShift'] = 1
                     print("maxFrameShift exceeded range",maxShiftBetweenFrames)
                 
-                if mic_key not in evaluated_mic:  # Check if the mic values have not been evaluated before
-                        evaluated_mic.add(mic_key) 
 
             self.data.to_csv(self.filePath, sep='\t', index=False)
         
