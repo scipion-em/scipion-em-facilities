@@ -126,7 +126,7 @@ class ProtMonitorSerialEm(ProtMonitor):
         self.fileDir = self.monitorProt.get()._getExtraPath()
         self.filePath = Path(str(self.filesPath)) / "serialEM.csv"
         
-        data_dict = {'maxGlobalShift': 0, 'maxFrameShift': 0, 'rangeDefocus': 0, 'astigmatism': 0}
+        data_dict = {'maxGlobalShift': 0, 'maxFrameShift': 0, 'Defocus': 0, 'astigmatism': 0}
         self.data = pd.DataFrame(data_dict, index=[0])
 
         def readFile():
@@ -163,12 +163,12 @@ class ProtMonitorSerialEm(ProtMonitor):
                     afis_key = f"{mic}_{defocus_U}_{defocus_V}"  # Create a unique key for the AFIS values
                     
                     if defocus_U >= self.maxDefocus.get() and  afis_key not in evaluated_afis: 
-                        self.data['maxDefocusU'] = 1
-                        print("Defocus_U exceeded range",defocus_U)
+                        self.data['Defocus'] = 1
+                        print("Defocus_U exceeded range upper",defocus_U)
                         
                     if defocus_U <= self.minDefocus.get() and  afis_key not in evaluated_afis:
-                        self.data['maxDefocusU'] = -1
-                        print("Defocus_U exceeded range",defocus_U)
+                        self.data['Defocus'] = -1
+                        print("Defocus_U exceeded range lower",defocus_U)
                         
                     if defocus_U >= defocus_V and  afis_key not in evaluated_afis:                      
                         ratio = defocus_U / defocus_V
