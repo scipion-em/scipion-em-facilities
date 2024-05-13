@@ -302,7 +302,7 @@ def balancePlot(good_particles, bad_particles, fileName):
     # Define colors for the bars
     colors = ['#007ACC', '#FF585D']
     # Create a bar plot with custom colors and formal style
-    fig, ax = plt.subplots(figsize=(8, 6))  # Adjust the figure size
+    _, ax = plt.subplots(figsize=(8, 6))  # Adjust the figure size
     ax.bar(classes, particle_counts, color=colors, edgecolor='black', linewidth=1.2)
     # Customize axis labels and title
     ax.set_xlabel('Classes', fontsize=14)

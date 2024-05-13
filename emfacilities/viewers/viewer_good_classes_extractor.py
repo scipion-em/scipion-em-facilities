@@ -87,15 +87,10 @@ class ViewerGoodClassesExtractor(EmProtocolViewer):
     def _visualizeParticles(self, objName):
         views = []
 
-        labels = 'id _filename _samplingRate _acquisition._dosePerFrame ' \
-                 '_acquisition._doseInitial _MEAN_DOSE_PER_ANGSTROM2 _STD_DOSE_PER_ANGSTROM2 ' \
-                 '_DIFF_TO_DOSE_PER_ANGSTROM2 '
-
         if self.protocol.hasAttribute(objName):
             setParticles = getattr(self.protocol, objName)
             views.append(ObjectView(
                 self._project, setParticles.getObjId(), setParticles.getFileName()))
-                #viewParams={'mode': MODE_MD, 'order': labels, 'visible': labels}))
         else:
             self.infoMessage('%s does not have %s%s'
                              % (self.protocol.getObjLabel(), objName,
