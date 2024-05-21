@@ -3,6 +3,7 @@ V3.0.6 (in progress...)
 - Monitor summary: verbose error if publish command fails
 - Updated workflow template
 - New protocols: Good classes extractor and Volume extractor
+- New logo for the plugin
 
 V3.0.5
 - Fix: TypeError: getPluginTemplateDir() missing 1 required positional argument: 'self'
