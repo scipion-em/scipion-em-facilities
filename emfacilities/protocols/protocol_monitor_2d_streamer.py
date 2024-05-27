@@ -39,7 +39,7 @@ class ProtMonitor2dStreamer(ProtMonitor):
      of a given 2D classification protocol but using subsets
      of the input particles as the 2D classification input.
     """
-    _label = '2d streamer'
+    _label = '2d classification launcher'
 
     NONE_OPTION = 0
     CLASSIFICATION_JOBS = 1
