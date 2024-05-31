@@ -1,4 +1,4 @@
-V3.0.6 (in progress...)
+V3.1.0 
 - Monitor summary: validation for publish command
 - Monitor summary: verbose error if publish command fails
 - Updated workflow template
