@@ -11,6 +11,8 @@ from .protocol_monitor_system import ProtMonitorSystem
 from .protocol_monitor_movie_gain import ProtMonitorMovieGain, MonitorMovieGain
 
 from .protocol_monitor_2d_streamer import ProtMonitor2dStreamer
+from .protocol_good_classes_extractor import ProtGoodClassesExtractor
+from .protocol_volume_extractor import ProtVolumeExtractor
 
 from .report_html import ReportHtml
 

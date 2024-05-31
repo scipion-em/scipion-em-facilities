@@ -30,6 +30,7 @@ import json
 import os
 from os.path import join, exists, abspath, basename
 import numpy as np
+import subprocess
 import multiprocessing
 from datetime import datetime
 from statistics import median, mean
@@ -567,6 +568,10 @@ class ReportHtml:
             self.info("Publishing the report:")
             cmd = self.publishCmd % {'REPORT_FOLDER': self.reportDir}
             self.info(cmd)
-            os.system(cmd)
-
+            p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE,
+                                 stderr=subprocess.PIPE)
+            output, err = p.communicate()
+            self.info('{}\n'.format(output.decode("utf-8")))
+            if err.decode("utf-8") != '':
+                self.info('Error publishing the report: {}'.format(err.decode("utf-8") ))
         return reportFinished

@@ -39,7 +39,11 @@ class ProtMonitor2dStreamer(ProtMonitor):
      of a given 2D classification protocol but using subsets
      of the input particles as the 2D classification input.
     """
-    _label = '2d streamer'
+    _label = '2d classification launcher'
+
+    NONE_OPTION = 0
+    CLASSIFICATION_JOBS = 1
+    NUMBER_PARTICLES = 2
 
     def __init__(self, **kwargs):
         ProtMonitor.__init__(self, **kwargs)
@@ -76,6 +80,31 @@ class ProtMonitor2dStreamer(ProtMonitor):
                            "batches (e.g, if you have classified them for the "
                            "initial 2D classification template. ")
 
+        form.addParam('cumulativeBatch', params.BooleanParam, default=False,
+                      label="Cumulative Batch?",
+                      help="If yes, the batches will be cumulative, and "
+                           "the size of each batch will be equal to: \n"
+                           "Batch size + cumulative population.")
+
+        form.addParam('maximumOption', params.EnumParam,
+                      choices=['None', 'Classification jobs', 'Number of particles'],
+                      default=self.NONE_OPTION,
+                      label="Limit for launching classification jobs", display=params.EnumParam.DISPLAY_COMBO,
+                      help='Select an option to limit the number of classification jobs launched: \n '
+                           '_None_: launch classification jobs until the set is closed. \n '
+                           '_Classification jobs_: set a maximum number of classification jobs to launch. \n'
+                           '_Number particles_: set a maximum number of particles to launch classification jobs.')
+
+        form.addParam('classificationJobs', params.IntParam, default=10,
+                      condition='maximumOption==%d' % self.CLASSIFICATION_JOBS,
+                      label='Maximum number of classification jobs',
+                      help='Set a maximum number of classification jobs to launch.')
+
+        form.addParam('numberParticles', params.IntParam, default=100000,
+                      condition='maximumOption==%d' % self.NUMBER_PARTICLES,
+                      label='Maximum number of particles',
+                      help='Set a maximum number of particles to launch classification jobs.')
+
         group = form.addGroup('Monitoring')
         group.addParam('samplingInterval', params.IntParam, default=10,
                        label="Update interval (min)",
@@ -91,6 +120,8 @@ class ProtMonitor2dStreamer(ProtMonitor):
     def monitorStep(self):
         interval = self.samplingInterval.get() * 60
         # list of particles that will be inserted in the new set
+        self._counterNewParticles = 0
+        self._counterParticlesProcessed = 0
         self._counter = 0
         self._lastMicId = None
         self._lastPartId = 0
@@ -153,15 +184,28 @@ class ProtMonitor2dStreamer(ProtMonitor):
 
             # Check the following after finding particles of a new micrograph
             if micId != self._lastMicId:
-                if self._lastMicId is not None and subset.getSize() > self.batchSize:
+                if self.classificationStop():
+                    self._streamClosed = True
+                    self.info("The limit for launching classification jobs has been reached, stopping protocol")
+                    return  # roll back to the monitorStep and finish
+
+                if self._lastMicId is not None and self._counterNewParticles > self.batchSize:  # New particles
                     self._writeSubset(subset)
+                    subsetTmp = subset  # save the previous so we can have the cumulative functionality
                     subset = self._createSubset()
+                    self.debug("Counter of new particles before resetting to 0: %d" % self._counterNewParticles)
+                    self._counterNewParticles = 0
+
+                    if self.cumulativeBatch:
+                        subset.appendFromImages(subsetTmp)
 
                 self._lastMicId = micId
 
             self._lastPartId = partId
+            self._counterNewParticles += 1
+            self._counterParticlesProcessed += 1
 
-        # Write last group of particles if input stream is closed
+            # Write last group of particles if input stream is closed
         if self._streamClosed:
             self._writeSubset(subset)
 
@@ -179,3 +223,17 @@ class ProtMonitor2dStreamer(ProtMonitor):
             yield p
 
         inputParts.close()
+
+    def classificationStop(self):
+        response = False
+
+        if self.maximumOption == self.NUMBER_PARTICLES:
+            inputSize = self._counterParticlesProcessed
+            if inputSize > self.numberParticles.get():
+                response = True
+
+        if self.maximumOption == self.CLASSIFICATION_JOBS:
+            if self._counter > self.classificationJobs.get():
+                response = True
+
+        return response

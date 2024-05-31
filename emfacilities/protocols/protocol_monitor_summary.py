@@ -32,6 +32,7 @@ from pyworkflow import VERSION_1_1
 
 from pwem.protocols import ProtCTFMicrographs, ProtAlignMovies
 from pwem import Domain
+import subprocess
 
 from .report_influx import ReportInflux
 from .report_html import ReportHtml
@@ -338,3 +339,21 @@ class ProtMonitorSummary(ProtMonitor):
                 summary.append(line.rstrip())
             pathRepoSummary.close()
         return summary
+
+
+    def validate(self):
+        errors = []
+        if self.publishCmd.get() != '':
+            self.reportDir = os.path.abspath(
+                self._getExtraPath(self.getProject().getShortName()))
+            pwutils.makePath(self.reportDir)
+
+            cmd = str(self.publishCmd) % {'REPORT_FOLDER': self.reportDir}
+            p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE,
+                                 stderr=subprocess.PIPE)
+            output, err = p.communicate()
+            if err.decode("utf-8") != '':
+                errors.append('The publish command {} is wrong, please check it{}'.format(cmd, err.decode("utf-8")))
+
+
+        return errors

@@ -1,5 +1,14 @@
+V3.1.0 
+- Monitor summary: validation for publish command
+- Monitor summary: verbose error if publish command fails
+- Updated workflow template
+- 2D Streamer protocol: new functionalities (cumulative batch and limit for launching classification jobs)
+- New protocols: Good classes extractor and Volume extractor
+- New logo for the plugin
+
 V3.0.5
 - Fix: TypeError: getPluginTemplateDir() missing 1 required positional argument: 'self'
+
 V3.0.4
 - new protocol track used items 
 - fixing important bugs in the html
