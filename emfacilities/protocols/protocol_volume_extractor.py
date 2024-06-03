@@ -27,6 +27,7 @@
 import pyworkflow.protocol.params as params
 import pwem.objects as emobj
 from pwem.protocols import EMProtocol
+from pyworkflow import BETA, UPDATED, NEW, PROD
 
 
 OUTPUT_PARTICLES = "outputParticles"
@@ -40,6 +41,7 @@ class ProtVolumeExtractor(EMProtocol):
     """
 
     _label = "volume extractor"
+    _devStatus = NEW
 
     _possibleOutputs = {OUTPUT_PARTICLES: emobj.SetOfParticles,
                         OUTPUT_VOLUME: emobj.Volume}

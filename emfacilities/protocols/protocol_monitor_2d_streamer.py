@@ -31,6 +31,7 @@ import pyworkflow.protocol.params as params
 from pyworkflow.project import Manager
 
 from .protocol_monitor import ProtMonitor
+from pyworkflow import BETA, UPDATED, NEW, PROD
 
 
 class ProtMonitor2dStreamer(ProtMonitor):
@@ -40,6 +41,7 @@ class ProtMonitor2dStreamer(ProtMonitor):
      of the input particles as the 2D classification input.
     """
     _label = '2d classification launcher'
+    _devStatus = UPDATED
 
     NONE_OPTION = 0
     CLASSIFICATION_JOBS = 1

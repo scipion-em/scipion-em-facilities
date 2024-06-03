@@ -35,6 +35,7 @@ from pyworkflow.object import Set
 from pyworkflow.protocol import ProtStreamingBase, STEPS_PARALLEL
 from pwem.protocols import EMProtocol
 from pwem.objects import SetOfParticles, SetOfAverages, SetOfClasses2D
+from pyworkflow import BETA, UPDATED, NEW, PROD
 
 
 OUTPUT_PARTICLES = "outputParticles"
@@ -48,6 +49,8 @@ class ProtGoodClassesExtractor(EMProtocol, ProtStreamingBase):
 
     _label = "good classes extractor"
     outputsToDefine = {}
+    _devStatus = NEW
+
     _possibleOutputs = {OUTPUT_PARTICLES: SetOfParticles,
                         OUTPUT_DISCARDED_PARTICLES: SetOfParticles}
     # Mode
