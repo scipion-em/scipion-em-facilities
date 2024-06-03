@@ -40,6 +40,7 @@ from .protocol_monitor import ProtMonitor, Monitor
 from .protocol_monitor_ctf import MonitorCTF
 from .protocol_monitor_movie_gain import MonitorMovieGain
 from .protocol_monitor_system import MonitorSystem
+from pyworkflow import BETA, UPDATED, NEW, PROD
 
 
 class ProtMonitorSummary(ProtMonitor):
@@ -51,6 +52,7 @@ class ProtMonitorSummary(ProtMonitor):
     """
     _label = 'monitor summary'
     _lastUpdateVersion = VERSION_1_1
+    _devStatus = UPDATED
 
     def __init__(self, **kwargs):
         ProtMonitor.__init__(self, **kwargs)
