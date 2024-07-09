@@ -1,4 +1,4 @@
-from .protocol_OCEM_json import ProtocolOSCEM
+from .protocol_OSCEM_json import ProtOSCEM
 from .protocol_monitor import ProtMonitor, Monitor, PrintNotifier
 from .protocol_monitor_system import SYSTEM_LOG_SQLITE
 
