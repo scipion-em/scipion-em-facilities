@@ -38,7 +38,7 @@ class ProtOSCEM(EMProtocol):
 
         form.addParam('maxShift', params.PointerParam,
                       label="Max Shift", important=True,
-                      pointerClass='XmippProtMovieMaxShift',  # 'CTFModel'],   # TODO: no estoy segura del pointerclass
+                      pointerClass='XmippProtMovieMaxShift',  # 'CTFModel'],
                       help="Max Shift",
                       condition='inputType==0',
                       allowsNull=True)  # extender este help
@@ -170,7 +170,7 @@ class ProtOSCEM(EMProtocol):
         # List of keys to retrieve
         keys_to_retrieve = ['binFactor', 'maxResForCorrelation', 'gainRot', 'gainFlip']
 
-        ## TODO: apply dose filter, where?
+        ## TOD: apply dose filter, where?
 
         # Mapping dictionary for key name changes
         key_mapping = {
