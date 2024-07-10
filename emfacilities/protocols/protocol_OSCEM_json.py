@@ -1,11 +1,14 @@
 import pyworkflow.protocol.params as params
-
 from pwem.protocols import EMProtocol
 from pyworkflow.object import String
 
 import numpy as np
 import json
 import os
+
+INPUT_MOVIES = 0
+INPUT_MICS = 1
+OUTFILE = 'Processing_json.json'
 
 
 class ProtOSCEM(EMProtocol):
@@ -18,36 +21,40 @@ class ProtOSCEM(EMProtocol):
 
     # -------------------------- DEFINE param functions ----------------------
     def _defineParams(self, form):
+        CONDITION_MOVIES = f'inputType=={INPUT_MOVIES}'
+
         form.addSection(label='Input')
 
-        form.addParam('inputType',  params.EnumParam, label='Input type', choices=['Movies','Micrographs'], important=True,
-                      help='Select the type of input, either movies or micrographs')
+        form.addParam('inputType', params.EnumParam, label='Input type',
+                      choices=['Movies', 'Micrographs'], important=True,
+                      help='Select the type of input, either movies or micrographs',
+                      default=INPUT_MOVIES)
 
         form.addParam('importMovies', params.PointerParam,
                       label="Import Movies", important=True,
-                      pointerClass='ProtImportMovies',  # 'CTFModel'],
+                      pointerClass='ProtImportMovies',
                       help="Import Movies",
-                      condition='inputType==0')  # extender este help
+                      condition=CONDITION_MOVIES)
 
         form.addParam('movieAlignment', params.PointerParam,
                       label="Movie alignment", important=True,
-                      pointerClass='ProtAlignMovies',  # 'CTFModel'],
+                      pointerClass='ProtAlignMovies',
                       help="Movie alignment used",
-                      condition='inputType==0',
-                      allowsNull=True)  # extender este help
+                      condition=CONDITION_MOVIES,
+                      allowsNull=True)
 
         form.addParam('maxShift', params.PointerParam,
                       label="Max Shift", important=True,
-                      pointerClass='XmippProtMovieMaxShift',  # 'CTFModel'],
+                      pointerClass='XmippProtMovieMaxShift',
                       help="Max Shift",
-                      condition='inputType==0',
-                      allowsNull=True)  # extender este help
+                      condition=CONDITION_MOVIES,
+                      allowsNull=True)
 
         form.addParam('CTF', params.PointerParam,
                       label="CTF", important=True,
-                      pointerClass='SetOfCTF',  # 'CTFModel'],
+                      pointerClass='SetOfCTF',
                       help="Max Shift",
-                      allowsNull=True)  # extender este help
+                      allowsNull=True)
 
     # -------------------------- INSERT steps functions -----------------------
     def _insertAllSteps(self):
@@ -58,37 +65,40 @@ class ProtOSCEM(EMProtocol):
     def generateJson(self):
 
         self.processing_json = {}
-        ###### IMPORT MOVIES ######
-        import_movies = self.import_movies_generation()
-        # print('Import movie dict:')
-        # print(json.dumps(import_movies, indent=4))
-        self.processing_json['Import_movies'] = import_movies
+        # self.processing_json['Description'] = 'OSCEM json for processing. Version 1.0'  ## !!!!
 
-        ###### MOVIE ALGINMENT ######
-        movie_alignment = self.movie_alignment_generation()
-        # print('Movie alignment dict:')
-        # print(json.dumps(movie_alignment, indent=4))
-        self.processing_json['Movie_alignment'] = movie_alignment
+        if self.inputType.get() == 0:  # movies as input
+            ###### IMPORT MOVIES ######
+            import_movies = self.import_movies_generation()
+            # print('Import movie dict:')
+            # print(json.dumps(import_movies, indent=4))
+            self.processing_json['Import_movies'] = import_movies
 
-        ###### MAX SHIFT ######
-        max_shift = self.max_shift_generation()
-        # print('Max shift dict:')
-        # print(json.dumps(max_shift, indent=4))
-        self.processing_json['Movie_maxshift'] = max_shift
+            if self.movieAlignment.get() is not None:
+                ###### MOVIE ALGINMENT ######
+                movie_alignment = self.movie_alignment_generation()
+                # print('Movie alignment dict:')
+                # print(json.dumps(movie_alignment, indent=4))
+                self.processing_json['Movie_alignment'] = movie_alignment
 
-        ###### CTF ######
-        CTF = self.CTF_generation()
-        # print('CTF estimation dict:')
-        # print(json.dumps(CTF, indent=4))
-        self.processing_json['CTF_estimation'] = CTF
+            if self.maxShift.get() is not None:
+                ###### MAX SHIFT ######
+                max_shift = self.max_shift_generation()
+                # print('Max shift dict:')
+                # print(json.dumps(max_shift, indent=4))
+                self.processing_json['Movie_maxshift'] = max_shift
+
+        if self.CTF.get() is not None:
+            ###### CTF ######
+            CTF = self.CTF_generation()
+            # print('CTF estimation dict:')
+            # print(json.dumps(CTF, indent=4))
+            self.processing_json['CTF_estimation'] = CTF
 
         print(json.dumps(self.processing_json, indent=4))
 
-        # protocol.alignFrame0.get() # assumes alignFrame0 exists as an attribute
-        # importmoviesprotocol.get('alignFrame0', String()).get()
-
     # -------------------------- INFO functions -------------------------------
-    def _validate(self):  # si no se cumple no ejecuta protocolo
+    def _validate(self):
         return []  # no errors
 
     def _summary(self):
@@ -97,25 +107,14 @@ class ProtOSCEM(EMProtocol):
     def _methods(self):
         return []
 
-    # def getInputProtocols(self):  # multipointer por el for
-    # protocols = []
-    # for protPointer in self.inputProtocols:
-    #     prot = protPointer.get()
-    #     prot.setProject(self.getProject())
-    #      protocols.append(prot)
-    # return protocols
-
     # -------------------- UTILS functions -------------------------
     def import_movies_generation(self):
         ImportMoviesProt = self.importMovies.get()
-        # print(ImportMoviesProt)
         input_movies = ImportMoviesProt.getObjDict()
 
-        # print("Input params:")
-        # print(inputParams)
-
         # List of keys to retrieve
-        # if doseperframe has a value, then dose initial is also retrieveD. Otherwise, none of them are retrieved.
+        # if doseperframe has a value, then dose initial is also retrieveD.
+        # Otherwise, none of them are retrieved.
         if input_movies['outputMovies._acquisition._dosePerFrame'] is None:
             keys_to_retrieve = ['outputMovies._acquisition._voltage', 'outputMovies._acquisition._sphericalAberration',
                                 'outputMovies._acquisition._amplitudeContrast', 'outputMovies._samplingRate',
@@ -149,7 +148,6 @@ class ProtOSCEM(EMProtocol):
         for key in keys_to_retrieve:
             if key in input_movies and input_movies[key] is not None and input_movies[key] != 0:
                 if key in boolean_keys:
-                    # Check if the value is not None or null (empty string in this case)
                     import_movies[key_mapping[key]] = bool(input_movies[key])
                 else:
                     import_movies[key_mapping[key]] = input_movies[key]
@@ -158,20 +156,14 @@ class ProtOSCEM(EMProtocol):
 
     def movie_alignment_generation(self):
         MovieAlignmentProt = self.movieAlignment.get()
-        # print(MovieAlignmentProt)
         movie_align = {'Method': MovieAlignmentProt.getClassName()}
 
-        #     ############################ INPUT #############################################
-
+        ################################ INPUT #############################################
         input_alignment = MovieAlignmentProt.getObjDict()
-        # print("Input params:")
-        # print(input_alignment)
-
         # List of keys to retrieve
         keys_to_retrieve = ['binFactor', 'maxResForCorrelation', 'gainRot', 'gainFlip']
 
         ## TOD: apply dose filter, where?
-
         # Mapping dictionary for key name changes
         key_mapping = {
             'binFactor': 'Binning_factor',
@@ -218,37 +210,26 @@ class ProtOSCEM(EMProtocol):
         if frames_aligned:
             movie_align['Frames_aligned'] = frames_aligned
 
-        #     ############################ OUTPUT #############################################
+        ############################### OUTPUT #############################################
         # average and max shift
-        max_shift = 0
         for a, output in MovieAlignmentProt.iterOutputAttributes():
-            # print(f"a: {a}")
-            # print(f"output: {output}")
-            if a == 'outputMovies':  ## ESTOY COGIENDO MOVIES NO MICROGRAPHS. DUDA!!!
+            if a == 'outputMovies':
                 for index, item in enumerate(output.iterItems()):
-                    # print(f"item: {item}")
                     attributes = item.getAttributes()
-                    # print(attributes)
                     attributes_dict = dict(attributes)
-                    # print(f'attributes dir: {attributes_dict}')
                     shiftX = attributes_dict.get('_xmipp_ShiftX')
                     shiftY = attributes_dict.get('_xmipp_ShiftY')
                     norm = np.linalg.norm([shiftX, shiftY], axis=0)
 
-                    # Max shift
+                    # Max and Average shift
                     max_norm = np.max(norm)
-                    max_shift = max(max_shift, max_norm)
-
-                    # Average shift
                     avgXY = np.mean(norm)
                     if index == 0:
                         avg_shift = avgXY
+                        max_shift = max_norm
                     else:
-                        avg_shift = np.mean([avgXY, avg_shift])  # average with total X and Y
-
-                    # for key, value in attributes:
-                    #     print(f"key: {key}")
-                    #     print(f"value: {value}")
+                        avg_shift = np.mean([avgXY, avg_shift])
+                        max_shift = max(max_shift, max_norm)
 
             output_movie_align = {'Ouput_avg_shift': avg_shift, 'Output_max_shift': max_shift}
             movie_align.update(output_movie_align)
@@ -257,16 +238,11 @@ class ProtOSCEM(EMProtocol):
 
     def max_shift_generation(self):
         MaxShiftProt = self.maxShift.get()
-        # print(MaxShiftProt)
 
-        #     ############################ INPUT #############################################
+        ############################### INPUT #############################################
         input_shift = MaxShiftProt.getObjDict()
-        # print("Input params:")
-        # print(inputParams)
-
         # List of keys to retrieve
         keys_to_retrieve = ['outputMoviesDiscarded._size', 'maxFrameShift', 'maxMovieShift', 'rejType']
-
         # Mapping dictionary for key name changes
         key_mapping = {
             'outputMoviesDiscarded._size': 'Discarded_movies',
@@ -275,7 +251,7 @@ class ProtOSCEM(EMProtocol):
             'rejType': 'Rejection_type'
         }
 
-        #     # Filter the dictionary and rename the keys
+        # Filter dictionary and rename keys
         movie_maxshift = {}
         for key in keys_to_retrieve:
             if key == 'rejType':
@@ -291,18 +267,14 @@ class ProtOSCEM(EMProtocol):
             elif key in input_shift and input_shift[key] is not None and input_shift[key] != 0:
                 movie_maxshift[key_mapping[key]] = input_shift[key]
 
-        #     ############################ OUTPUT #############################################
+        ############################### OUTPUT #############################################
         # average and max shift
         max_shift = 0
         for a, output in MaxShiftProt.iterOutputAttributes():
-            # print(f"a: {a}")
-            # print(f"output: {output}")
-            if a == 'outputMovies':  ## ESTOY COGIENDO MOVIES NO MICROGRAPHS. DUDA!!!
+            if a == 'outputMovies':
                 for index, item in enumerate(output.iterItems()):
-                    # print(f"item: {item}")
                     attributes = item.getAttributes()
                     attributes_dict = dict(attributes)
-                    # print(f'attributes dir: {attributes_dict}')
                     shiftX = attributes_dict.get('_xmipp_ShiftX')
                     shiftY = attributes_dict.get('_xmipp_ShiftY')
                     norm = np.linalg.norm([shiftX, shiftY], axis=0)
@@ -316,11 +288,7 @@ class ProtOSCEM(EMProtocol):
                     if index == 0:
                         avg_shift = avgXY
                     else:
-                        avg_shift = np.mean([avgXY, avg_shift])  # average with total X and Y
-
-                    # for key, value in attributes:
-                    #     print(f"key: {key}")
-                    #     print(f"value: {value}")
+                        avg_shift = np.mean([avgXY, avg_shift])
 
         output_movie_maxshift = {'Ouput_avg_shift': avg_shift, 'Output_max_shift': max_shift}
         movie_maxshift.update(output_movie_maxshift)
@@ -329,21 +297,9 @@ class ProtOSCEM(EMProtocol):
 
     def CTF_generation(self):
         CTFs = self.CTF.get()
-        # print('CTFs:')
-        # print(CTFs)
-
-        #     ############################ OUTPUT #############################################
-
+        ############################## OUTPUT #############################################
         CTF_estimation = {}
         for index, item in enumerate(CTFs.iterItems()):
-            # print(f"item: {item}")
-            # print(f"type of item: {type(item)}")
-            # print(dir(item))  # available attributes
-            # print(f"Index: {index}, Item: {item}")
-            # print(f"defU: {item._defocusU}")
-            # print(f"defV: {item._defocusV}")
-            # print(f"Resolution: {item._resolution}")
-
             # Min, max  and average defocus and resolution
             defocus = np.mean([float(item._defocusU), float(item._defocusV)])
             resolution = float(item._resolution)
@@ -374,12 +330,13 @@ class ProtOSCEM(EMProtocol):
 
     def saveJson(self):
 
-        folder_path = self._getExtraPath()
-        # print(folder_path)
-        file_path = os.path.join(folder_path, 'Processing_json')
+        file_path = self.getOutFile()
         try:
             with open(file_path, 'w') as json_file:
                 json.dump(self.processing_json, json_file, indent=4)
             print(f"JSON data successfully saved to {file_path}")
         except Exception as e:
             print(f"An error occurred while saving JSON data: {e}")
+
+    def getOutFile(self):
+        return self._getExtraPath(OUTFILE)
