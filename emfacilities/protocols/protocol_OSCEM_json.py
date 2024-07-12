@@ -200,6 +200,7 @@ class ProtOSCEM(EMProtocol):
             movie_align['Crop_dims'] = crop_dims
 
         # Dictionary for frames aligned
+        # if input_alignment['alignFrameN'] != 0:
         keys_to_retrieve = ['alignFrame0', 'alignFrameN']
         key_mapping = {
             'alignFrame0': 'Frame0',
