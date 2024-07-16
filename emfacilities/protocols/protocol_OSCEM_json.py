@@ -53,7 +53,7 @@ class ProtOSCEM(EMProtocol):
         form.addParam('CTF', params.PointerParam,
                       label="CTF", important=True,
                       pointerClass='SetOfCTF',
-                      help="Max Shift",
+                      help="CTF micrographs",
                       allowsNull=True)
 
     # -------------------------- INSERT steps functions -----------------------
@@ -232,7 +232,7 @@ class ProtOSCEM(EMProtocol):
                         avg_shift = np.mean([avgXY, avg_shift])
                         max_shift = max(max_shift, max_norm)
 
-            output_movie_align = {'Ouput_avg_shift': avg_shift, 'Output_max_shift': max_shift}
+            output_movie_align = {'Output_avg_shift': avg_shift, 'Output_max_shift': max_shift}
             movie_align.update(output_movie_align)
 
         return movie_align
@@ -291,7 +291,7 @@ class ProtOSCEM(EMProtocol):
                     else:
                         avg_shift = np.mean([avgXY, avg_shift])
 
-        output_movie_maxshift = {'Ouput_avg_shift': avg_shift, 'Output_max_shift': max_shift}
+        output_movie_maxshift = {'Output_avg_shift': avg_shift, 'Output_max_shift': max_shift}
         movie_maxshift.update(output_movie_maxshift)
 
         return movie_maxshift
@@ -321,9 +321,9 @@ class ProtOSCEM(EMProtocol):
                 avg_resolution = np.mean([avg_resolution, resolution])
 
         defocus = {'Output_max_defocus': max_defocus, 'Output_min_defocus': min_defocus,
-                   'Ouput_avg_defocus': avg_defocus}
+                   'Output_avg_defocus': avg_defocus}
         resolution = {'Output_max_resolution': max_resolution, 'Output_min_resolution': min_resolution,
-                      'Ouput_avg_resolution': avg_resolution}
+                      'Output_avg_resolution': avg_resolution}
         CTF_estimation['Defocus'] = defocus
         CTF_estimation['Resolution'] = resolution
 
