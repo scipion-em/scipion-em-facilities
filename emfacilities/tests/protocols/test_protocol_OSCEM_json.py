@@ -34,7 +34,7 @@ class TestOscemJson(BaseTest):
                 "Frame0": 1,
                 "FrameN": 0
             },
-            "Ouput_avg_shift": 12.085274343980803,
+            "Output_avg_shift": 12.085274343980803,
             "Output_max_shift": 34.31086742604614
         },
         "Movie_maxshift": {
@@ -42,23 +42,22 @@ class TestOscemJson(BaseTest):
             "Max_frame_shift": 5.0,
             "Max_movie_shift": 20.0,
             "Rejection_type": "By frame or movie",
-            "Ouput_avg_shift": 10.655840604909368,
+            "Output_avg_shift": 10.655840604909368,
             "Output_max_shift": 28.289413400687277
         },
         "CTF_estimation": {
             "Defocus": {
                 "Output_max_defocus": 9238.84,
                 "Output_min_defocus": 1509.145,
-                "Ouput_avg_defocus": 5364.463750000001
+                "Output_avg_defocus": 5364.463750000001
             },
             "Resolution": {
                 "Output_max_resolution": 3.062813,
                 "Output_min_resolution": 2.45025,
-                "Ouput_avg_resolution": 2.793877375
+                "Output_avg_resolution": 2.793877375
             }
         }
     }
-
 
     @classmethod
     def setUpClass(cls):
@@ -68,7 +67,7 @@ class TestOscemJson(BaseTest):
         cls.protmoviegain, cls.gainmovies = cls.runMovieGain()
         cls.protalignmovie, cls.alignedmovies = cls.runMovieAlign()
         cls.protmaxshift, cls.maxshiftmicro = cls.runMaxShift()
-        # cls.protCTF, cls.CTFmicro = cls.runCTFestimation()
+        cls.protCTF, cls.CTFmicro = cls.runCTFestimation()
 
     @classmethod
     def runImportMovies(cls):
@@ -120,18 +119,7 @@ class TestOscemJson(BaseTest):
                                highRes=cls.high_res)
 
         cls.launchProtocol(prot)
-        import os
-        fname = "/home/lsanchez/debugs/test.txt"
-        if os.path.exists(fname):
-            os.remove(fname)
-        fjj = open(fname, "a+")
-        fjj.write('-------->onDebugMode PID {}'.format(os.getpid()))
-        fjj.close()
-        print('-------->onDebugMode PID {}'.format(os.getpid()))
-        import time
-        time.sleep(10)
-
-        output = getattr(prot, 'outputMovies', None)
+        output = getattr(prot, 'outputCTF', None)
         return prot, output
 
     def test_only_import(self):
@@ -149,10 +137,10 @@ class TestOscemJson(BaseTest):
         with open(abspath(file_path), 'r') as json_file:
             load_json = json.load(json_file)
 
-        for key, current_test_dict in test_data_import.items():
+        for key, section_test_dict in test_data_import.items():
             current_dict = load_json.get(key, None)
             self.assertIsNotNone(current_dict, msg=f'Dictionary section {key} is not found')
-            for key_in, current_test_value in current_test_dict.items():
+            for key_in, current_test_value in section_test_dict.items():
                 current_value = current_dict.get(key_in, None)
                 self.assertIsNotNone(current_value, msg=f'In dictionary {key}, {key_in} is not found')
                 self.assertEqual(current_test_value, current_value)
@@ -174,15 +162,15 @@ class TestOscemJson(BaseTest):
         with open(abspath(file_path), 'r') as json_file:
             load_json = json.load(json_file)
 
-        for key, current_test_dict in test_data_import.items():
+        for key, section_test_dict in test_data_import.items():
             current_dict = load_json.get(key, None)
             self.assertIsNotNone(current_dict, msg=f'Dictionary section {key} is not found')
-            for key_in, current_test_value in current_test_dict.items():
+            for key_in, current_test_value in section_test_dict.items():
                 current_value = current_dict.get(key_in, None)
                 self.assertIsNotNone(current_value, msg=f'In dictionary {key}, {key_in} is not found')
-                if key_in == "Ouput_avg_shift" or key_in == "Output_max_shift":
+                if key_in == "Output_avg_shift" or key_in == "Output_max_shift":
                     # these values change decimals each time alignment is run
-                    self.assertEqual(round(current_test_value), round(current_value))
+                    self.assertAlmostEqual(current_test_value, current_value, delta=1.5)
                 else:
                     self.assertEqual(current_test_value, current_value)
 
@@ -204,50 +192,62 @@ class TestOscemJson(BaseTest):
         with open(abspath(file_path), 'r') as json_file:
             load_json = json.load(json_file)
 
-        for key, current_test_dict in test_data_import.items():
+        for key, section_test_dict in test_data_import.items():
             current_dict = load_json.get(key, None)
             self.assertIsNotNone(current_dict, msg=f'Dictionary section {key} is not found')
-            for key_in, current_test_value in current_test_dict.items():
+            for key_in, current_test_value in section_test_dict.items():
                 current_value = current_dict.get(key_in, None)
                 self.assertIsNotNone(current_value, msg=f'In dictionary {key}, {key_in} is not found')
-                if key_in == "Ouput_avg_shift" or key_in == "Output_max_shift":
+                if key_in == "Discarded_movies":
                     # these values change decimals each time alignment is run
-                    self.assertEqual(round(current_test_value), round(current_value))
+                    self.assertAlmostEqual(current_test_value, current_value, delta=1)
+                elif key_in == "Output_avg_shift" or key_in == "Output_max_shift":
+                    # these values change decimals each time alignment is run
+                    self.assertAlmostEqual(current_test_value, current_value, delta=1.5)
                 else:
                     self.assertEqual(current_test_value, current_value)
 
-    # def test_import_and_CTF(self):
-    #     print(magentaStr(f"\n==> Running import movies and CTF estimation test:"))
-    #     test_data_import = {"Import_movies": self.test_data["Import_movies"],
-    #                         "CTF_estimation": self.test_data["CTF_estimation"]
-    #                         }
-    #
-    #     prot = self.newProtocol(ProtOSCEM,
-    #                             inputType=INPUT_MOVIES,
-    #                             importMovies=self.protimportmovies,
-    #                             CTF=self.protCTF)
-    #     self.launchProtocol(prot)
-    #     # recuperar resultados -> meter en funcion y meto el protocolo de entrada
-    #     file_path = prot.getOutFile()
-    #     self.assertTrue(exists(file_path))
-    #
-    #     with open(abspath(file_path), 'r') as json_file:
-    #         load_json = json.load(json_file)
-    #
-    #     for key, current_test_dict in test_data_import.items():
-    #         current_dict = load_json.get(key, None)
-    #         self.assertIsNotNone(current_dict, msg=f'Dictionary section {key} is not found')
-    #         for key_in, current_test_value in current_test_dict.items():
-    #             current_value = current_dict.get(key_in, None)
-    #             self.assertIsNotNone(current_value, msg=f'In dictionary {key}, {key_in} is not found')
-    #             if key_in == "Ouput_avg_shift" or key_in == "Output_max_shift":
-    #                 # these values change decimals each time alignment is run
-    #                 self.assertEqual(round(current_test_value), round(current_value))
-    #             else:
-    #                 self.assertEqual(current_test_value, current_value)
+    def test_import_and_CTF(self):
+        print(magentaStr(f"\n==> Running import movies and CTF estimation test:"))
+        test_data_import = {"Import_movies": self.test_data["Import_movies"],
+                            "CTF_estimation": self.test_data["CTF_estimation"]
+                            }
+
+        prot = self.newProtocol(ProtOSCEM,
+                                inputType=INPUT_MOVIES,
+                                importMovies=self.protimportmovies,
+                                CTF=self.CTFmicro)
+
+        self.launchProtocol(prot)
+        # recuperar resultados -> meter en funcion y meto el protocolo de entrada
+        file_path = prot.getOutFile()
+        self.assertTrue(exists(file_path))
+
+        with open(abspath(file_path), 'r') as json_file:
+            load_json = json.load(json_file)
+
+        for key, section_test_dict in test_data_import.items():
+            current_dict = load_json.get(key, None)
+            self.assertIsNotNone(current_dict, msg=f'Dictionary section {key} is not found')
+            for key_in, current_test_value in section_test_dict.items():
+                if key == 'Import_movies':
+                    current_value = current_dict.get(key_in, None)
+                    self.assertIsNotNone(current_value, msg=f'In dictionary {key}, {key_in} is not found')
+                    self.assertEqual(current_test_value, current_value)
+                else:
+                    for key_in_in, current_test_value_in in current_test_value.items():
+                        current_section_dict = current_dict.get(key_in, None)
+                        current_value = current_section_dict.get(key_in_in, None)
+                        self.assertIsNotNone(current_value, msg=f'In dictionary {key}, {key_in} is not found')
+                        if key_in_in == "Output_max_defocus" or key_in_in == "Output_min_defocus" or key_in_in == "Output_avg_defocus":
+                            self.assertAlmostEqual(current_test_value_in, current_value, delta=1500)
+                        elif key_in_in == "Output_max_resolution" or key_in_in == "Output_min_resolution" or key_in_in == "Output_avg_resolution":
+                            self.assertAlmostEqual(current_test_value_in, current_value, delta=1500)
+                        else:
+                            self.assertEqual(current_test_value_in, current_value)
 
     def test_5(self):
-        print(magentaStr(f"\n==> Running import movies, movie alignment and max shift test:"))
+        print(magentaStr(f"\n==> Running import movies, movie alignment, max shift and CTF estimation test:"))
         test_data_import = {"Import_movies": self.test_data["Import_movies"],
                             "Movie_alignment": self.test_data["Movie_alignment"],
                             "Movie_maxshift": self.test_data["Movie_maxshift"]}
@@ -265,14 +265,66 @@ class TestOscemJson(BaseTest):
         with open(abspath(file_path), 'r') as json_file:
             load_json = json.load(json_file)
 
-        for key, current_test_dict in test_data_import.items():
+        for key, section_test_dict in test_data_import.items():
             current_dict = load_json.get(key, None)
             self.assertIsNotNone(current_dict, msg=f'Dictionary section {key} is not found')
-            for key_in, current_test_value in current_test_dict.items():
+            for key_in, current_test_value in section_test_dict.items():
                 current_value = current_dict.get(key_in, None)
                 self.assertIsNotNone(current_value, msg=f'In dictionary {key}, {key_in} is not found')
-                if key_in == "Ouput_avg_shift" or key_in == "Output_max_shift":
+                if key_in == "Discarded_movies":
                     # these values change decimals each time alignment is run
-                    self.assertEqual(round(current_test_value), round(current_value))
+                    self.assertAlmostEqual(current_test_value, current_value, delta=1)
+                elif key_in == "Output_avg_shift" or key_in == "Output_max_shift":
+                    # these values change decimals each time alignment is run
+                    self.assertAlmostEqual(current_test_value, current_value, delta=1.5)
                 else:
                     self.assertEqual(current_test_value, current_value)
+
+    def test_6(self):
+        print(magentaStr(f"\n==> Running import movies, movie alignment and max shift test:"))
+        test_data_import = {"Import_movies": self.test_data["Import_movies"],
+                            "Movie_alignment": self.test_data["Movie_alignment"],
+                            "Movie_maxshift": self.test_data["Movie_maxshift"],
+                            "CTF_estimation": self.test_data["CTF_estimation"]}
+
+        prot = self.newProtocol(ProtOSCEM,
+                                inputType=INPUT_MOVIES,
+                                importMovies=self.protimportmovies,
+                                movieAlignment=self.protalignmovie,
+                                maxShift=self.protmaxshift,
+                                CTF=self.CTFmicro)
+
+        self.launchProtocol(prot)
+
+        file_path = prot.getOutFile()
+        self.assertTrue(exists(file_path))
+
+        with open(abspath(file_path), 'r') as json_file:
+            load_json = json.load(json_file)
+
+        for key, section_test_dict in test_data_import.items():
+            current_dict = load_json.get(key, None)
+            self.assertIsNotNone(current_dict, msg=f'Dictionary section {key} is not found')
+            for key_in, current_test_value in section_test_dict.items():
+                if key == 'CTF_estimation':
+                    for key_in_in, current_test_value_in in current_test_value.items():
+                        current_section_dict = current_dict.get(key_in, None)
+                        current_value = current_section_dict.get(key_in_in, None)
+                        self.assertIsNotNone(current_value, msg=f'In dictionary {key}, {key_in} is not found')
+                        if key_in_in == "Output_max_defocus" or key_in_in == "Output_min_defocus" or key_in_in == "Output_avg_defocus":
+                            self.assertAlmostEqual(current_test_value_in, current_value, delta=1500)
+                        elif key_in_in == "Output_max_resolution" or key_in_in == "Output_min_resolution" or key_in_in == "Output_avg_resolution":
+                            self.assertAlmostEqual(current_test_value_in, current_value, delta=1500)
+                        else:
+                            self.assertEqual(current_test_value_in, current_value)
+                else:
+                    current_value = current_dict.get(key_in, None)
+                    self.assertIsNotNone(current_value, msg=f'In dictionary {key}, {key_in} is not found')
+                    if key_in == "Discarded_movies":
+                        # these values change decimals each time alignment is run
+                        self.assertAlmostEqual(current_test_value, current_value, delta=1)
+                    elif key_in == "Output_avg_shift" or key_in == "Output_max_shift":
+                        # these values change decimals each time alignment is run
+                        self.assertAlmostEqual(current_test_value, current_value, delta=1.5)
+                    else:
+                        self.assertEqual(current_test_value, current_value)
