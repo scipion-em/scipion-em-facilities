@@ -59,6 +59,12 @@ class ProtOSCEM(EMProtocol):
                       help="CTF micrographs",
                       allowsNull=True)
 
+        form.addParam('particles', params.PointerParam,
+                      label="Particles", important=True,
+                      pointerClass='SetOfParticles',
+                      help="Particles obtained when doing particle extraction",
+                      allowsNull=True)
+
     # -------------------------- INSERT steps functions -----------------------
     def _insertAllSteps(self):
         self._insertFunctionStep(self.generateJson)
@@ -97,6 +103,9 @@ class ProtOSCEM(EMProtocol):
             # print('CTF estimation dict:')
             # print(json.dumps(CTF, indent=4))
             self.processing_json['CTF_estimation'] = CTF
+
+        particles = self.particles_generation()
+        self.processing_json['Particle_picking'] = particles
 
         print(json.dumps(self.processing_json, indent=4))
 
@@ -367,6 +376,36 @@ class ProtOSCEM(EMProtocol):
         plotterAstigmatism.close()
 
         return CTF_estimation
+
+    def particles_generation(self):
+        parts = self.particles.get()
+        # print(parts)
+        mic_numbers = []
+        particle_counts = []
+        for index, item in enumerate(parts.iterItems()):
+            micrograph_num = item._micId
+            key_name = f"mic_{micrograph_num}"
+            # retrieve the number of particles per micrograph
+            if index == 0 or key_name not in mic_numbers:
+                mic_numbers.append(key_name)
+                particle_counts.append(1)
+            else:
+                index = mic_numbers.index(key_name)
+                particle_counts[index] += 1
+
+        mean_particles_values = np.mean(particle_counts)
+        particles = {"Particles_per_micrograph": mean_particles_values}
+        # print(particles)
+
+        plt.bar(mic_numbers, particle_counts)
+        plt.xlabel('# Micrograph')
+        plt.ylabel('# Particles')
+        plt.title('Histogram for particle number per micrograph')
+
+        particles_hist = self.hist_path('particles_hist')
+        plt.savefig(particles_hist)
+
+        return particles
 
     def saveJson(self):
 
