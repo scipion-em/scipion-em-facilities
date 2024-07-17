@@ -1,3 +1,5 @@
+from matplotlib import pyplot as plt
+
 import pyworkflow.protocol.params as params
 from pwem.protocols import EMProtocol
 from pyworkflow.object import String
@@ -300,10 +302,19 @@ class ProtOSCEM(EMProtocol):
         CTFs = self.CTF.get()
         ############################## OUTPUT #############################################
         CTF_estimation = {}
+        defocus_list = []
+        resolution_list = []
+        astigmatism_list = []
+
         for index, item in enumerate(CTFs.iterItems()):
             # Min, max  and average defocus and resolution
             defocus = np.mean([float(item._defocusU), float(item._defocusV)])
             resolution = float(item._resolution)
+            astigmatism = float(item._defocusRatio)
+
+            defocus_list.append(defocus)
+            resolution_list.append(resolution)
+            astigmatism_list.append(astigmatism)
 
             if index == 0:
                 max_defocus = defocus
@@ -327,6 +338,37 @@ class ProtOSCEM(EMProtocol):
         CTF_estimation['Defocus'] = defocus
         CTF_estimation['Resolution'] = resolution
 
+        # Histograms generation
+        # DEFOCUS
+        # print(defocus_list)
+        plt.figure()
+        plt.hist(defocus_list, color='orange', edgecolor='black')
+        plt.title('Histogram of Defocus Values')
+        plt.xlabel('Defocus Value')
+        plt.ylabel('Frequency')
+        self.save_histograms('defocus_hist')
+        plt.close()
+
+        # RESOLUTION
+        # print(resolution_list)
+        plt.figure()
+        plt.hist(resolution_list, color='green', edgecolor='black')
+        plt.title('Histogram of Resolution Values')
+        plt.xlabel('Resolution Value')
+        plt.ylabel('Frequency')
+        self.save_histograms('resolution_hist')
+        plt.close()
+
+        # ASTIGMATISM
+        # print(astigmatism_list)
+        plt.figure()
+        plt.hist(astigmatism_list, color='blue', edgecolor='black')
+        plt.title('Histogram of Astigmatism Values')
+        plt.xlabel('Astigmatism Value')
+        plt.ylabel('Frequency')
+        self.save_histograms('astigmatism_hist')
+        plt.close()
+
         return CTF_estimation
 
     def saveJson(self):
@@ -341,3 +383,8 @@ class ProtOSCEM(EMProtocol):
 
     def getOutFile(self):
         return self._getExtraPath(OUTFILE)
+
+    def save_histograms(self, file_name):
+        folder_path = self._getExtraPath()
+        file_path = os.path.join(folder_path, file_name)
+        plt.savefig(file_path)
