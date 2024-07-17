@@ -2,6 +2,7 @@ from matplotlib import pyplot as plt
 
 import pyworkflow.protocol.params as params
 from pwem.protocols import EMProtocol
+from pwem.viewers import EmPlotter
 from pyworkflow.object import String
 
 import numpy as np
@@ -339,35 +340,31 @@ class ProtOSCEM(EMProtocol):
         CTF_estimation['Resolution'] = resolution
 
         # Histograms generation
+        numberOfBins = 10
+        plotterDefocus = EmPlotter()
+        plotterResolution = EmPlotter()
+        plotterAstigmatism = EmPlotter()
+
         # DEFOCUS
-        # print(defocus_list)
-        plt.figure()
-        plt.hist(defocus_list, color='orange', edgecolor='black')
-        plt.title('Histogram of Defocus Values')
-        plt.xlabel('Defocus Value')
-        plt.ylabel('Frequency')
-        self.save_histograms('defocus_hist')
-        plt.close()
+        plotterDefocus.createSubPlot("Defocus histogram", "Defocus (A)", "#")
+        plotterDefocus.plotHist(defocus_list, nbins=numberOfBins)
+        defocus_hist = self.hist_path('defocus_hist')
+        plotterDefocus.savefig(defocus_hist)
+        plotterDefocus.close()
 
         # RESOLUTION
-        # print(resolution_list)
-        plt.figure()
-        plt.hist(resolution_list, color='green', edgecolor='black')
-        plt.title('Histogram of Resolution Values')
-        plt.xlabel('Resolution Value')
-        plt.ylabel('Frequency')
-        self.save_histograms('resolution_hist')
-        plt.close()
+        plotterResolution.createSubPlot("Resolution histogram", "Resolution", "#")
+        plotterResolution.plotHist(resolution_list, nbins=numberOfBins)
+        resolution_hist = self.hist_path('resolution_hist')
+        plotterResolution.savefig(resolution_hist)
+        plotterResolution.close()
 
         # ASTIGMATISM
-        # print(astigmatism_list)
-        plt.figure()
-        plt.hist(astigmatism_list, color='blue', edgecolor='black')
-        plt.title('Histogram of Astigmatism Values')
-        plt.xlabel('Astigmatism Value')
-        plt.ylabel('Frequency')
-        self.save_histograms('astigmatism_hist')
-        plt.close()
+        plotterAstigmatism.createSubPlot("Astigmatism histogram", "Astigmatism", "#")
+        plotterAstigmatism.plotHist(astigmatism_list, nbins=numberOfBins)
+        astigmatism_hist = self.hist_path('astigmatism_hist')
+        plotterAstigmatism.savefig(astigmatism_hist)
+        plotterAstigmatism.close()
 
         return CTF_estimation
 
@@ -384,7 +381,7 @@ class ProtOSCEM(EMProtocol):
     def getOutFile(self):
         return self._getExtraPath(OUTFILE)
 
-    def save_histograms(self, file_name):
+    def hist_path(self, file_name):
         folder_path = self._getExtraPath()
         file_path = os.path.join(folder_path, file_name)
-        plt.savefig(file_path)
+        return file_path
