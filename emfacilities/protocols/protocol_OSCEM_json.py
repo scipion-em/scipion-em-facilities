@@ -104,8 +104,10 @@ class ProtOSCEM(EMProtocol):
             # print(json.dumps(CTF, indent=4))
             self.processing_json['CTF_estimation'] = CTF
 
-        particles = self.particles_generation()
-        self.processing_json['Particle_picking'] = particles
+        if self.particles.get() is not None:
+            ###### PARTICLES ######
+            particles = self.particles_generation()
+            self.processing_json['Particle_picking'] = particles
 
         print(json.dumps(self.processing_json, indent=4))
 

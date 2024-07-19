@@ -1,10 +1,13 @@
 import json
 from os.path import join, exists, abspath
 
-from pwem.protocols import ProtImportMovies, ProtAlignMovies
+from relion.protocols import ProtRelionAutopickLoG, ProtRelionExtractParticles
+
+from pwem.protocols import ProtImportMovies, ProtAlignMovies, ProtUserSubSet
 from pyworkflow.tests import BaseTest, tests, DataSet
 from pyworkflow.utils import magentaStr
-from xmipp3.protocols import XmippProtMovieGain, XmippProtFlexAlign, XmippProtMovieMaxShift, XmippProtCTFMicrographs
+from xmipp3.protocols import XmippProtMovieGain, XmippProtFlexAlign, XmippProtMovieMaxShift, XmippProtCTFMicrographs, \
+    XmippProtParticlePicking, XmippParticlePickingAutomatic
 from ...protocols import ProtOSCEM
 from ...protocols.protocol_OSCEM_json import INPUT_MOVIES
 
@@ -56,6 +59,9 @@ class TestOscemJson(BaseTest):
                 "Output_min_resolution": 2.45025,
                 "Output_avg_resolution": 2.793877375
             }
+        },
+        "Particle_picking": {
+            "Particles_per_micrograph": 33.6
         }
     }
 
@@ -68,6 +74,8 @@ class TestOscemJson(BaseTest):
         cls.protalignmovie, cls.alignedmovies = cls.runMovieAlign()
         cls.protmaxshift, cls.maxshiftmicro = cls.runMaxShift()
         cls.protCTF, cls.CTFmicro = cls.runCTFestimation()
+        cls.protpicking, cls.picked = cls.runLoGPicking()
+        cls.protextract, cls.particles = cls.runExtractParticles()
 
     @classmethod
     def runImportMovies(cls):
@@ -120,6 +128,28 @@ class TestOscemJson(BaseTest):
 
         cls.launchProtocol(prot)
         output = getattr(prot, 'outputCTF', None)
+        return prot, output
+
+    @classmethod
+    def runLoGPicking(cls):
+        prot = cls.newProtocol(ProtRelionAutopickLoG,
+                               inputMicrographs=cls.maxshiftmicro,
+                               boxSize=300)
+
+        cls.launchProtocol(prot)
+        output = getattr(prot, 'outputCoordinates', None)
+        return prot, output
+
+    @classmethod
+    def runExtractParticles(cls):
+        prot = cls.newProtocol(ProtRelionExtractParticles,
+                               inputCoordinates=cls.picked,
+                               ctfRelations=cls.CTFmicro,
+                               boxSize=300,
+                               doInvert=False)
+
+        cls.launchProtocol(prot)
+        output = getattr(prot, 'outputParticles', None)
         return prot, output
 
     def test_only_import(self):
@@ -328,3 +358,32 @@ class TestOscemJson(BaseTest):
                         self.assertAlmostEqual(current_test_value, current_value, delta=1.5)
                     else:
                         self.assertEqual(current_test_value, current_value)
+
+    def test_import_and_(self):
+        print(magentaStr(f"\n==> Running import movies and particles test:"))
+        test_data_import = {"Import_movies": self.test_data["Import_movies"],
+                            "Particle_picking": self.test_data["Particle_picking"]}
+
+        prot = self.newProtocol(ProtOSCEM,
+                                inputType=INPUT_MOVIES,
+                                importMovies=self.protimportmovies,
+                                particles=self.particles)
+        self.launchProtocol(prot)
+
+        file_path = prot.getOutFile()
+        self.assertTrue(exists(file_path))
+
+        with open(abspath(file_path), 'r') as json_file:
+            load_json = json.load(json_file)
+
+        for key, section_test_dict in test_data_import.items():
+            current_dict = load_json.get(key, None)
+            self.assertIsNotNone(current_dict, msg=f'Dictionary section {key} is not found')
+            for key_in, current_test_value in section_test_dict.items():
+                current_value = current_dict.get(key_in, None)
+                self.assertIsNotNone(current_value, msg=f'In dictionary {key}, {key_in} is not found')
+                if key_in == "Particles_per_micrograph":
+                    # these values change decimals each time alignment is run
+                    self.assertAlmostEqual(current_test_value, current_value, delta=1)
+                else:
+                    self.assertEqual(current_test_value, current_value)
