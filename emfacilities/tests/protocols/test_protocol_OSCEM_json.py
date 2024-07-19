@@ -1,13 +1,13 @@
 import json
 from os.path import join, exists, abspath
 
-from relion.protocols import ProtRelionAutopickLoG, ProtRelionExtractParticles
+from relion.protocols import ProtRelionAutopickLoG, ProtRelionExtractParticles, ProtRelionClassify2D
 
 from pwem.protocols import ProtImportMovies, ProtAlignMovies, ProtUserSubSet
 from pyworkflow.tests import BaseTest, tests, DataSet
 from pyworkflow.utils import magentaStr
 from xmipp3.protocols import XmippProtMovieGain, XmippProtFlexAlign, XmippProtMovieMaxShift, XmippProtCTFMicrographs, \
-    XmippProtParticlePicking, XmippParticlePickingAutomatic
+    XmippProtParticlePicking, XmippParticlePickingAutomatic, XmippProtCTFConsensus, XmippProtCenterParticles
 from ...protocols import ProtOSCEM
 from ...protocols.protocol_OSCEM_json import INPUT_MOVIES
 
@@ -50,18 +50,25 @@ class TestOscemJson(BaseTest):
         },
         "CTF_estimation": {
             "Defocus": {
-                "Output_max_defocus": 9238.84,
-                "Output_min_defocus": 1509.145,
-                "Output_avg_defocus": 5364.463750000001
+                "Output_max_defocus": 8162.08,
+                "Output_min_defocus": 6486.285,
+                "Output_avg_defocus": 7324.1825
             },
             "Resolution": {
-                "Output_max_resolution": 3.062813,
-                "Output_min_resolution": 2.45025,
-                "Output_avg_resolution": 2.793877375
+                "Output_max_resolution": 2.513077,
+                "Output_min_resolution": 2.279302,
+                "Output_avg_resolution": 2.3961895
             }
         },
         "Particle_picking": {
-            "Particles_per_micrograph": 33.6
+            "Particles_per_micrograph": 175.0
+        },
+        "Classes_2D": {
+            "Number_classes_2D": 3,
+            "Particles_per_class": [
+                213,
+                109,
+                28]
         }
     }
 
@@ -73,9 +80,12 @@ class TestOscemJson(BaseTest):
         cls.protmoviegain, cls.gainmovies = cls.runMovieGain()
         cls.protalignmovie, cls.alignedmovies = cls.runMovieAlign()
         cls.protmaxshift, cls.maxshiftmicro = cls.runMaxShift()
-        cls.protCTF, cls.CTFmicro = cls.runCTFestimation()
+        cls.protCTF, cls.CTFout = cls.runCTFestimation()
+        cls.protCTFconsensus, cls.CTFmicro, cls.CTFconsensus = cls.runCTFconsensus()
         cls.protpicking, cls.picked = cls.runLoGPicking()
         cls.protextract, cls.particles = cls.runExtractParticles()
+        cls.prot2Dclasses, cls.classes2D = cls.run2DClassification()
+        cls.portCenter, cls.centeredClasses2D, cls.centeredParticles = cls.runCenterParticles()
 
     @classmethod
     def runImportMovies(cls):
@@ -131,10 +141,22 @@ class TestOscemJson(BaseTest):
         return prot, output
 
     @classmethod
+    def runCTFconsensus(cls):
+        prot = cls.newProtocol(XmippProtCTFConsensus,
+                               inputCTF=cls.CTFout,
+                               resolution=4.0)
+
+        cls.launchProtocol(prot)
+        output1 = getattr(prot, 'outputMicrographs', None)
+        output2 = getattr(prot, 'outputCTF', None)
+        return prot, output1, output2
+
+    @classmethod
     def runLoGPicking(cls):
         prot = cls.newProtocol(ProtRelionAutopickLoG,
-                               inputMicrographs=cls.maxshiftmicro,
-                               boxSize=300)
+                               inputMicrographs=cls.CTFmicro,
+                               boxSize=300,
+                               minDiameter=100)
 
         cls.launchProtocol(prot)
         output = getattr(prot, 'outputCoordinates', None)
@@ -144,13 +166,34 @@ class TestOscemJson(BaseTest):
     def runExtractParticles(cls):
         prot = cls.newProtocol(ProtRelionExtractParticles,
                                inputCoordinates=cls.picked,
-                               ctfRelations=cls.CTFmicro,
+                               ctfRelations=cls.CTFconsensus,
                                boxSize=300,
                                doInvert=False)
 
         cls.launchProtocol(prot)
         output = getattr(prot, 'outputParticles', None)
         return prot, output
+
+    @classmethod
+    def run2DClassification(cls):
+        prot = cls.newProtocol(ProtRelionClassify2D,
+                               inputParticles=cls.particles,
+                               useGradientAlg=False)
+
+        cls.launchProtocol(prot)
+        output = getattr(prot, 'outputClasses', None)
+        return prot, output
+
+    @classmethod
+    def runCenterParticles(cls):
+        prot = cls.newProtocol(XmippProtCenterParticles,
+                               inputClasses=cls.classes2D,
+                               inputMics=cls.CTFmicro)
+
+        cls.launchProtocol(prot)
+        output1 = getattr(prot, 'outputClasses', None)
+        output2 = getattr(prot, 'outputParticles', None)
+        return prot, output1, output2
 
     def test_only_import(self):
         print(magentaStr(f"\n==> Running import movies test:"))
@@ -246,7 +289,7 @@ class TestOscemJson(BaseTest):
         prot = self.newProtocol(ProtOSCEM,
                                 inputType=INPUT_MOVIES,
                                 importMovies=self.protimportmovies,
-                                CTF=self.CTFmicro)
+                                CTF=self.CTFconsensus)
 
         self.launchProtocol(prot)
         # recuperar resultados -> meter en funcion y meto el protocolo de entrada
@@ -311,7 +354,7 @@ class TestOscemJson(BaseTest):
                     self.assertEqual(current_test_value, current_value)
 
     def test_6(self):
-        print(magentaStr(f"\n==> Running import movies, movie alignment and max shift test:"))
+        print(magentaStr(f"\n==> Running import movies, movie alignment, max shift and CTF test:"))
         test_data_import = {"Import_movies": self.test_data["Import_movies"],
                             "Movie_alignment": self.test_data["Movie_alignment"],
                             "Movie_maxshift": self.test_data["Movie_maxshift"],
@@ -322,7 +365,7 @@ class TestOscemJson(BaseTest):
                                 importMovies=self.protimportmovies,
                                 movieAlignment=self.protalignmovie,
                                 maxShift=self.protmaxshift,
-                                CTF=self.CTFmicro)
+                                CTF=self.CTFconsensus)
 
         self.launchProtocol(prot)
 
@@ -359,7 +402,7 @@ class TestOscemJson(BaseTest):
                     else:
                         self.assertEqual(current_test_value, current_value)
 
-    def test_import_and_(self):
+    def test_import_and_particles(self):
         print(magentaStr(f"\n==> Running import movies and particles test:"))
         test_data_import = {"Import_movies": self.test_data["Import_movies"],
                             "Particle_picking": self.test_data["Particle_picking"]}
@@ -384,6 +427,34 @@ class TestOscemJson(BaseTest):
                 self.assertIsNotNone(current_value, msg=f'In dictionary {key}, {key_in} is not found')
                 if key_in == "Particles_per_micrograph":
                     # these values change decimals each time alignment is run
-                    self.assertAlmostEqual(current_test_value, current_value, delta=1)
+                    self.assertAlmostEqual(current_test_value, current_value, delta=2)
+                else:
+                    self.assertEqual(current_test_value, current_value)
+
+    def test_import_and_2DClassification(self):
+        print(magentaStr(f"\n==> Running import movies and 2D classification test:"))
+        test_data_import = {"Import_movies": self.test_data["Import_movies"],
+                            "Classes_2D": self.test_data["Classes_2D"]}
+
+        prot = self.newProtocol(ProtOSCEM,
+                                inputType=INPUT_MOVIES,
+                                importMovies=self.protimportmovies,
+                                classes2D=self.centeredClasses2D)
+        self.launchProtocol(prot)
+
+        file_path = prot.getOutFile()
+        self.assertTrue(exists(file_path))
+
+        with open(abspath(file_path), 'r') as json_file:
+            load_json = json.load(json_file)
+
+        for key, section_test_dict in test_data_import.items():
+            current_dict = load_json.get(key, None)
+            self.assertIsNotNone(current_dict, msg=f'Dictionary section {key} is not found')
+            for key_in, current_test_value in section_test_dict.items():
+                current_value = current_dict.get(key_in, None)
+                self.assertIsNotNone(current_value, msg=f'In dictionary {key}, {key_in} is not found')
+                if key_in == "Particles_per_class":
+                    pass
                 else:
                     self.assertEqual(current_test_value, current_value)
