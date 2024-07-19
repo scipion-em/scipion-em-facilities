@@ -65,6 +65,12 @@ class ProtOSCEM(EMProtocol):
                       help="Particles obtained when doing particle extraction",
                       allowsNull=True)
 
+        form.addParam('classes2D', params.PointerParam,
+                      label="Classes 2D", important=True,
+                      pointerClass='SetOfClasses2D',
+                      help="Set of 2D classes",
+                      allowsNull=True)
+
     # -------------------------- INSERT steps functions -----------------------
     def _insertAllSteps(self):
         self._insertFunctionStep(self.generateJson)
@@ -108,6 +114,11 @@ class ProtOSCEM(EMProtocol):
             ###### PARTICLES ######
             particles = self.particles_generation()
             self.processing_json['Particle_picking'] = particles
+
+        if self.classes2D.get() is not None:
+            ###### PARTICLES ######
+            classes = self.classes2D_generation()
+            self.processing_json['Classes_2D'] = classes
 
         print(json.dumps(self.processing_json, indent=4))
 
@@ -408,6 +419,28 @@ class ProtOSCEM(EMProtocol):
         plt.savefig(particles_hist)
 
         return particles
+
+    def classes2D_generation(self):
+        classes2D = self.classes2D.get()
+        print(classes2D)
+        attrib = classes2D.getAttributes()
+        print(attrib)
+        particles_per_class = []
+        for index, item in enumerate(classes2D.iterItems()):
+            print(f"item: {item}")
+            print(f" size: {item._size}")
+            print(f"type of item: {type(item)}")
+            print(dir(item)) # available attributes
+            print(f"Index: {index}, Item: {item}")
+            number_particles = item._size.get()
+            print(f"particles: {number_particles}")
+            particles_per_class.append(number_particles)
+            classes = index + 1
+        print(f"classes: {classes}")
+        print(particles_per_class)
+        classes_2D = {"Number_classes_2D": classes, "Particles_per_class": particles_per_class}
+
+        return classes_2D
 
     def saveJson(self):
 
