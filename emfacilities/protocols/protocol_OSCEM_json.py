@@ -71,6 +71,12 @@ class ProtOSCEM(EMProtocol):
                       help="Set of 2D classes",
                       allowsNull=True)
 
+        form.addParam('initVolume', params.PointerParam,
+                      label="Initial volume", important=True,
+                      pointerClass='Volume',
+                      help="Initial volume",
+                      allowsNull=True)
+
     # -------------------------- INSERT steps functions -----------------------
     def _insertAllSteps(self):
         self._insertFunctionStep(self.generateJson)
@@ -116,9 +122,14 @@ class ProtOSCEM(EMProtocol):
             self.processing_json['Particle_picking'] = particles
 
         if self.classes2D.get() is not None:
-            ###### PARTICLES ######
+            ###### CLASSES 2D ######
             classes = self.classes2D_generation()
             self.processing_json['Classes_2D'] = classes
+
+        if self.initVolume.get() is not None:
+            ###### INITIAL VOLUME ######
+            self.initVolume_generation()
+            # self.processing_json['Initial_volume'] = volume
 
         print(json.dumps(self.processing_json, indent=4))
 
@@ -422,25 +433,35 @@ class ProtOSCEM(EMProtocol):
 
     def classes2D_generation(self):
         classes2D = self.classes2D.get()
-        print(classes2D)
+        # print(classes2D)
         attrib = classes2D.getAttributes()
-        print(attrib)
+        # print(attrib)
         particles_per_class = []
         for index, item in enumerate(classes2D.iterItems()):
-            print(f"item: {item}")
-            print(f" size: {item._size}")
-            print(f"type of item: {type(item)}")
-            print(dir(item)) # available attributes
-            print(f"Index: {index}, Item: {item}")
+            # print(f"item: {item}")
+            # print(f" size: {item._size}")
+            # print(f"type of item: {type(item)}")
+            # print(dir(item)) # available attributes
+            # print(f"Index: {index}, Item: {item}")
             number_particles = item._size.get()
-            print(f"particles: {number_particles}")
+            # print(f"particles: {number_particles}")
             particles_per_class.append(number_particles)
-            classes = index + 1
-        print(f"classes: {classes}")
-        print(particles_per_class)
+
+        classes = index + 1
+        # print(f"classes: {clasases}")
+        # print
         classes_2D = {"Number_classes_2D": classes, "Particles_per_class": particles_per_class}
 
         return classes_2D
+
+    def initVolume_generation(self):
+        # volume = self.initVolume.get()
+        # print(volume)
+        # # attrib = volume.getAttributes()
+        # attributes = [attr for attr in dir(volume) if not attr.startswith('__')]
+        # print(attributes)
+        particles_per_class = []
+
 
     def saveJson(self):
 

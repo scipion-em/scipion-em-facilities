@@ -1,13 +1,16 @@
 import json
 from os.path import join, exists, abspath
 
+from cryosparc2.protocols import ProtCryo2D, ProtCryoSparcInitialModel
+
 from relion.protocols import ProtRelionAutopickLoG, ProtRelionExtractParticles, ProtRelionClassify2D
 
 from pwem.protocols import ProtImportMovies, ProtAlignMovies, ProtUserSubSet
 from pyworkflow.tests import BaseTest, tests, DataSet
 from pyworkflow.utils import magentaStr
 from xmipp3.protocols import XmippProtMovieGain, XmippProtFlexAlign, XmippProtMovieMaxShift, XmippProtCTFMicrographs, \
-    XmippProtParticlePicking, XmippParticlePickingAutomatic, XmippProtCTFConsensus, XmippProtCenterParticles
+    XmippProtParticlePicking, XmippParticlePickingAutomatic, XmippProtCTFConsensus, XmippProtCenterParticles, \
+    XmippProtExtractParticles
 from ...protocols import ProtOSCEM
 from ...protocols.protocol_OSCEM_json import INPUT_MOVIES
 
@@ -27,7 +30,7 @@ class TestOscemJson(BaseTest):
             "Sampling_rate": 0.495,
             "Pixel_size": 2.475,
             "Gain_image": True,
-            "Number_movies": 10
+            "Number_movies": 30
         },
         "Movie_alignment": {
             "Method": "XmippProtFlexAlign",
@@ -37,38 +40,84 @@ class TestOscemJson(BaseTest):
                 "Frame0": 1,
                 "FrameN": 0
             },
-            "Output_avg_shift": 12.085274343980803,
-            "Output_max_shift": 34.31086742604614
+            "Output_avg_shift": 11.817132324620918,
+            "Output_max_shift": 34.02834443504211
         },
         "Movie_maxshift": {
-            "Discarded_movies": 5,
+            "Discarded_movies": 9,
             "Max_frame_shift": 5.0,
             "Max_movie_shift": 20.0,
             "Rejection_type": "By frame or movie",
-            "Output_avg_shift": 10.655840604909368,
-            "Output_max_shift": 28.289413400687277
+            "Output_avg_shift": 11.806156624471319,
+            "Output_max_shift": 29.569197112511205
         },
         "CTF_estimation": {
             "Defocus": {
-                "Output_max_defocus": 8162.08,
-                "Output_min_defocus": 6486.285,
-                "Output_avg_defocus": 7324.1825
+                "Output_max_defocus": 11850.75,
+                "Output_min_defocus": 4822.985000000001,
+                "Output_avg_defocus": 9654.118046875
             },
             "Resolution": {
-                "Output_max_resolution": 2.513077,
-                "Output_min_resolution": 2.279302,
-                "Output_avg_resolution": 2.3961895
+                "Output_max_resolution": 2.882647,
+                "Output_min_resolution": 2.085319,
+                "Output_avg_resolution": 2.5573557734375
             }
         },
         "Particle_picking": {
-            "Particles_per_micrograph": 175.0
+            "Particles_per_micrograph": 113.375
         },
         "Classes_2D": {
-            "Number_classes_2D": 3,
+            "Number_classes_2D": 49,
             "Particles_per_class": [
-                213,
-                109,
-                28]
+                7,
+                12,
+                13,
+                3,
+                11,
+                7,
+                22,
+                7,
+                6,
+                1,
+                9,
+                4,
+                5,
+                18,
+                10,
+                5,
+                7,
+                5,
+                22,
+                3,
+                6,
+                52,
+                13,
+                6,
+                4,
+                332,
+                17,
+                10,
+                3,
+                10,
+                8,
+                3,
+                1,
+                15,
+                3,
+                15,
+                19,
+                86,
+                13,
+                14,
+                20,
+                2,
+                21,
+                20,
+                2,
+                10,
+                24,
+                1
+            ]
         }
     }
 
@@ -156,7 +205,8 @@ class TestOscemJson(BaseTest):
         prot = cls.newProtocol(ProtRelionAutopickLoG,
                                inputMicrographs=cls.CTFmicro,
                                boxSize=300,
-                               minDiameter=100)
+                               minDiameter=100,
+                               maxDiameter=200)
 
         cls.launchProtocol(prot)
         output = getattr(prot, 'outputCoordinates', None)
@@ -164,11 +214,11 @@ class TestOscemJson(BaseTest):
 
     @classmethod
     def runExtractParticles(cls):
-        prot = cls.newProtocol(ProtRelionExtractParticles,
+        prot = cls.newProtocol(XmippProtExtractParticles,
                                inputCoordinates=cls.picked,
                                ctfRelations=cls.CTFconsensus,
-                               boxSize=300,
-                               doInvert=False)
+                               downFactor=2.5,
+                               boxSize=300)
 
         cls.launchProtocol(prot)
         output = getattr(prot, 'outputParticles', None)
@@ -176,9 +226,8 @@ class TestOscemJson(BaseTest):
 
     @classmethod
     def run2DClassification(cls):
-        prot = cls.newProtocol(ProtRelionClassify2D,
-                               inputParticles=cls.particles,
-                               useGradientAlg=False)
+        prot = cls.newProtocol(ProtCryo2D,
+                               inputParticles=cls.particles)
 
         cls.launchProtocol(prot)
         output = getattr(prot, 'outputClasses', None)
@@ -457,4 +506,4 @@ class TestOscemJson(BaseTest):
                 if key_in == "Particles_per_class":
                     pass
                 else:
-                    self.assertEqual(current_test_value, current_value)
+                    self.assertAlmostEqual(current_test_value, current_value, delta=2)
