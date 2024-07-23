@@ -317,8 +317,9 @@ class TestOscemJson(BaseTest):
         inputVolumesList = [cls.initVolVolumes, cls.initVol2, cls.cropVol, cls.reconstructOutVolume,
                             cls.ransacOutVolumes]
         prot = cls.newProtocol(XmippProtAlignVolume,
-                               inputReference=cls.reconstructOutVolume,
-                               inputVolumes=inputVolumesList)
+                               inputReference=cls.reconstructOutVolume)
+        for vol in inputVolumesList:
+            prot.inputVolumes.append(vol)
 
         cls.launchProtocol(prot)
         output = getattr(prot, 'outputVolumes', None)
