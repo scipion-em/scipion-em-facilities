@@ -77,6 +77,12 @@ class ProtOSCEM(EMProtocol):
                       help="Initial volume",
                       allowsNull=True)
 
+        form.addParam('classes3D', params.PointerParam,
+                      label="Classes 3D", important=True,
+                      pointerClass='SetOfClasses3D',
+                      help="Set of 2D classes",
+                      allowsNull=True)
+
     # -------------------------- INSERT steps functions -----------------------
     def _insertAllSteps(self):
         self._insertFunctionStep(self.generateJson)
@@ -123,13 +129,19 @@ class ProtOSCEM(EMProtocol):
 
         if self.classes2D.get() is not None:
             ###### CLASSES 2D ######
-            classes = self.classes2D_generation()
-            self.processing_json['Classes_2D'] = classes
+            classes_2D = self.classes2D_generation()
+            self.processing_json['Classes_2D'] = classes_2D
 
         if self.initVolume.get() is not None:
             ###### INITIAL VOLUME ######
             self.initVolume_generation()
             # self.processing_json['Initial_volume'] = volume
+
+        if self.classes3D.get() is not None:
+            ###### CLASSES 3D ######
+            classes_3D = self.classes3D_generation()
+            self.processing_json['Classes_3D'] = classes_3D
+
 
         print(json.dumps(self.processing_json, indent=4))
 
@@ -462,6 +474,28 @@ class ProtOSCEM(EMProtocol):
         # print(attributes)
         particles_per_class = []
 
+    def classes3D_generation(self):
+        classes3D = self.classes3D.get()
+        # print(classes2D)
+        attrib = classes3D.getAttributes()
+        # print(attrib)
+        particles_per_class = []
+        for index, item in enumerate(classes3D.iterItems()):
+            # print(f"item: {item}")
+            # print(f" size: {item._size}")
+            # print(f"type of item: {type(item)}")
+            # print(dir(item)) # available attributes
+            # print(f"Index: {index}, Item: {item}")
+            number_particles = item._size.get()
+            # print(f"particles: {number_particles}")
+            particles_per_class.append(number_particles)
+        #
+        classes = index + 1
+        # print(f"classes: {classes}")
+        # print
+        classes_3D = {"Number_classes_3D": classes, "Particles_per_class": particles_per_class}
+
+        return classes_3D
 
     def saveJson(self):
 
