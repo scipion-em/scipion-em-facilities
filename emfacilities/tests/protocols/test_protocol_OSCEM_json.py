@@ -1,10 +1,10 @@
 import json
 from os.path import exists, abspath
 
-from cryosparc2.protocols import ProtCryo2D, ProtCryoSparcInitialModel
+from cryosparc2.protocols import ProtCryo2D, ProtCryoSparcInitialModel, ProtCryoSparc3DHomogeneousRefine
 from pwem import SYM_TETRAHEDRAL
 
-from relion.protocols import ProtRelionAutopickLoG, ProtRelionInitialModel
+from relion.protocols import ProtRelionAutopickLoG, ProtRelionInitialModel, ProtRelionClassify3D
 
 from pwem.protocols import ProtImportMovies, ProtAlignMovies, ProtUserSubSet
 from pyworkflow.tests import BaseTest, tests, DataSet
@@ -12,7 +12,7 @@ from pyworkflow.utils import magentaStr
 from xmipp3.protocols import XmippProtMovieGain, XmippProtFlexAlign, XmippProtMovieMaxShift, XmippProtCTFMicrographs, \
     XmippProtCTFConsensus, XmippProtCenterParticles, \
     XmippProtExtractParticles, XmippProtReconstructSignificant, XmippProtRansac, XmippProtCropResizeVolumes, \
-    XmippProtAlignVolume
+    XmippProtAlignVolume, XmippProtReconstructSwarm
 from ...protocols import ProtOSCEM
 from ...protocols.protocol_OSCEM_json import INPUT_MOVIES
 
@@ -132,19 +132,12 @@ class TestOscemJson(BaseTest):
         cls.protalignmovie, cls.alignedmovies = cls.runMovieAlign()
         cls.protmaxshift, cls.maxshiftmicro = cls.runMaxShift()
         cls.protCTF, cls.CTFout = cls.runCTFestimation()
-        cls.protCTFconsensus, cls.CTFmicro, cls.CTFconsensus = cls.runCTFconsensus()
         cls.protpicking, cls.picked = cls.runLoGPicking()
         cls.protextract, cls.particles = cls.runExtractParticles()
         cls.prot2Dclasses, cls.classes2D = cls.run2DClassification()
         cls.portCenter, cls.centeredClasses2D, cls.centeredParticles = cls.runCenterParticles()
         cls.protInitVolume, cls.initVolClasses, cls.initVolVolumes = cls.runInitialVolume()
-        cls.protInitVolume2, cls.initVolParticles2, cls.initVol2 = cls.runInitialVolume2()
-        cls.protCrop, cls.cropVol = cls.runCropResize()
-        cls.protReconstructSig, cls.reconstructOutVolume = cls.runReconstructSig()
-        cls.protRansac, cls.ransacOutVolumes = cls.runRansac()
-        cls.protAlign, cls. alignVolumes = cls.runAlignVol()
-        cls.protSwarmConsensus, cls.swarmVolume, cls.swarmVolumes = cls.runSwarmConsensus()
-        cls.protCrop2, cls.cropVol2 = cls.runCropResize2()
+        cls.prot3DClassification, cls.classes3DClassification, cls.volumes3DClassification = cls.run3DClassification()
 
     @classmethod
     def runImportMovies(cls):
@@ -200,20 +193,9 @@ class TestOscemJson(BaseTest):
         return prot, output
 
     @classmethod
-    def runCTFconsensus(cls):
-        prot = cls.newProtocol(XmippProtCTFConsensus,
-                               inputCTF=cls.CTFout,
-                               resolution=4.0)
-
-        cls.launchProtocol(prot)
-        output1 = getattr(prot, 'outputMicrographs', None)
-        output2 = getattr(prot, 'outputCTF', None)
-        return prot, output1, output2
-
-    @classmethod
     def runLoGPicking(cls):
         prot = cls.newProtocol(ProtRelionAutopickLoG,
-                               inputMicrographs=cls.CTFmicro,
+                               inputMicrographs=cls.maxshiftmicro,
                                boxSize=300,
                                minDiameter=100,
                                maxDiameter=200)
@@ -226,7 +208,7 @@ class TestOscemJson(BaseTest):
     def runExtractParticles(cls):
         prot = cls.newProtocol(XmippProtExtractParticles,
                                inputCoordinates=cls.picked,
-                               ctfRelations=cls.CTFconsensus,
+                               ctfRelations=cls.CTFout,
                                doResize=True,
                                downFactor=2.5,
                                boxSize=300)
@@ -248,7 +230,7 @@ class TestOscemJson(BaseTest):
     def runCenterParticles(cls):
         prot = cls.newProtocol(XmippProtCenterParticles,
                                inputClasses=cls.classes2D,
-                               inputMics=cls.CTFmicro)
+                               inputMics=cls.maxshiftmicro)
 
         cls.launchProtocol(prot)
         output1 = getattr(prot, 'outputClasses', None)
@@ -259,7 +241,12 @@ class TestOscemJson(BaseTest):
     def runInitialVolume(cls):
         prot = cls.newProtocol(ProtCryoSparcInitialModel,
                                inputParticles=cls.centeredParticles,
-                               symmetryGroup=SYM_TETRAHEDRAL)
+                               symmetryGroup=SYM_TETRAHEDRAL,
+                               numberOfClasses=2,
+                               abinit_max_res=20,
+                               abinit_num_init_iters=50,
+                               abinit_num_final_iters=75,
+                               abinit_radwn_step=0.1)
 
         cls.launchProtocol(prot)
         output1 = getattr(prot, 'outputClasses', None)
@@ -267,88 +254,19 @@ class TestOscemJson(BaseTest):
         return prot, output1, output2
 
     @classmethod
-    def runInitialVolume2(cls):
-        prot = cls.newProtocol(ProtRelionInitialModel,
+    def run3DClassification(cls):
+        prot = cls.newProtocol(ProtRelionClassify3D,
                                inputParticles=cls.centeredParticles,
-                               symmetry='o')
+                               referenceVolume=cls.initVolVolumes,
+                               numberOfIterations=10,
+                               symmetryGroup='O',
+                               initialLowPassFilterA=15,
+                               numberOfClasses=2)
 
         cls.launchProtocol(prot)
-        output1 = getattr(prot, 'outputParticles', None)
-        output2 = getattr(prot, 'outputVolume', None)
-        return prot, output1, output2
-
-    @classmethod
-    def runCropResize(cls):
-        prot = cls.newProtocol(XmippProtCropResizeVolumes,
-                               inputVolumes=cls.initVolVolumes,
-                               doResize=True,
-                               resizeSamplingRate=1.24,
-                               doWindow=True,
-                               windowSize=120)
-
-        cls.launchProtocol(prot)
-        output = getattr(prot, 'outputVol', None)
-        return prot, output
-
-    @classmethod
-    def runReconstructSig(cls):
-        prot = cls.newProtocol(XmippProtReconstructSignificant,
-                               useGpu=False,
-                               inputSet=cls.centeredClasses2D,
-                               symmetryGroup='o',
-                               alpha0=100)
-
-        cls.launchProtocol(prot)
-        output = getattr(prot, 'outputVolume', None)
-        return prot, output
-
-    @classmethod
-    def runRansac(cls):
-        prot = cls.newProtocol(XmippProtRansac,
-                               inputSet=cls.centeredClasses2D,
-                               symmetryGroup='o')
-
-        cls.launchProtocol(prot)
-        output = getattr(prot, 'outputVolumes', None)
-        return prot, output
-
-    @classmethod
-    def runAlignVol(cls):
-        inputVolumesList = [cls.initVolVolumes, cls.initVol2, cls.cropVol, cls.reconstructOutVolume,
-                            cls.ransacOutVolumes]
-        prot = cls.newProtocol(XmippProtAlignVolume,
-                               inputReference=cls.reconstructOutVolume)
-        for vol in inputVolumesList:
-            prot.inputVolumes.append(vol)
-
-        cls.launchProtocol(prot)
-        output = getattr(prot, 'outputVolumes', None)
-        return prot, output
-
-    @classmethod
-    def runSwarmConsensus(cls):
-        prot = cls.newProtocol(XmippProtAlignVolume,
-                               inputParticles=cls.centeredParticles,
-                               inputVolumes=cls.alignVolumes,
-                               symmetryGroup='o')
-
-        cls.launchProtocol(prot)
-        output1 = getattr(prot, 'outputVolume', None)
+        output1 = getattr(prot, 'outputClasses', None)
         output2 = getattr(prot, 'outputVolumes', None)
         return prot, output1, output2
-
-    @classmethod
-    def runCropResize2(cls):
-        prot = cls.newProtocol(XmippProtCropResizeVolumes,
-                               inputVolumes=cls.swarmVolume,
-                               doResize=True,
-                               resizeSamplingRate=0.74,
-                               doWindow=True,
-                               windowSize=250)
-
-        cls.launchProtocol(prot)
-        output = getattr(prot, 'outputVol', None)
-        return prot, output
 
     def test_only_import(self):
         print(magentaStr(f"\n==> Running import movies test:"))
@@ -397,7 +315,7 @@ class TestOscemJson(BaseTest):
                 current_value = current_dict.get(key_in, None)
                 self.assertIsNotNone(current_value, msg=f'In dictionary {key}, {key_in} is not found')
                 if key_in == "Output_avg_shift" or key_in == "Output_max_shift":
-                    # these values change decimals each time alignment is run
+                    # these values change each time alignment is run
                     self.assertAlmostEqual(current_test_value, current_value, delta=4)
                 else:
                     self.assertEqual(current_test_value, current_value)
@@ -427,10 +345,10 @@ class TestOscemJson(BaseTest):
                 current_value = current_dict.get(key_in, None)
                 self.assertIsNotNone(current_value, msg=f'In dictionary {key}, {key_in} is not found')
                 if key_in == "Discarded_movies":
-                    # these values change decimals each time alignment is run
+                    # these values change each time alignment is run
                     self.assertAlmostEqual(current_test_value, current_value, delta=1)
                 elif key_in == "Output_avg_shift" or key_in == "Output_max_shift":
-                    # these values change decimals each time alignment is run
+                    # these values change each time alignment is run
                     self.assertAlmostEqual(current_test_value, current_value, delta=4)
                 else:
                     self.assertEqual(current_test_value, current_value)
@@ -447,7 +365,6 @@ class TestOscemJson(BaseTest):
                                 CTF=self.CTFconsensus)
 
         self.launchProtocol(prot)
-        # recuperar resultados -> meter en funcion y meto el protocolo de entrada
         file_path = prot.getOutFile()
         self.assertTrue(exists(file_path))
 
@@ -500,10 +417,10 @@ class TestOscemJson(BaseTest):
                 current_value = current_dict.get(key_in, None)
                 self.assertIsNotNone(current_value, msg=f'In dictionary {key}, {key_in} is not found')
                 if key_in == "Discarded_movies":
-                    # these values change decimals each time alignment is run
+                    # these values change each time alignment is run
                     self.assertAlmostEqual(current_test_value, current_value, delta=1)
                 elif key_in == "Output_avg_shift" or key_in == "Output_max_shift":
-                    # these values change decimals each time alignment is run
+                    # these values change each time alignment is run
                     self.assertAlmostEqual(current_test_value, current_value, delta=4)
                 else:
                     self.assertEqual(current_test_value, current_value)
@@ -549,10 +466,10 @@ class TestOscemJson(BaseTest):
                     current_value = current_dict.get(key_in, None)
                     self.assertIsNotNone(current_value, msg=f'In dictionary {key}, {key_in} is not found')
                     if key_in == "Discarded_movies":
-                        # these values change decimals each time alignment is run
+                        # these values change each time alignment is run
                         self.assertAlmostEqual(current_test_value, current_value, delta=1)
                     elif key_in == "Output_avg_shift" or key_in == "Output_max_shift":
-                        # these values change decimals each time alignment is run
+                        # these values change each time alignment is run
                         self.assertAlmostEqual(current_test_value, current_value, delta=4)
                     else:
                         self.assertEqual(current_test_value, current_value)
@@ -581,7 +498,7 @@ class TestOscemJson(BaseTest):
                 current_value = current_dict.get(key_in, None)
                 self.assertIsNotNone(current_value, msg=f'In dictionary {key}, {key_in} is not found')
                 if key_in == "Particles_per_micrograph":
-                    # these values change decimals each time alignment is run
+                    # these values change each time alignment is run
                     self.assertAlmostEqual(current_test_value, current_value, delta=10)
                 else:
                     self.assertEqual(current_test_value, current_value)
