@@ -416,24 +416,24 @@ class ProtOSCEM(EMProtocol):
     def particles_generation(self):
         parts = self.particles.get()
         # print(parts)
-        mic_numbers = []
+        # mic_numbers = []
         particle_counts = []
         for index, item in enumerate(parts.iterItems()):
             micrograph_num = item._micId
             key_name = f"mic_{micrograph_num}"
             # retrieve the number of particles per micrograph
-            if index == 0 or key_name not in mic_numbers:
-                mic_numbers.append(key_name)
+            if index == 0: # or key_name not in mic_numbers:
+                # mic_numbers.append(key_name)
                 particle_counts.append(1)
             else:
-                index = mic_numbers.index(key_name)
+                # index = mic_numbers.index(key_name)
                 particle_counts[index] += 1
 
         mean_particles_values = np.mean(particle_counts)
         particles = {"Particles_per_micrograph": mean_particles_values}
         # print(particles)
 
-        plt.bar(mic_numbers, particle_counts)
+        plt.hist(particle_counts)
         plt.xlabel('# Micrograph')
         plt.ylabel('# Particles')
         plt.title('Histogram for particle number per micrograph')
