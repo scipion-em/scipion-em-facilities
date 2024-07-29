@@ -1,20 +1,19 @@
 import json
 from os.path import exists, abspath
 
-from cryosparc2.protocols import ProtCryo2D, ProtCryoSparcInitialModel, ProtCryoSparc3DHomogeneousRefine
+from cryosparc2.protocols import ProtCryo2D, ProtCryoSparcInitialModel
 from pwem import SYM_TETRAHEDRAL
 
-from relion.protocols import ProtRelionAutopickLoG, ProtRelionInitialModel, ProtRelionClassify3D
+from relion.protocols import ProtRelionAutopickLoG, ProtRelionClassify3D
 
-from pwem.protocols import ProtImportMovies, ProtAlignMovies, ProtUserSubSet
+from pwem.protocols import ProtImportMovies
 from pyworkflow.tests import BaseTest, tests, DataSet
 from pyworkflow.utils import magentaStr
 from xmipp3.protocols import XmippProtMovieGain, XmippProtFlexAlign, XmippProtMovieMaxShift, XmippProtCTFMicrographs, \
-    XmippProtCTFConsensus, XmippProtCenterParticles, \
-    XmippProtExtractParticles, XmippProtReconstructSignificant, XmippProtRansac, XmippProtCropResizeVolumes, \
-    XmippProtAlignVolume, XmippProtReconstructSwarm
+    XmippProtCenterParticles, \
+    XmippProtExtractParticles
 from ...protocols import ProtOSCEM
-from ...protocols.protocol_OSCEM_json import INPUT_MOVIES
+from ...protocols.protocol_OSCEM_json import INPUT_MOVIES, INPUT_MICS
 
 
 class TestOscemJson(BaseTest):
@@ -56,72 +55,87 @@ class TestOscemJson(BaseTest):
         "CTF_estimation": {
             "Defocus": {
                 "Output_max_defocus": 11850.75,
-                "Output_min_defocus": 4822.985000000001,
-                "Output_avg_defocus": 9654.118046875
+                "Output_min_defocus": 1469.91,
+                "Output_avg_defocus": 1723.308045434952,
+                "Defocus_histogram": "defocus_hist.png"
             },
             "Resolution": {
-                "Output_max_resolution": 2.882647,
+                "Output_max_resolution": 5.158421,
                 "Output_min_resolution": 2.085319,
-                "Output_avg_resolution": 2.5573557734375
+                "Output_avg_resolution": 2.950691318804741,
+                "Resolution_histogram": "resolution_hist.png"
+            },
+            "Astigmatism": {
+                "Astigmatism_histogram": "astigmatism_hist.png"
             }
         },
         "Particle_picking": {
-            "Particles_per_micrograph": 113.375
+            "Particles_per_micrograph": 136.1904761904762,
+            "Particles_histogram": "particles_hist.png"
         },
         "Classes_2D": {
             "Number_classes_2D": 49,
             "Particles_per_class": [
-                7,
-                12,
-                13,
-                3,
-                11,
-                7,
+                42,
                 22,
-                7,
-                6,
-                1,
+                798,
+                16,
                 9,
-                4,
-                5,
-                18,
-                10,
-                5,
-                7,
-                5,
-                22,
-                3,
-                6,
-                52,
-                13,
-                6,
-                4,
-                332,
-                17,
-                10,
-                3,
-                10,
-                8,
-                3,
-                1,
-                15,
-                3,
-                15,
-                19,
-                86,
-                13,
                 14,
+                28,
+                35,
+                4,
+                23,
+                17,
+                13,
+                44,
+                22,
+                22,
+                12,
                 20,
-                2,
+                365,
+                19,
+                27,
+                17,
+                13,
+                4,
+                25,
+                92,
+                78,
+                31,
+                109,
+                262,
+                12,
+                51,
                 21,
-                20,
-                2,
-                10,
-                24,
-                1
+                16,
+                23,
+                7,
+                17,
+                128,
+                40,
+                18,
+                18,
+                82,
+                33,
+                16,
+                26,
+                1,
+                54,
+                77,
+                16,
+                21
+            ]
+        },
+        "Classes_3D": {
+            "Number_classes_3D": 2,
+            "Particles_per_class": [
+                875,
+                1985
             ]
         }
     }
+
 
     @classmethod
     def setUpClass(cls):
@@ -268,176 +282,26 @@ class TestOscemJson(BaseTest):
         output2 = getattr(prot, 'outputVolumes', None)
         return prot, output1, output2
 
-    def test_only_import(self):
-        print(magentaStr(f"\n==> Running import movies test:"))
-        test_data_import = {"Import_movies": self.test_data["Import_movies"]}
-
-        prot = self.newProtocol(ProtOSCEM,
-                                inputType=INPUT_MOVIES,
-                                importMovies=self.protimportmovies)
-        self.launchProtocol(prot)
-
-        file_path = prot.getOutFile()
-        self.assertTrue(exists(file_path))
-
-        with open(abspath(file_path), 'r') as json_file:
-            load_json = json.load(json_file)
-
-        for key, section_test_dict in test_data_import.items():
-            current_dict = load_json.get(key, None)
-            self.assertIsNotNone(current_dict, msg=f'Dictionary section {key} is not found')
-            for key_in, current_test_value in section_test_dict.items():
-                current_value = current_dict.get(key_in, None)
-                self.assertIsNotNone(current_value, msg=f'In dictionary {key}, {key_in} is not found')
-                self.assertEqual(current_test_value, current_value)
-
-    def test_import_and_movie_align(self):
-        print(magentaStr(f"\n==> Running import movies and movie alignment test:"))
-        test_data_import = {"Import_movies": self.test_data["Import_movies"],
-                            "Movie_alignment": self.test_data["Movie_alignment"]}
-
-        prot = self.newProtocol(ProtOSCEM,
-                                inputType=INPUT_MOVIES,
-                                importMovies=self.protimportmovies,
-                                movieAlignment=self.protalignmovie)
-        self.launchProtocol(prot)
-
-        file_path = prot.getOutFile()
-        self.assertTrue(exists(file_path))
-
-        with open(abspath(file_path), 'r') as json_file:
-            load_json = json.load(json_file)
-
-        for key, section_test_dict in test_data_import.items():
-            current_dict = load_json.get(key, None)
-            self.assertIsNotNone(current_dict, msg=f'Dictionary section {key} is not found')
-            for key_in, current_test_value in section_test_dict.items():
-                current_value = current_dict.get(key_in, None)
-                self.assertIsNotNone(current_value, msg=f'In dictionary {key}, {key_in} is not found')
-                if key_in == "Output_avg_shift" or key_in == "Output_max_shift":
-                    # these values change each time alignment is run
-                    self.assertAlmostEqual(current_test_value, current_value, delta=4)
-                else:
-                    self.assertEqual(current_test_value, current_value)
-
-    def test_import_and_max_shift(self):
-        print(magentaStr(f"\n==> Running import movies and movie max shift test:"))
-        test_data_import = {"Import_movies": self.test_data["Import_movies"],
-                            "Movie_maxshift": self.test_data["Movie_maxshift"]
-                            }
-
-        prot = self.newProtocol(ProtOSCEM,
-                                inputType=INPUT_MOVIES,
-                                importMovies=self.protimportmovies,
-                                maxShift=self.protmaxshift)
-        self.launchProtocol(prot)
-        #
-        file_path = prot.getOutFile()
-        self.assertTrue(exists(file_path))
-
-        with open(abspath(file_path), 'r') as json_file:
-            load_json = json.load(json_file)
-
-        for key, section_test_dict in test_data_import.items():
-            current_dict = load_json.get(key, None)
-            self.assertIsNotNone(current_dict, msg=f'Dictionary section {key} is not found')
-            for key_in, current_test_value in section_test_dict.items():
-                current_value = current_dict.get(key_in, None)
-                self.assertIsNotNone(current_value, msg=f'In dictionary {key}, {key_in} is not found')
-                if key_in == "Discarded_movies":
-                    # these values change each time alignment is run
-                    self.assertAlmostEqual(current_test_value, current_value, delta=1)
-                elif key_in == "Output_avg_shift" or key_in == "Output_max_shift":
-                    # these values change each time alignment is run
-                    self.assertAlmostEqual(current_test_value, current_value, delta=4)
-                else:
-                    self.assertEqual(current_test_value, current_value)
-
-    def test_import_and_CTF(self):
-        print(magentaStr(f"\n==> Running import movies and CTF estimation test:"))
-        test_data_import = {"Import_movies": self.test_data["Import_movies"],
-                            "CTF_estimation": self.test_data["CTF_estimation"]
-                            }
-
-        prot = self.newProtocol(ProtOSCEM,
-                                inputType=INPUT_MOVIES,
-                                importMovies=self.protimportmovies,
-                                CTF=self.CTFconsensus)
-
-        self.launchProtocol(prot)
-        file_path = prot.getOutFile()
-        self.assertTrue(exists(file_path))
-
-        with open(abspath(file_path), 'r') as json_file:
-            load_json = json.load(json_file)
-
-        for key, section_test_dict in test_data_import.items():
-            current_dict = load_json.get(key, None)
-            self.assertIsNotNone(current_dict, msg=f'Dictionary section {key} is not found')
-            for key_in, current_test_value in section_test_dict.items():
-                if key == 'Import_movies':
-                    current_value = current_dict.get(key_in, None)
-                    self.assertIsNotNone(current_value, msg=f'In dictionary {key}, {key_in} is not found')
-                    self.assertEqual(current_test_value, current_value)
-                else:
-                    for key_in_in, current_test_value_in in current_test_value.items():
-                        current_section_dict = current_dict.get(key_in, None)
-                        current_value = current_section_dict.get(key_in_in, None)
-                        self.assertIsNotNone(current_value, msg=f'In dictionary {key}, {key_in} is not found')
-                        if key_in_in == "Output_max_defocus" or key_in_in == "Output_min_defocus" or key_in_in == "Output_avg_defocus":
-                            self.assertAlmostEqual(current_test_value_in, current_value, delta=3000)
-                        elif key_in_in == "Output_max_resolution" or key_in_in == "Output_min_resolution" or key_in_in == "Output_avg_resolution":
-                            self.assertAlmostEqual(current_test_value_in, current_value, delta=3000)
-                        else:
-                            self.assertEqual(current_test_value_in, current_value)
-
-    def test_5(self):
-        print(magentaStr(f"\n==> Running import movies, movie alignment, max shift and CTF estimation test:"))
-        test_data_import = {"Import_movies": self.test_data["Import_movies"],
-                            "Movie_alignment": self.test_data["Movie_alignment"],
-                            "Movie_maxshift": self.test_data["Movie_maxshift"]}
-
-        prot = self.newProtocol(ProtOSCEM,
-                                inputType=INPUT_MOVIES,
-                                importMovies=self.protimportmovies,
-                                movieAlignment=self.protalignmovie,
-                                maxShift=self.protmaxshift)
-        self.launchProtocol(prot)
-
-        file_path = prot.getOutFile()
-        self.assertTrue(exists(file_path))
-
-        with open(abspath(file_path), 'r') as json_file:
-            load_json = json.load(json_file)
-
-        for key, section_test_dict in test_data_import.items():
-            current_dict = load_json.get(key, None)
-            self.assertIsNotNone(current_dict, msg=f'Dictionary section {key} is not found')
-            for key_in, current_test_value in section_test_dict.items():
-                current_value = current_dict.get(key_in, None)
-                self.assertIsNotNone(current_value, msg=f'In dictionary {key}, {key_in} is not found')
-                if key_in == "Discarded_movies":
-                    # these values change each time alignment is run
-                    self.assertAlmostEqual(current_test_value, current_value, delta=1)
-                elif key_in == "Output_avg_shift" or key_in == "Output_max_shift":
-                    # these values change each time alignment is run
-                    self.assertAlmostEqual(current_test_value, current_value, delta=4)
-                else:
-                    self.assertEqual(current_test_value, current_value)
-
-    def test_6(self):
-        print(magentaStr(f"\n==> Running import movies, movie alignment, max shift and CTF test:"))
+    def test_complete_input(self):
+        print(magentaStr(f"\n==> Running test with all input completed:"))
         test_data_import = {"Import_movies": self.test_data["Import_movies"],
                             "Movie_alignment": self.test_data["Movie_alignment"],
                             "Movie_maxshift": self.test_data["Movie_maxshift"],
-                            "CTF_estimation": self.test_data["CTF_estimation"]}
+                            "CTF_estimation": self.test_data["CTF_estimation"],
+                            "Particle_picking": self.test_data["Particle_picking"],
+                            "Classes_2D": self.test_data["Classes_2D"],
+                            "Classes_3D": self.test_data["Classes_3D"]}
 
         prot = self.newProtocol(ProtOSCEM,
                                 inputType=INPUT_MOVIES,
                                 importMovies=self.protimportmovies,
                                 movieAlignment=self.protalignmovie,
                                 maxShift=self.protmaxshift,
-                                CTF=self.CTFconsensus)
+                                CTF=self.CTFout,
+                                particles=self.particles,
+                                classes2D=self.centeredClasses2D,
+                                initVolume=self.initVolVolumes,
+                                classes3D=self.classes3DClassification)
 
         self.launchProtocol(prot)
 
@@ -466,23 +330,100 @@ class TestOscemJson(BaseTest):
                     current_value = current_dict.get(key_in, None)
                     self.assertIsNotNone(current_value, msg=f'In dictionary {key}, {key_in} is not found')
                     if key_in == "Discarded_movies":
-                        # these values change each time alignment is run
+                        # these values change each time alignment protocol is run
                         self.assertAlmostEqual(current_test_value, current_value, delta=1)
                     elif key_in == "Output_avg_shift" or key_in == "Output_max_shift":
-                        # these values change each time alignment is run
+                        # these values change each time alignment protocol is run
+                        self.assertAlmostEqual(current_test_value, current_value, delta=4)
+                    elif key_in == "Particles_per_micrograph":
+                        # these values change each time alignment protocol is run
+                        self.assertAlmostEqual(current_test_value, current_value, delta=10)
+                    elif key_in == "Particles_per_class":
+                        pass
+                    else:
+                        self.assertEqual(current_test_value, current_value)
+
+    def test_only_compulsory(self):
+        print(magentaStr(f"\n==> Running test with only compulsory input completed:"))
+        test_data_import = {"Import_movies": self.test_data["Import_movies"]}
+
+        prot = self.newProtocol(ProtOSCEM,
+                                inputType=INPUT_MOVIES,
+                                importMovies=self.protimportmovies)
+
+        self.launchProtocol(prot)
+
+        file_path = prot.getOutFile()
+        self.assertTrue(exists(file_path))
+
+        with open(abspath(file_path), 'r') as json_file:
+            load_json = json.load(json_file)
+
+        for key, section_test_dict in test_data_import.items():
+            current_dict = load_json.get(key, None)
+            self.assertIsNotNone(current_dict, msg=f'Dictionary section {key} is not found')
+            for key_in, current_test_value in section_test_dict.items():
+                current_value = current_dict.get(key_in, None)
+                self.assertIsNotNone(current_value, msg=f'In dictionary {key}, {key_in} is not found')
+                self.assertEqual(current_test_value, current_value)
+
+    def test_medium_level(self):
+        print(magentaStr(f"\n==> Running test with compulsory and some optional input:"))
+        test_data_import = {"Import_movies": self.test_data["Import_movies"],
+                            "Movie_alignment": self.test_data["Movie_alignment"],
+                            "Movie_maxshift": self.test_data["Movie_maxshift"],
+                            "CTF_estimation": self.test_data["CTF_estimation"]}
+
+        prot = self.newProtocol(ProtOSCEM,
+                                inputType=INPUT_MOVIES,
+                                importMovies=self.protimportmovies,
+                                movieAlignment=self.protalignmovie,
+                                maxShift=self.protmaxshift,
+                                CTF=self.CTFout)
+
+        self.launchProtocol(prot)
+
+        file_path = prot.getOutFile()
+        self.assertTrue(exists(file_path))
+
+        with open(abspath(file_path), 'r') as json_file:
+            load_json = json.load(json_file)
+
+        for key, section_test_dict in test_data_import.items():
+            current_dict = load_json.get(key, None)
+            self.assertIsNotNone(current_dict, msg=f'Dictionary section {key} is not found')
+            for key_in, current_test_value in section_test_dict.items():
+                if key == 'CTF_estimation':
+                    for key_in_in, current_test_value_in in current_test_value.items():
+                        current_section_dict = current_dict.get(key_in, None)
+                        current_value = current_section_dict.get(key_in_in, None)
+                        self.assertIsNotNone(current_value, msg=f'In dictionary {key}, {key_in} is not found')
+                        if key_in_in == "Output_max_defocus" or key_in_in == "Output_min_defocus" or key_in_in == "Output_avg_defocus":
+                            self.assertAlmostEqual(current_test_value_in, current_value, delta=3000)
+                        elif key_in_in == "Output_max_resolution" or key_in_in == "Output_min_resolution" or key_in_in == "Output_avg_resolution":
+                            self.assertAlmostEqual(current_test_value_in, current_value, delta=3000)
+                        else:
+                            self.assertEqual(current_test_value_in, current_value)
+                else:
+                    current_value = current_dict.get(key_in, None)
+                    self.assertIsNotNone(current_value, msg=f'In dictionary {key}, {key_in} is not found')
+                    if key_in == "Discarded_movies":
+                        # these values change each time alignment protocol is run
+                        self.assertAlmostEqual(current_test_value, current_value, delta=1)
+                    elif key_in == "Output_avg_shift" or key_in == "Output_max_shift":
+                        # these values change each time alignment protocol is run
                         self.assertAlmostEqual(current_test_value, current_value, delta=4)
                     else:
                         self.assertEqual(current_test_value, current_value)
 
-    def test_import_and_particles(self):
-        print(magentaStr(f"\n==> Running import movies and particles test:"))
-        test_data_import = {"Import_movies": self.test_data["Import_movies"],
-                            "Particle_picking": self.test_data["Particle_picking"]}
+    def test_micro_input(self):
+        print(magentaStr(f"\n==> Running test with micrographs as input:"))
+        test_data_import = {"CTF_estimation": self.test_data["CTF_estimation"]}
 
         prot = self.newProtocol(ProtOSCEM,
-                                inputType=INPUT_MOVIES,
-                                importMovies=self.protimportmovies,
-                                particles=self.particles)
+                                inputType=INPUT_MICS,
+                                CTF=self.CTFout)
+
         self.launchProtocol(prot)
 
         file_path = prot.getOutFile()
@@ -495,38 +436,20 @@ class TestOscemJson(BaseTest):
             current_dict = load_json.get(key, None)
             self.assertIsNotNone(current_dict, msg=f'Dictionary section {key} is not found')
             for key_in, current_test_value in section_test_dict.items():
-                current_value = current_dict.get(key_in, None)
-                self.assertIsNotNone(current_value, msg=f'In dictionary {key}, {key_in} is not found')
-                if key_in == "Particles_per_micrograph":
-                    # these values change each time alignment is run
-                    self.assertAlmostEqual(current_test_value, current_value, delta=10)
-                else:
+                if key == 'Import_movies':
+                    current_value = current_dict.get(key_in, None)
+                    self.assertIsNotNone(current_value, msg=f'In dictionary {key}, {key_in} is not found')
                     self.assertEqual(current_test_value, current_value)
-
-    def test_import_and_2DClassification(self):
-        print(magentaStr(f"\n==> Running import movies and 2D classification test:"))
-        test_data_import = {"Import_movies": self.test_data["Import_movies"],
-                            "Classes_2D": self.test_data["Classes_2D"]}
-
-        prot = self.newProtocol(ProtOSCEM,
-                                inputType=INPUT_MOVIES,
-                                importMovies=self.protimportmovies,
-                                classes2D=self.centeredClasses2D)
-        self.launchProtocol(prot)
-
-        file_path = prot.getOutFile()
-        self.assertTrue(exists(file_path))
-
-        with open(abspath(file_path), 'r') as json_file:
-            load_json = json.load(json_file)
-
-        for key, section_test_dict in test_data_import.items():
-            current_dict = load_json.get(key, None)
-            self.assertIsNotNone(current_dict, msg=f'Dictionary section {key} is not found')
-            for key_in, current_test_value in section_test_dict.items():
-                current_value = current_dict.get(key_in, None)
-                self.assertIsNotNone(current_value, msg=f'In dictionary {key}, {key_in} is not found')
-                if key_in == "Particles_per_class":
-                    pass
                 else:
-                    self.assertAlmostEqual(current_test_value, current_value, delta=2)
+                    for key_in_in, current_test_value_in in current_test_value.items():
+                        current_section_dict = current_dict.get(key_in, None)
+                        current_value = current_section_dict.get(key_in_in, None)
+                        self.assertIsNotNone(current_value, msg=f'In dictionary {key}, {key_in} is not found')
+                        if key_in_in == "Output_max_defocus" or key_in_in == "Output_min_defocus" or key_in_in == "Output_avg_defocus":
+                            # these values change each time alignment protocol is run
+                            self.assertAlmostEqual(current_test_value_in, current_value, delta=3000)
+                        elif key_in_in == "Output_max_resolution" or key_in_in == "Output_min_resolution" or key_in_in == "Output_avg_resolution":
+                            # these values change each time alignment protocol is run
+                            self.assertAlmostEqual(current_test_value_in, current_value, delta=3000)
+                        else:
+                            self.assertEqual(current_test_value_in, current_value)
