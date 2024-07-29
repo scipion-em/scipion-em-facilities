@@ -385,57 +385,70 @@ class ProtOSCEM(EMProtocol):
         CTF_estimation['Resolution'] = resolution
 
         # Histograms generation
-        numberOfBins = 10
-        plotterDefocus = EmPlotter()
-        plotterResolution = EmPlotter()
-        plotterAstigmatism = EmPlotter()
 
         # DEFOCUS
-        plotterDefocus.createSubPlot("Defocus histogram", "Defocus (A)", "#")
-        plotterDefocus.plotHist(defocus_list, nbins=numberOfBins)
-        defocus_hist = self.hist_path('defocus_hist')
-        plotterDefocus.savefig(defocus_hist)
-        plotterDefocus.close()
+        plt.close('all')
+        plt.clf()
+        plt.cla()
 
-        # RESOLUTION
-        plotterResolution.createSubPlot("Resolution histogram", "Resolution", "#")
-        plotterResolution.plotHist(resolution_list, nbins=numberOfBins)
+        plt.hist(defocus_list, bins='auto', edgecolor='black')
+        plt.xlabel('# Defocus (A)')
+        plt.ylabel('Frequency of Micrographs')
+        plt.title('Defocus histogram')
+        defocus_hist = self.hist_path('defocus_hist')
+        plt.savefig(defocus_hist)
+
+        # # RESOLUTION
+        plt.close('all')
+        plt.clf()
+        plt.cla()
+
+        plt.hist(resolution_list, bins='auto', edgecolor='black')
+        plt.xlabel("Resolution")
+        plt.ylabel('Frequency of Micrographs')
+        plt.title('Resolution histogram')
         resolution_hist = self.hist_path('resolution_hist')
-        plotterResolution.savefig(resolution_hist)
-        plotterResolution.close()
+        plt.savefig(resolution_hist)
+
 
         # ASTIGMATISM
-        plotterAstigmatism.createSubPlot("Astigmatism histogram", "Astigmatism", "#")
-        plotterAstigmatism.plotHist(astigmatism_list, nbins=numberOfBins)
+        plt.close('all')
+        plt.clf()
+        plt.cla()
+
+        plt.hist(astigmatism_list, bins='auto', edgecolor='black')
+        plt.xlabel("Astigmatism")
+        plt.ylabel('Frequency of Micrographs')
+        plt.title('Astigmatism histogram')
         astigmatism_hist = self.hist_path('astigmatism_hist')
-        plotterAstigmatism.savefig(astigmatism_hist)
-        plotterAstigmatism.close()
+        plt.savefig(astigmatism_hist)
 
         return CTF_estimation
 
     def particles_generation(self):
         parts = self.particles.get()
-        # print(parts)
-        # mic_numbers = []
+        mic_numbers = []
         particle_counts = []
         for index, item in enumerate(parts.iterItems()):
             micrograph_num = item._micId
             key_name = f"mic_{micrograph_num}"
-            # retrieve the number of particles per micrograph
-            if index == 0: # or key_name not in mic_numbers:
-                # mic_numbers.append(key_name)
+            if index == 0 or key_name not in mic_numbers:
+                mic_numbers.append(key_name)
                 particle_counts.append(1)
             else:
-                # index = mic_numbers.index(key_name)
+                index = mic_numbers.index(key_name)
                 particle_counts[index] += 1
 
         mean_particles_values = np.mean(particle_counts)
         particles = {"Particles_per_micrograph": mean_particles_values}
-        # print(particles)
+        print(particle_counts)
+        plt.close('all')
+        plt.clf()
+        plt.cla()
 
-        plt.hist(particle_counts)
-        plt.xlabel('# Micrograph')
-        plt.ylabel('# Particles')
+        plt.hist(particle_counts, bins='auto', edgecolor='black')
+        plt.xlabel('# Particles per Micrograph')
+        plt.ylabel('Frequency of Micrographs')
         plt.title('Histogram for particle number per micrograph')
 
         particles_hist = self.hist_path('particles_hist')
