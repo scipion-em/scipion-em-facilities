@@ -1,9 +1,15 @@
+import copy
+
+from PIL import Image, ImageDraw, ImageFont
 from matplotlib import pyplot as plt
+import mrcfile
 
 import pyworkflow.protocol.params as params
+from pwem.objects import Class2D
 from pwem.protocols import EMProtocol
 from pwem.viewers import EmPlotter
 from pyworkflow.object import String
+import pyworkflow.utils as pwutils
 
 import numpy as np
 import json
@@ -40,51 +46,52 @@ class ProtOSCEM(EMProtocol):
                       condition=CONDITION_MOVIES)
 
         form.addParam('movieAlignment', params.PointerParam,
-                      label="Movie alignment", important=True,
+                      label="Movie alignment",
                       pointerClass='ProtAlignMovies',
                       help="Movie alignment used",
                       condition=CONDITION_MOVIES,
                       allowsNull=True)
 
         form.addParam('maxShift', params.PointerParam,
-                      label="Max Shift", important=True,
+                      label="Max Shift",
                       pointerClass='XmippProtMovieMaxShift',
                       help="Max Shift",
                       condition=CONDITION_MOVIES,
                       allowsNull=True)
 
         form.addParam('CTF', params.PointerParam,
-                      label="CTF", important=True,
+                      label="CTF",
                       pointerClass='SetOfCTF',
                       help="CTF micrographs",
                       allowsNull=True)
 
         form.addParam('particles', params.PointerParam,
-                      label="Particles", important=True,
+                      label="Particles",
                       pointerClass='SetOfParticles',
                       help="Particles obtained when doing particle extraction",
                       allowsNull=True)
 
         form.addParam('classes2D', params.PointerParam,
-                      label="Classes 2D", important=True,
+                      label="Classes 2D",
                       pointerClass='SetOfClasses2D',
                       help="Set of 2D classes",
                       allowsNull=True)
 
         form.addParam('initVolume', params.PointerParam,
-                      label="Initial volume", important=True,
+                      label="Initial volume",
                       pointerClass='Volume',
                       help="Initial volume",
                       allowsNull=True)
 
         form.addParam('classes3D', params.PointerParam,
-                      label="Classes 3D", important=True,
+                      label="Classes 3D",
                       pointerClass='SetOfClasses3D',
                       help="Set of 2D classes",
                       allowsNull=True)
 
     # -------------------------- INSERT steps functions -----------------------
     def _insertAllSteps(self):
+
         self._insertFunctionStep(self.generateJson)
         self._insertFunctionStep(self.saveJson)
 
@@ -142,7 +149,6 @@ class ProtOSCEM(EMProtocol):
             classes_3D = self.classes3D_generation()
             self.processing_json['Classes_3D'] = classes_3D
 
-
         print(json.dumps(self.processing_json, indent=4))
 
     # -------------------------- INFO functions -------------------------------
@@ -161,7 +167,7 @@ class ProtOSCEM(EMProtocol):
         input_movies = ImportMoviesProt.getObjDict()
 
         # List of keys to retrieve
-        # if doseperframe has a value, then dose initial is also retrieveD.
+        # if doseperframe has a value, then dose initial is also retrieved
         # Otherwise, none of them are retrieved.
         if input_movies['outputMovies._acquisition._dosePerFrame'] is None:
             keys_to_retrieve = ['outputMovies._acquisition._voltage', 'outputMovies._acquisition._sphericalAberration',
@@ -377,15 +383,7 @@ class ProtOSCEM(EMProtocol):
                 avg_defocus = np.mean([avg_defocus, defocus])
                 avg_resolution = np.mean([avg_resolution, resolution])
 
-        defocus = {'Output_max_defocus': max_defocus, 'Output_min_defocus': min_defocus,
-                   'Output_avg_defocus': avg_defocus}
-        resolution = {'Output_max_resolution': max_resolution, 'Output_min_resolution': min_resolution,
-                      'Output_avg_resolution': avg_resolution}
-        CTF_estimation['Defocus'] = defocus
-        CTF_estimation['Resolution'] = resolution
-
         # Histograms generation
-
         # DEFOCUS
         plt.close('all')
         plt.clf()
@@ -395,10 +393,11 @@ class ProtOSCEM(EMProtocol):
         plt.xlabel('# Defocus (A)')
         plt.ylabel('Frequency of Micrographs')
         plt.title('Defocus histogram')
-        defocus_hist = self.hist_path('defocus_hist')
+        defocus_hist_name = 'defocus_hist.png'
+        defocus_hist = self.hist_path(defocus_hist_name)
         plt.savefig(defocus_hist)
 
-        # # RESOLUTION
+        # RESOLUTION
         plt.close('all')
         plt.clf()
         plt.cla()
@@ -407,9 +406,9 @@ class ProtOSCEM(EMProtocol):
         plt.xlabel("Resolution")
         plt.ylabel('Frequency of Micrographs')
         plt.title('Resolution histogram')
-        resolution_hist = self.hist_path('resolution_hist')
+        resolution_hist_name = 'resolution_hist.png'
+        resolution_hist = self.hist_path(resolution_hist_name)
         plt.savefig(resolution_hist)
-
 
         # ASTIGMATISM
         plt.close('all')
@@ -420,8 +419,17 @@ class ProtOSCEM(EMProtocol):
         plt.xlabel("Astigmatism")
         plt.ylabel('Frequency of Micrographs')
         plt.title('Astigmatism histogram')
-        astigmatism_hist = self.hist_path('astigmatism_hist')
+        astigmatism_hist_name = 'astigmatism_hist.png'
+        astigmatism_hist = self.hist_path(astigmatism_hist_name)
         plt.savefig(astigmatism_hist)
+
+        defocus = {'Output_max_defocus': max_defocus, 'Output_min_defocus': min_defocus,
+                   'Output_avg_defocus': avg_defocus, 'Defocus_histogram': defocus_hist_name}
+        resolution = {'Output_max_resolution': max_resolution, 'Output_min_resolution': min_resolution,
+                      'Output_avg_resolution': avg_resolution, 'Resolution_histogram': resolution_hist_name}
+        CTF_estimation['Defocus'] = defocus
+        CTF_estimation['Resolution'] = resolution
+        CTF_estimation['Astigmatism'] = {'Astigmatism_histogram': astigmatism_hist_name}
 
         return CTF_estimation
 
@@ -440,8 +448,7 @@ class ProtOSCEM(EMProtocol):
                 particle_counts[index] += 1
 
         mean_particles_values = np.mean(particle_counts)
-        particles = {"Particles_per_micrograph": mean_particles_values}
-        print(particle_counts)
+
         plt.close('all')
         plt.clf()
         plt.cla()
@@ -451,31 +458,96 @@ class ProtOSCEM(EMProtocol):
         plt.ylabel('Frequency of Micrographs')
         plt.title('Histogram for particle number per micrograph')
 
-        particles_hist = self.hist_path('particles_hist')
+        hist_name = 'particles_hist.png'
+        particles_hist = self.hist_path(hist_name)
         plt.savefig(particles_hist)
 
+        particles = {"Particles_per_micrograph": mean_particles_values,
+                     "Particles_histogram": hist_name}
         return particles
 
     def classes2D_generation(self):
         classes2D = self.classes2D.get()
-        # print(classes2D)
-        attrib = classes2D.getAttributes()
-        # print(attrib)
-        particles_per_class = []
-        for index, item in enumerate(classes2D.iterItems()):
-            # print(f"item: {item}")
-            # print(f" size: {item._size}")
-            # print(f"type of item: {type(item)}")
-            # print(dir(item)) # available attributes
-            # print(f"Index: {index}, Item: {item}")
-            number_particles = item._size.get()
-            # print(f"particles: {number_particles}")
-            particles_per_class.append(number_particles)
 
-        classes = index + 1
-        # print(f"classes: {clasases}")
-        # print
-        classes_2D = {"Number_classes_2D": classes, "Particles_per_class": particles_per_class}
+        # Creation of a list (copy) of classes2D
+        list_classes = []
+        for cl in classes2D.iterItems():
+            new_class = Class2D()
+            new_class.copy(cl)
+
+            new_class_repre = new_class.getRepresentative()
+            current_class_repre = cl.getRepresentative()
+            new_class_repre.setIndex(current_class_repre.getIndex())
+            new_class._size.set(cl.getSize())
+
+            list_classes.append(new_class)
+
+        # Sorting list in descending order regarding the number of particles
+        sorted_list_classes = sorted(list_classes, key=lambda x: x.getSize(), reverse=True)
+        print(f"Particles: {sorted_list_classes[10].getSize()}")
+        print(f"Index: {sorted_list_classes[10].getRepresentative().getIndex()}")
+        classes = len(sorted_list_classes)
+
+        img_classes_file = classes2D.getFirstItem().getRepresentative().getFileName()
+        print(img_classes_file)
+
+        # Saving images in .png, drawing number of particles on them
+        particles_list = []
+        img_filenames = []
+        with mrcfile.open(img_classes_file, 'r') as mrc:
+            data = mrc.data
+            # for i, data in enumerate(mrc.data):
+            for i, class_2D in enumerate(sorted_list_classes):
+                particles = class_2D.getSize()
+                particles_list.append(particles)
+                index = class_2D.getRepresentative().getIndex()
+
+                img = data[index-1, :, :]
+
+                img_normalized = 255 * (img - np.min(img)) / (np.max(img) - np.min(img))
+                img_normalized = img_normalized.astype(np.uint8)
+                image = Image.fromarray(img_normalized)
+                image = image.convert('RGB')
+
+                # Draw the number of particles on the images
+                draw = ImageDraw.Draw(image)
+                font = ImageFont.load_default()
+                position = (10, 10)
+                draw.text(position, str(particles), fill='#80FF00', font=font)
+
+                # Saving images
+                new_img_filename = os.path.splitext(img_classes_file)[0] + f'_image_{i}.png'
+                image.save(new_img_filename)
+                img_filenames.append(new_img_filename)
+
+            # Creating collage in .png with all images ordered in descending order
+            if img_filenames:
+                images = images = [Image.open(filename) for filename in img_filenames]
+                img_width, img_height = images[0].size
+
+                # Define the number of rows and columns for the collage
+                num_images = len(images)
+                num_columns = int(np.ceil(np.sqrt(num_images)))
+                num_rows = int(np.ceil(num_images / num_columns))
+
+                # Create a blank canvas for the collage
+                collage_width = num_columns * img_width
+                collage_height = num_rows * img_height
+                collage = Image.new('RGB', (collage_width, collage_height))
+
+                # Paste each image onto the collage canvas in sorted order
+                for index, image in enumerate(images):
+                    row = index // num_columns
+                    col = index % num_columns
+                    collage.paste(image, (col * img_width, row * img_height))
+
+                output_folder = self._getExtraPath()  # Extra path of current protocol
+                collage_filename = 'classes_2D.png'
+                collage_filepath = os.path.join(output_folder, 'classes_2D.png')
+                collage.save(collage_filepath)
+
+        classes_2D = {"Number_classes_2D": classes, "Particles_per_class": particles_list,
+                      "Images_classes_2D": collage_filename}
 
         return classes_2D
 
@@ -527,3 +599,12 @@ class ProtOSCEM(EMProtocol):
         folder_path = self._getExtraPath()
         file_path = os.path.join(folder_path, file_name)
         return file_path
+
+    def find_file_with_suffix(self, directory, suffix):
+        """ Function to get the filename that ends with certain suffix
+        """
+        for root, _, files in os.walk(directory):
+            for file in files:
+                if file.endswith(suffix):
+                    return os.path.join(root, file)
+        return None  # Return None if no matching file is found
