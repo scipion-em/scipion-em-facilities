@@ -484,19 +484,15 @@ class ProtOSCEM(EMProtocol):
 
         # Sorting list in descending order regarding the number of particles
         sorted_list_classes = sorted(list_classes, key=lambda x: x.getSize(), reverse=True)
-        print(f"Particles: {sorted_list_classes[10].getSize()}")
-        print(f"Index: {sorted_list_classes[10].getRepresentative().getIndex()}")
-        classes = len(sorted_list_classes)
+        classes = len(sorted_list_classes)  # Number of classes
 
         img_classes_file = classes2D.getFirstItem().getRepresentative().getFileName()
-        print(img_classes_file)
 
         # Saving images in .png, drawing number of particles on them
         particles_list = []
         img_filenames = []
         with mrcfile.open(img_classes_file, 'r') as mrc:
             data = mrc.data
-            # for i, data in enumerate(mrc.data):
             for i, class_2D in enumerate(sorted_list_classes):
                 particles = class_2D.getSize()
                 particles_list.append(particles)
@@ -522,7 +518,7 @@ class ProtOSCEM(EMProtocol):
 
             # Creating collage in .png with all images ordered in descending order
             if img_filenames:
-                images = images = [Image.open(filename) for filename in img_filenames]
+                images = [Image.open(filename) for filename in img_filenames]
                 img_width, img_height = images[0].size
 
                 # Define the number of rows and columns for the collage
