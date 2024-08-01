@@ -1,10 +1,14 @@
 import copy
 
+import configparser
+from os.path import abspath
+
 from PIL import Image, ImageDraw, ImageFont
 from matplotlib import pyplot as plt
 import mrcfile
 
 import pyworkflow.protocol.params as params
+import xmipp3
 from pwem.objects import Class2D
 from pwem.protocols import EMProtocol
 from pwem.viewers import EmPlotter
@@ -83,6 +87,10 @@ class ProtOSCEM(EMProtocol):
                       help="Initial volume",
                       allowsNull=True)
 
+        form.addParam('threshold_initVol', params.IntParam, default=-1,
+                      label="Initial volume threshold",
+                      help='Threshold to obtain isosurface of volume')
+
         form.addParam('classes3D', params.PointerParam,
                       label="Classes 3D",
                       pointerClass='SetOfClasses3D',
@@ -141,8 +149,8 @@ class ProtOSCEM(EMProtocol):
 
         if self.initVolume.get() is not None:
             ###### INITIAL VOLUME ######
-            self.initVolume_generation()
-            # self.processing_json['Initial_volume'] = volume
+            volume = self.init_volume_generation()
+            self.processing_json['Initial_volume'] = volume
 
         if self.classes3D.get() is not None:
             ###### CLASSES 3D ######
@@ -498,7 +506,7 @@ class ProtOSCEM(EMProtocol):
                 particles_list.append(particles)
                 index = class_2D.getRepresentative().getIndex()
 
-                img = data[index-1, :, :]
+                img = data[index - 1, :, :]
 
                 img_normalized = 255 * (img - np.min(img)) / (np.max(img) - np.min(img))
                 img_normalized = img_normalized.astype(np.uint8)
@@ -517,43 +525,75 @@ class ProtOSCEM(EMProtocol):
                 img_filenames.append(new_img_filename)
 
             # Creating collage in .png with all images ordered in descending order
-            if img_filenames:
-                images = [Image.open(filename) for filename in img_filenames]
-                img_width, img_height = images[0].size
+            images = [Image.open(filename) for filename in img_filenames]
 
-                # Define the number of rows and columns for the collage
-                num_images = len(images)
-                num_columns = int(np.ceil(np.sqrt(num_images)))
-                num_rows = int(np.ceil(num_images / num_columns))
-
-                # Create a blank canvas for the collage
-                collage_width = num_columns * img_width
-                collage_height = num_rows * img_height
-                collage = Image.new('RGB', (collage_width, collage_height))
-
-                # Paste each image onto the collage canvas in sorted order
-                for index, image in enumerate(images):
-                    row = index // num_columns
-                    col = index % num_columns
-                    collage.paste(image, (col * img_width, row * img_height))
-
-                output_folder = self._getExtraPath()  # Extra path of current protocol
-                collage_filename = 'classes_2D.png'
-                collage_filepath = os.path.join(output_folder, 'classes_2D.png')
-                collage.save(collage_filepath)
+            output_folder = self._getExtraPath()  # Extra path of current protocol
+            collage_filename = 'classes_2D.png'
+            collage_filepath = os.path.join(output_folder, collage_filename)
+            self.create_collage(images, collage_filepath)
 
         classes_2D = {"Number_classes_2D": classes, "Particles_per_class": particles_list,
                       "Images_classes_2D": collage_filename}
 
         return classes_2D
 
-    def initVolume_generation(self):
-        # volume = self.initVolume.get()
-        # print(volume)
-        # # attrib = volume.getAttributes()
-        # attributes = [attr for attr in dir(volume) if not attr.startswith('__')]
-        # print(attributes)
-        particles_per_class = []
+    def init_volume_generation(self):
+        output_folder = self._getExtraPath()
+        initial_vol_folder = os.path.join(output_folder, 'Initial_volume')
+
+        # Folder to store orthogonal slices
+        orthogonal_slices_folder = 'orthogonal_slices'
+        orthogonal_slices_path = os.path.join(initial_vol_folder, orthogonal_slices_folder)
+        os.makedirs(orthogonal_slices_path, exist_ok=True)
+
+        # Folder to store isosurface images
+        isosurface_images_folder = 'isosurface_images'
+        isosurface_images_path = os.path.join(initial_vol_folder, isosurface_images_folder)
+        os.makedirs(isosurface_images_path, exist_ok=True)
+
+        volume = self.initVolume.get()
+        volume_file = volume.getFileName()
+        print(volume_file)
+
+        # Getting orthogonal slices in X, Y and Z
+        self.orthogonalSlices(fnRoot=orthogonal_slices_path, map=volume_file)
+
+        # Getting 3 isosurface images
+        th = int(self.threshold_initVol.get())
+
+        volume_file_abspath = abspath(volume_file)
+        working_path = os.path.dirname(volume_file_abspath)
+
+        # Front_view
+        front_view_img = 'front_view.png'
+        output_path = abspath(os.path.join(isosurface_images_path, front_view_img))
+        self.generateChimeraView(fnWorkingDir=working_path, fnMap=volume_file_abspath,
+                                 fnView=output_path, threshold=th, angX=0, angY=0, angZ=0)
+
+        # Side view (rotated 90 degrees around Y-axis)
+        side_view_img = 'side_view.png'
+        output_path = abspath(os.path.join(isosurface_images_path, side_view_img))
+        self.generateChimeraView(fnWorkingDir=working_path, fnMap=volume_file_abspath,
+                                 fnView=output_path, threshold=th, angX=0, angY=90, angZ=0)
+
+        # Top view (rotated 90 degrees around X-axis)
+        top_view_img = 'top_view.png'
+        output_path = abspath(os.path.join(isosurface_images_path, top_view_img))
+        self.generateChimeraView(fnWorkingDir=working_path, fnMap=volume_file_abspath,
+                                 fnView=output_path, threshold=th, angX=90, angY=0, angZ=0)
+
+        init_volume = {'Orthogonal_slices': {
+            'Orthogonal_slices_X': "orthogonal_slices_X.png",
+            'Orthogonal_slices_Y': "orthogonal_slices_Y.png",
+            'Orthogonal_slices_Z': "orthogonal_slices_Z.png"
+        },
+            'Isosurface_images': {
+                'Front_view': front_view_img,
+                'Side_view': side_view_img,
+                'Top_view': top_view_img
+            }}
+
+        return init_volume
 
     def classes3D_generation(self):
         classes3D = self.classes3D.get()
@@ -596,11 +636,149 @@ class ProtOSCEM(EMProtocol):
         file_path = os.path.join(folder_path, file_name)
         return file_path
 
-    def find_file_with_suffix(self, directory, suffix):
-        """ Function to get the filename that ends with certain suffix
-        """
-        for root, _, files in os.walk(directory):
-            for file in files:
-                if file.endswith(suffix):
-                    return os.path.join(root, file)
-        return None  # Return None if no matching file is found
+    def orthogonalSlices(self, fnRoot, map):
+
+        if type(map) is str:
+            V = self.readMap(map)
+            mV = V.getData()
+            Zdim, Ydim, Xdim = mV.shape
+        else:
+            mV = map
+            Zdim, Ydim, Xdim = mV.shape
+
+        min_val = mV.min()
+        max_val = mV.max()
+        mV = 255 * (mV - min_val) / (max_val - min_val)
+        mV = mV.astype(np.uint8)
+
+        slices_X = [mV[:, :, i] for i in range(Xdim)]
+        slices_Y = [mV[:, i, :] for i in range(Ydim)]
+        slices_Z = [mV[i, :, :] for i in range(Zdim)]
+
+        # Save slices as images
+        images_X = self.slices_to_images(slices_X)
+        images_Y = self.slices_to_images(slices_Y)
+        images_Z = self.slices_to_images(slices_Z)
+
+        collage_X_path = os.path.join(fnRoot, 'orthogonal_slices_X.png')
+        collage_Y_path = os.path.join(fnRoot, 'orthogonal_slices_Y.png')
+        collage_Z_path = os.path.join(fnRoot, 'orthogonal_slices_Z.png')
+
+        self.create_collage(images_X, collage_X_path)
+        self.create_collage(images_Y, collage_Y_path)
+        self.create_collage(images_Z, collage_Z_path)
+
+    # Convert slices to images
+    def slices_to_images(self, slices):
+        images = [Image.fromarray(slice) for slice in slices]
+        return images
+
+    def create_collage(self, images, collage_filename):
+        img_width, img_height = images[0].size
+
+        # Define the number of rows and columns for the collage
+        num_images = len(images)
+        num_columns = int(np.ceil(np.sqrt(num_images)))
+        num_rows = int(np.ceil(num_images / num_columns))
+
+        # Create a blank canvas for the collage
+        collage_width = num_columns * img_width
+        collage_height = num_rows * img_height
+        collage = Image.new('RGB', (collage_width, collage_height))
+
+        # Paste each image onto the collage canvas in sorted order
+        for index, image in enumerate(images):
+            row = index // num_columns
+            col = index % num_columns
+            collage.paste(image, (col * img_width, row * img_height))
+
+        collage.save(collage_filename)
+
+    def readMap(self, fnMap):
+        return xmipp3.Image(fnMap)
+
+    def generateChimeraView(self, fnWorkingDir, fnMap, fnView, isMap=True, threshold=0, angX=0, angY=0, angZ=0,
+                            bfactor=False, \
+                            occupancy=False, otherAttribute=[], rainbow=True, legendMin=None, legendMax=None):
+        # config = configparser.ConfigParser()
+        # config.read(os.path.join(os.path.dirname(__file__), 'config.yaml'))
+        # maxMemToUse = config['CHIMERA'].getint('MAX_MEM_TO_USE')
+        # maxVoxelsToOpen = config['CHIMERA'].getint('MAX_VOXELS')
+
+        maxMemToUse = 60000
+        maxVoxelsToOpen = 1500
+
+        chimeraScript = \
+            """
+            windowsize 1300 700
+            set bgColor white
+            """
+        if isMap:
+            chimeraScript += \
+                """
+                volume dataCacheSize %d
+                volume voxelLimitForOpen %d
+                volume showPlane false
+                """ % (maxMemToUse, maxVoxelsToOpen)
+        chimeraScript += \
+            """
+            open %s
+            """ % fnMap
+        if isMap:
+            if threshold == -1:
+                chimeraScript += \
+                    """show #1 models
+                    volume #1 color #4e9a06
+                    lighting soft
+                    """
+            else:
+                chimeraScript += \
+                    """show #1 models
+                    volume #1 level %f
+                    volume #1 color #4e9a06
+                    lighting soft
+                    """ % threshold
+            #  # volume #1 level %f
+            # % threshold
+        else:
+            chimeraScript += \
+                """hide atoms
+                show cartoons
+                """
+            if bfactor:
+                chimeraScript += "color bfactor\n"
+            if occupancy:
+                chimeraScript += "color byattribute occupancy"
+                if rainbow:
+                    chimeraScript += " palette rainbow\n"
+                if legendMin and legendMax:
+                    chimeraScript += " palette bluered range %s,%s\n" % (legendMin, legendMax)
+                else:
+                    chimeraScript += "\n"
+            if len(otherAttribute) > 0:
+                chimeraScript += "open %s\n" % otherAttribute[0]
+                chimeraScript += "color byattribute %s" % otherAttribute[1]
+                if legendMin and legendMax:
+                    chimeraScript += " palette bluered range %s,%s\n" % (legendMin, legendMax)
+                else:
+                    chimeraScript += "\n"
+            if legendMin and legendMax:
+                chimeraScript += "key blue:%s white: red:%s fontSize 15 size 0.025,0.4 pos 0.01,0.3\n" % (
+                    legendMin, legendMax)
+        chimeraScript += \
+            """turn x %f
+            turn y %f
+            turn z %f
+            view all
+            save %s
+            exit
+            """ % (angX, angY, angZ, fnView)
+        fnTmp = os.path.join(fnWorkingDir, "chimeraScript.cxc")
+        fh = open(fnTmp, "w")
+        fh.write(chimeraScript)
+        fh.close()
+
+        from chimera import Plugin
+        args = "--nogui --offscreen chimeraScript.cxc"
+        Plugin.runChimeraProgram(Plugin.getProgram(), args, cwd=fnWorkingDir)
+        # cleanPath(fnTmp)
