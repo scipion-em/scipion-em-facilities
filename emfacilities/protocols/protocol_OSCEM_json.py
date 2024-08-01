@@ -1,7 +1,7 @@
 import copy
 
 import configparser
-from os.path import abspath
+from os.path import abspath, join, dirname, splitext
 
 from PIL import Image, ImageDraw, ImageFont
 from matplotlib import pyplot as plt
@@ -9,7 +9,7 @@ import mrcfile
 
 import pyworkflow.protocol.params as params
 import xmipp3
-from pwem.objects import Class2D
+from pwem.objects import Class2D, Class3D
 from pwem.protocols import EMProtocol
 from pwem.viewers import EmPlotter
 from pyworkflow.object import String
@@ -96,6 +96,10 @@ class ProtOSCEM(EMProtocol):
                       pointerClass='SetOfClasses3D',
                       help="Set of 2D classes",
                       allowsNull=True)
+
+        form.addParam('threshold_classes3D', params.IntParam, default=-1,
+                      label="3D Classes threshold",
+                      help='Threshold to obtain isosurface of classes 3D')
 
     # -------------------------- INSERT steps functions -----------------------
     def _insertAllSteps(self):
@@ -520,7 +524,7 @@ class ProtOSCEM(EMProtocol):
                 draw.text(position, str(particles), fill='#80FF00', font=font)
 
                 # Saving images
-                new_img_filename = os.path.splitext(img_classes_file)[0] + f'_image_{i}.png'
+                new_img_filename = splitext(img_classes_file)[0] + f'_image_{i}.png'
                 image.save(new_img_filename)
                 img_filenames.append(new_img_filename)
 
@@ -529,7 +533,7 @@ class ProtOSCEM(EMProtocol):
 
             output_folder = self._getExtraPath()  # Extra path of current protocol
             collage_filename = 'classes_2D.png'
-            collage_filepath = os.path.join(output_folder, collage_filename)
+            collage_filepath = join(output_folder, collage_filename)
             self.create_collage(images, collage_filepath)
 
         classes_2D = {"Number_classes_2D": classes, "Particles_per_class": particles_list,
@@ -538,84 +542,187 @@ class ProtOSCEM(EMProtocol):
         return classes_2D
 
     def init_volume_generation(self):
-        output_folder = self._getExtraPath()
-        initial_vol_folder = os.path.join(output_folder, 'Initial_volume')
-
-        # Folder to store orthogonal slices
-        orthogonal_slices_folder = 'orthogonal_slices'
-        orthogonal_slices_path = os.path.join(initial_vol_folder, orthogonal_slices_folder)
-        os.makedirs(orthogonal_slices_path, exist_ok=True)
-
-        # Folder to store isosurface images
-        isosurface_images_folder = 'isosurface_images'
-        isosurface_images_path = os.path.join(initial_vol_folder, isosurface_images_folder)
-        os.makedirs(isosurface_images_path, exist_ok=True)
+        extra_folder = self._getExtraPath()
+        initial_vol_folder_name = 'Initial_volume'
+        initial_vol_folder_path = join(extra_folder, initial_vol_folder_name)
+        os.makedirs(initial_vol_folder_path, exist_ok=True)
 
         volume = self.initVolume.get()
         volume_file = volume.getFileName()
         print(volume_file)
 
         # Getting orthogonal slices in X, Y and Z
+        # Folder to store orthogonal slices
+        orthogonal_slices_folder = 'orthogonal_slices'
+        orthogonal_slices_path = join(initial_vol_folder_path, orthogonal_slices_folder)
+        os.makedirs(orthogonal_slices_path, exist_ok=True)
+
         self.orthogonalSlices(fnRoot=orthogonal_slices_path, map=volume_file)
 
         # Getting 3 isosurface images
+        # Folder to store isosurface images
+        isosurface_images_folder = 'isosurface_images'
+        isosurface_images_path = join(initial_vol_folder_path, isosurface_images_folder)
+        os.makedirs(isosurface_images_path, exist_ok=True)
+
         th = int(self.threshold_initVol.get())
 
         volume_file_abspath = abspath(volume_file)
-        working_path = os.path.dirname(volume_file_abspath)
+        working_path = dirname(volume_file_abspath)
 
         # Front_view
         front_view_img = 'front_view.png'
-        output_path = abspath(os.path.join(isosurface_images_path, front_view_img))
+        output_path = abspath(join(isosurface_images_path, front_view_img))
         self.generateChimeraView(fnWorkingDir=working_path, fnMap=volume_file_abspath,
                                  fnView=output_path, threshold=th, angX=0, angY=0, angZ=0)
 
         # Side view (rotated 90 degrees around Y-axis)
         side_view_img = 'side_view.png'
-        output_path = abspath(os.path.join(isosurface_images_path, side_view_img))
+        output_path = abspath(join(isosurface_images_path, side_view_img))
         self.generateChimeraView(fnWorkingDir=working_path, fnMap=volume_file_abspath,
                                  fnView=output_path, threshold=th, angX=0, angY=90, angZ=0)
 
         # Top view (rotated 90 degrees around X-axis)
         top_view_img = 'top_view.png'
-        output_path = abspath(os.path.join(isosurface_images_path, top_view_img))
+        output_path = abspath(join(isosurface_images_path, top_view_img))
         self.generateChimeraView(fnWorkingDir=working_path, fnMap=volume_file_abspath,
                                  fnView=output_path, threshold=th, angX=90, angY=0, angZ=0)
 
         init_volume = {'Orthogonal_slices': {
-            'Orthogonal_slices_X': "orthogonal_slices_X.png",
-            'Orthogonal_slices_Y': "orthogonal_slices_Y.png",
-            'Orthogonal_slices_Z': "orthogonal_slices_Z.png"
+            'Orthogonal_slices_X': join(initial_vol_folder_name, "orthogonal_slices_X.png"),
+            'Orthogonal_slices_Y': join(initial_vol_folder_name, "orthogonal_slices_Y.png"),
+            'Orthogonal_slices_Z': join(initial_vol_folder_name, "orthogonal_slices_Z.png")
         },
             'Isosurface_images': {
-                'Front_view': front_view_img,
-                'Side_view': side_view_img,
-                'Top_view': top_view_img
+                'Front_view': join(initial_vol_folder_name, front_view_img),
+                'Side_view': join(initial_vol_folder_name, side_view_img),
+                'Top_view': join(initial_vol_folder_name, top_view_img)
             }}
 
         return init_volume
 
     def classes3D_generation(self):
         classes3D = self.classes3D.get()
-        # print(classes2D)
-        attrib = classes3D.getAttributes()
-        # print(attrib)
-        particles_per_class = []
-        for index, item in enumerate(classes3D.iterItems()):
-            # print(f"item: {item}")
-            # print(f" size: {item._size}")
-            # print(f"type of item: {type(item)}")
-            # print(dir(item)) # available attributes
-            # print(f"Index: {index}, Item: {item}")
-            number_particles = item._size.get()
-            # print(f"particles: {number_particles}")
-            particles_per_class.append(number_particles)
-        #
-        classes = index + 1
-        # print(f"classes: {classes}")
-        # print
-        classes_3D = {"Number_classes_3D": classes, "Particles_per_class": particles_per_class}
 
+        extra_folder = self._getExtraPath()  # Extra path of current protocol
+        classes_3D_folder_name = 'Classes_3D'
+        classes3D_folder_path = join(extra_folder, classes_3D_folder_name)
+        os.makedirs(classes3D_folder_path, exist_ok=True)
+
+        # Creation of a list (copy) of classes2D
+        list_classes = []
+        for cl in classes3D.iterItems():
+            new_class = Class3D()
+            new_class.copy(cl)
+
+            new_class_repre = new_class.getRepresentative()
+            current_class_repre = cl.getRepresentative()
+            new_class_repre.setIndex(current_class_repre.getIndex())
+            new_class._size.set(cl.getSize())
+
+            list_classes.append(new_class)
+
+        # Sorting list in descending order regarding the number of particles
+        sorted_list_classes = sorted(list_classes, key=lambda x: x.getSize(), reverse=True)
+        classes = len(sorted_list_classes)  # Number of classes
+
+        # Saving images in .png, drawing number of particles on them
+        particles_list = []
+        img_filenames = []
+        for i, class_3D in enumerate(sorted_list_classes):
+            file_name = sorted_list_classes[i].getRepresentative().getFileName()
+            file_name_without_suffix = file_name.split(':')[0]
+            # img = self.readMap(file_name)
+            with mrcfile.open(file_name_without_suffix, 'r') as mrc:
+                data = mrc.data
+
+                ############################
+                ########## CLASES ##########
+                ############################
+
+                particles = class_3D.getSize()
+                particles_list.append(particles)
+
+                mid_index = data.shape[0] // 2
+
+                img = data[mid_index, :, :]
+
+                img_normalized = 255 * (img - np.min(img)) / (np.max(img) - np.min(img))
+                img_normalized = img_normalized.astype(np.uint8)
+                image = Image.fromarray(img_normalized)
+                image = image.convert('RGB')
+
+                # Draw the number of particles on the images
+                draw = ImageDraw.Draw(image)
+                font = ImageFont.load_default()
+                position = (10, 10)
+                draw.text(position, str(particles), fill='#80FF00', font=font)
+
+                # Saving images
+                new_img_filename = splitext(file_name)[0] + '.png'
+                image.save(new_img_filename)
+                img_filenames.append(new_img_filename)
+
+                #############################
+                ########## VOLUMES ##########
+                #############################
+
+                # Getting orthogonal slices in X, Y and Z
+                # Folder to store orthogonal slices
+                orthogonal_slices_folder = f'orthogonal_slices_volume{i + 1}'
+                orthogonal_slices_path = join(classes3D_folder_path, orthogonal_slices_folder)
+                os.makedirs(orthogonal_slices_path, exist_ok=True)
+
+                self.orthogonalSlices(fnRoot=orthogonal_slices_path, map=data)
+
+                # Getting 3 isosurface images
+                # Folder to store isosurface images
+                isosurface_images_folder = f'isosurface_images_volume{i}'
+                isosurface_images_path = join(classes3D_folder_path, isosurface_images_folder)
+                os.makedirs(isosurface_images_path, exist_ok=True)
+
+                th = int(self.threshold_classes3D.get())
+
+                volume_file_abspath = abspath(file_name_without_suffix)
+                working_path = dirname(volume_file_abspath)
+
+                # Front_view
+                front_view_img = 'front_view.png'
+                output_path = abspath(join(isosurface_images_path, front_view_img))
+                self.generateChimeraView(fnWorkingDir=working_path, fnMap=volume_file_abspath,
+                                         fnView=output_path, threshold=th, angX=0, angY=0, angZ=0)
+
+                # Side view (rotated 90 degrees around Y-axis)
+                side_view_img = 'side_view.png'
+                output_path = abspath(join(isosurface_images_path, side_view_img))
+                self.generateChimeraView(fnWorkingDir=working_path, fnMap=volume_file_abspath,
+                                         fnView=output_path, threshold=th, angX=0, angY=90, angZ=0)
+
+                # Top view (rotated 90 degrees around X-axis)
+                top_view_img = 'top_view.png'
+                output_path = abspath(join(isosurface_images_path, top_view_img))
+                self.generateChimeraView(fnWorkingDir=working_path, fnMap=volume_file_abspath,
+                                         fnView=output_path, threshold=th, angX=90, angY=0, angZ=0)
+
+
+        # Creating collage in .png with all images ordered in descending order
+        images = [Image.open(filename) for filename in img_filenames]
+        collage_filename = 'classes_3D.png'
+        collage_filepath = join(classes3D_folder_path, collage_filename)
+        self.create_collage(images, collage_filepath)
+
+
+        classes_3D = {"Number_classes_3D": classes, "Particles_per_class": particles_list,
+                      "Images_classes_3D": collage_filename,
+                      "Orthogonal_slices": {
+                          "Orthogonal_slices_X": join(classes_3D_folder_name, "orthogonal_slices_X.png"),
+                          "Orthogonal_slices_Y": join(classes_3D_folder_name, "orthogonal_slices_Y.png"),
+                          "Orthogonal_slices_Z": join(classes_3D_folder_name, "orthogonal_slices_Z.png")},
+                      'Isosurface_images': {
+                          'Front_view': join(classes_3D_folder_name, front_view_img),
+                          'Side_view': join(classes_3D_folder_name, side_view_img),
+                          'Top_view': join(classes_3D_folder_name,top_view_img)
+                      }}
         return classes_3D
 
     def saveJson(self):
@@ -633,7 +740,7 @@ class ProtOSCEM(EMProtocol):
 
     def hist_path(self, file_name):
         folder_path = self._getExtraPath()
-        file_path = os.path.join(folder_path, file_name)
+        file_path = join(folder_path, file_name)
         return file_path
 
     def orthogonalSlices(self, fnRoot, map):
@@ -660,9 +767,9 @@ class ProtOSCEM(EMProtocol):
         images_Y = self.slices_to_images(slices_Y)
         images_Z = self.slices_to_images(slices_Z)
 
-        collage_X_path = os.path.join(fnRoot, 'orthogonal_slices_X.png')
-        collage_Y_path = os.path.join(fnRoot, 'orthogonal_slices_Y.png')
-        collage_Z_path = os.path.join(fnRoot, 'orthogonal_slices_Z.png')
+        collage_X_path = join(fnRoot, 'orthogonal_slices_X.png')
+        collage_Y_path = join(fnRoot, 'orthogonal_slices_Y.png')
+        collage_Z_path = join(fnRoot, 'orthogonal_slices_Z.png')
 
         self.create_collage(images_X, collage_X_path)
         self.create_collage(images_Y, collage_Y_path)
@@ -700,11 +807,6 @@ class ProtOSCEM(EMProtocol):
     def generateChimeraView(self, fnWorkingDir, fnMap, fnView, isMap=True, threshold=0, angX=0, angY=0, angZ=0,
                             bfactor=False, \
                             occupancy=False, otherAttribute=[], rainbow=True, legendMin=None, legendMax=None):
-        # config = configparser.ConfigParser()
-        # config.read(os.path.join(os.path.dirname(__file__), 'config.yaml'))
-        # maxMemToUse = config['CHIMERA'].getint('MAX_MEM_TO_USE')
-        # maxVoxelsToOpen = config['CHIMERA'].getint('MAX_VOXELS')
-
         maxMemToUse = 60000
         maxVoxelsToOpen = 1500
 
@@ -773,7 +875,7 @@ class ProtOSCEM(EMProtocol):
             save %s
             exit
             """ % (angX, angY, angZ, fnView)
-        fnTmp = os.path.join(fnWorkingDir, "chimeraScript.cxc")
+        fnTmp = join(fnWorkingDir, "chimeraScript.cxc")
         fh = open(fnTmp, "w")
         fh.write(chimeraScript)
         fh.close()
