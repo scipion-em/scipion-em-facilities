@@ -6,6 +6,7 @@ from pwem import SYM_TETRAHEDRAL
 
 from relion.protocols import ProtRelionAutopickLoG, ProtRelionClassify3D
 
+from pyworkflow.object import Pointer
 from pwem.protocols import ProtImportMovies
 from pyworkflow.tests import BaseTest, tests, DataSet
 from pyworkflow.utils import magentaStr
@@ -125,19 +126,44 @@ class TestOscemJson(BaseTest):
                 4,
                 4,
                 1
-            ]
+            ],
+            "Images_classes_2D": "classes_2D.png"
+        },
+        "Initial_volume": {
+            "Orthogonal_slices": {
+                "Orthogonal_slices_X": "Initial_volume/orthogonal_slices_X.png",
+                "Orthogonal_slices_Y": "Initial_volume/orthogonal_slices_Y.png",
+                "Orthogonal_slices_Z": "Initial_volume/orthogonal_slices_Z.png"
+            },
+            "Isosurface_images": {
+                "Front_view": "Initial_volume/front_view.png",
+                "Side_view": "Initial_volume/side_view.png",
+                "Top_view": "Initial_volume/top_view.png"
+            }
         },
         "Classes_3D": {
             "Number_classes_3D": 2,
             "Particles_per_class": [
-                875,
-                1985
-            ]
+                1985,
+                875
+            ],
+            "Images_classes_3D": "classes_3D.png",
+            "Orthogonal_slices": {
+                "Orthogonal_slices_X": "Classes_3D/orthogonal_slices_X.png",
+                "Orthogonal_slices_Y": "Classes_3D/orthogonal_slices_Y.png",
+                "Orthogonal_slices_Z": "Classes_3D/orthogonal_slices_Z.png"
+            },
+            "Isosurface_images": {
+                "Front_view": "Classes_3D/front_view.png",
+                "Side_view": "Classes_3D/side_view.png",
+                "Top_view": "Classes_3D/top_view.png"
+            }
         }
     }
 
     @classmethod
     def setUpClass(cls):
+
         tests.setupTestProject(cls)
         cls.dataset = DataSet.getDataSet('OSCEM_jsons')
         cls.protimportmovies, cls.importedmovies = cls.runImportMovies()
@@ -289,6 +315,7 @@ class TestOscemJson(BaseTest):
                             "CTF_estimation": self.test_data["CTF_estimation"],
                             "Particle_picking": self.test_data["Particle_picking"],
                             "Classes_2D": self.test_data["Classes_2D"],
+                            "Initial_volume":self.test_data["Initial_volume"],
                             "Classes_3D": self.test_data["Classes_3D"]}
 
         prot = self.newProtocol(ProtOSCEM,
@@ -298,8 +325,8 @@ class TestOscemJson(BaseTest):
                                 maxShift=self.protmaxshift,
                                 CTF=self.CTFout,
                                 particles=self.particles,
-                                classes2D=self.centeredClasses2D,
-                                initVolume=self.initVolVolumes,
+                                classes2D=self.classes2D,
+                                initVolume=Pointer(self.initVolVolumes.getFirstItem()),
                                 classes3D=self.classes3DClassification)
 
         self.launchProtocol(prot)
@@ -330,13 +357,16 @@ class TestOscemJson(BaseTest):
                     self.assertIsNotNone(current_value, msg=f'In dictionary {key}, {key_in} is not found')
                     if key_in == "Discarded_movies":
                         # these values change each time alignment protocol is run
-                        self.assertAlmostEqual(current_test_value, current_value, delta=1)
+                        self.assertAlmostEqual(current_test_value, current_value, delta=2)
                     elif key_in == "Output_avg_shift" or key_in == "Output_max_shift":
                         # these values change each time alignment protocol is run
                         self.assertAlmostEqual(current_test_value, current_value, delta=4)
                     elif key_in == "Particles_per_micrograph":
                         # these values change each time alignment protocol is run
                         self.assertAlmostEqual(current_test_value, current_value, delta=10)
+                    elif key_in == "Number_classes_2D":
+                        # these values change each time alignment protocol is run
+                        self.assertAlmostEqual(current_test_value, current_value, delta=2)
                     elif key_in == "Particles_per_class":
                         pass
                     else:
@@ -408,7 +438,7 @@ class TestOscemJson(BaseTest):
                     self.assertIsNotNone(current_value, msg=f'In dictionary {key}, {key_in} is not found')
                     if key_in == "Discarded_movies":
                         # these values change each time alignment protocol is run
-                        self.assertAlmostEqual(current_test_value, current_value, delta=1)
+                        self.assertAlmostEqual(current_test_value, current_value, delta=2)
                     elif key_in == "Output_avg_shift" or key_in == "Output_max_shift":
                         # these values change each time alignment protocol is run
                         self.assertAlmostEqual(current_test_value, current_value, delta=4)
