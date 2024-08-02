@@ -103,7 +103,6 @@ class ProtOSCEM(EMProtocol):
 
     # -------------------------- INSERT steps functions -----------------------
     def _insertAllSteps(self):
-
         self._insertFunctionStep(self.generateJson)
         self._insertFunctionStep(self.saveJson)
 
@@ -116,29 +115,21 @@ class ProtOSCEM(EMProtocol):
         if self.inputType.get() == 0:  # movies as input
             ###### IMPORT MOVIES ######
             import_movies = self.import_movies_generation()
-            # print('Import movie dict:')
-            # print(json.dumps(import_movies, indent=4))
             self.processing_json['Import_movies'] = import_movies
 
             if self.movieAlignment.get() is not None:
                 ###### MOVIE ALGINMENT ######
                 movie_alignment = self.movie_alignment_generation()
-                # print('Movie alignment dict:')
-                # print(json.dumps(movie_alignment, indent=4))
                 self.processing_json['Movie_alignment'] = movie_alignment
 
             if self.maxShift.get() is not None:
                 ###### MAX SHIFT ######
                 max_shift = self.max_shift_generation()
-                # print('Max shift dict:')
-                # print(json.dumps(max_shift, indent=4))
                 self.processing_json['Movie_maxshift'] = max_shift
 
         if self.CTF.get() is not None:
             ###### CTF ######
             CTF = self.CTF_generation()
-            # print('CTF estimation dict:')
-            # print(json.dumps(CTF, indent=4))
             self.processing_json['CTF_estimation'] = CTF
 
         if self.particles.get() is not None:
@@ -499,7 +490,6 @@ class ProtOSCEM(EMProtocol):
         classes = len(sorted_list_classes)  # Number of classes
 
         img_classes_file = classes2D.getFirstItem().getRepresentative().getFileName()
-
         # Saving images in .png, drawing number of particles on them
         particles_list = []
         img_filenames = []
@@ -549,7 +539,6 @@ class ProtOSCEM(EMProtocol):
 
         volume = self.initVolume.get()
         volume_file = volume.getFileName()
-        print(volume_file)
 
         # Getting orthogonal slices in X, Y and Z
         # Folder to store orthogonal slices
@@ -631,13 +620,18 @@ class ProtOSCEM(EMProtocol):
         img_filenames = []
         for i, class_3D in enumerate(sorted_list_classes):
             file_name = sorted_list_classes[i].getRepresentative().getFileName()
-            file_name_without_suffix = file_name.split(':')[0]
+            # Option 1:
             # img = self.readMap(file_name)
+            # data = img.getData()
+
+            # Option 2:
+            file_name_without_suffix = file_name.split(':')[0]
+
             with mrcfile.open(file_name_without_suffix, 'r') as mrc:
                 data = mrc.data
 
                 ############################
-                ########## CLASES ##########
+                ########## CLASSES ##########
                 ############################
 
                 particles = class_3D.getSize()
@@ -704,13 +698,11 @@ class ProtOSCEM(EMProtocol):
                 self.generateChimeraView(fnWorkingDir=working_path, fnMap=volume_file_abspath,
                                          fnView=output_path, threshold=th, angX=90, angY=0, angZ=0)
 
-
         # Creating collage in .png with all images ordered in descending order
         images = [Image.open(filename) for filename in img_filenames]
         collage_filename = 'classes_3D.png'
         collage_filepath = join(classes3D_folder_path, collage_filename)
         self.create_collage(images, collage_filepath)
-
 
         classes_3D = {"Number_classes_3D": classes, "Particles_per_class": particles_list,
                       "Images_classes_3D": collage_filename,
@@ -721,19 +713,15 @@ class ProtOSCEM(EMProtocol):
                       'Isosurface_images': {
                           'Front_view': join(classes_3D_folder_name, front_view_img),
                           'Side_view': join(classes_3D_folder_name, side_view_img),
-                          'Top_view': join(classes_3D_folder_name,top_view_img)
+                          'Top_view': join(classes_3D_folder_name, top_view_img)
                       }}
         return classes_3D
 
     def saveJson(self):
-
         file_path = self.getOutFile()
-        try:
-            with open(file_path, 'w') as json_file:
-                json.dump(self.processing_json, json_file, indent=4)
-            print(f"JSON data successfully saved to {file_path}")
-        except Exception as e:
-            print(f"An error occurred while saving JSON data: {e}")
+        with open(file_path, 'w') as json_file:
+            json.dump(self.processing_json, json_file, indent=4)
+        print(f"JSON data successfully saved to {file_path}")
 
     def getOutFile(self):
         return self._getExtraPath(OUTFILE)
@@ -744,7 +732,6 @@ class ProtOSCEM(EMProtocol):
         return file_path
 
     def orthogonalSlices(self, fnRoot, map):
-
         if type(map) is str:
             V = self.readMap(map)
             mV = V.getData()
