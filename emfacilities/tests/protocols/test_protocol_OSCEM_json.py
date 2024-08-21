@@ -26,52 +26,51 @@ class TestOscemJson(BaseTest):
     high_res = 0.5
     test_data = {
         "Import_movies": {
-            "Microscope_voltage": 300.0,
-            "Spherical_aberration": 2.7,
+            "Microscope_voltage_(kV)": 300.0,
+            "Spherical_aberration_(mm)": 2.7,
             "Amplitud_contrast": 0.1,
-            "Sampling_rate": 0.495,
-            "Pixel_size": 2.475,
-            "Gain_image": True,
+            "Pixel_size_(A/px)": 0.495,
+            "Gain_image": "gain.mrc",
             "Number_movies": 30
         },
         "Movie_alignment": {
             "Method": "XmippProtFlexAlign",
             "Binning_factor": 1.0,
-            "Maximum_resolution": 30.0,
+            "Maximum_resolution_(A)": 30.0,
             "Frames_aligned": {
                 "Frame0": 1,
-                "FrameN": 0
+                "FrameN": 30
             },
-            "Output_avg_shift": 11.817132324620918,
-            "Output_max_shift": 34.02834443504211
+            "Output_avg_shift_(A)": 11.8,
+            "Output_max_shift_(A)": 34.0
         },
         "Movie_maxshift": {
             "Discarded_movies": 9,
-            "Max_frame_shift": 5.0,
-            "Max_movie_shift": 20.0,
+            "Max_frame_shift_(A)": 5.0,
+            "Max_movie_shift_(A)": 20.0,
             "Rejection_type": "By frame or movie",
-            "Output_avg_shift": 11.806156624471319,
-            "Output_max_shift": 29.569197112511205
+            "Output_avg_shift_(A)": 11.8,
+            "Output_max_shift_(A)": 29.6
         },
         "CTF_estimation": {
-            "Defocus": {
-                "Output_max_defocus": 11850.75,
-                "Output_min_defocus": 1469.91,
-                "Output_avg_defocus": 1723.308045434952,
+            "Defocus_(A)": {
+                "Output_max_defocus": 11850.8,
+                "Output_min_defocus": 1469.9,
+                "Output_avg_defocus": 1723.3,
                 "Defocus_histogram": "defocus_hist.png"
             },
-            "Resolution": {
-                "Output_max_resolution": 5.158421,
-                "Output_min_resolution": 2.085319,
-                "Output_avg_resolution": 2.950691318804741,
+            "Resolution_(A)": {
+                "Output_max_resolution": 5.2,
+                "Output_min_resolution": 2.1,
+                "Output_avg_resolution": 3.0,
                 "Resolution_histogram": "resolution_hist.png"
             },
-            "Astigmatism": {
+            "Astigmatism_(A)": {
                 "Astigmatism_histogram": "astigmatism_hist.png"
             }
         },
         "Particle_picking": {
-            "Particles_per_micrograph": 136.1904761904762,
+            "Particles_per_micrograph": 136.2,
             "Particles_histogram": "particles_hist.png"
         },
         "Classes_2D": {
@@ -131,14 +130,14 @@ class TestOscemJson(BaseTest):
         },
         "Initial_volume": {
             "Orthogonal_slices": {
-                "Orthogonal_slices_X": "Initial_volume/orthogonal_slices_X.png",
-                "Orthogonal_slices_Y": "Initial_volume/orthogonal_slices_Y.png",
-                "Orthogonal_slices_Z": "Initial_volume/orthogonal_slices_Z.png"
+                "Orthogonal_slices_X": "Initial_volume/orthogonal_slices/orthogonal_slices_X.png",
+                "Orthogonal_slices_Y": "Initial_volume/orthogonal_slices/orthogonal_slices_Y.png",
+                "Orthogonal_slices_Z": "Initial_volume/orthogonal_slices/orthogonal_slices_Z.png"
             },
             "Isosurface_images": {
-                "Front_view": "Initial_volume/front_view.png",
-                "Side_view": "Initial_volume/side_view.png",
-                "Top_view": "Initial_volume/top_view.png"
+                "Front_view": "Initial_volume/isosurface_images/front_view.png",
+                "Side_view": "Initial_volume/isosurface_images/side_view.png",
+                "Top_view": "Initial_volume/isosurface_images/top_view.png"
             }
         },
         "Classes_3D": {
@@ -147,22 +146,49 @@ class TestOscemJson(BaseTest):
                 1985,
                 875
             ],
-            "Images_classes_3D": "classes_3D.png",
-            "Orthogonal_slices": {
-                "Orthogonal_slices_X": "Classes_3D/orthogonal_slices_X.png",
-                "Orthogonal_slices_Y": "Classes_3D/orthogonal_slices_Y.png",
-                "Orthogonal_slices_Z": "Classes_3D/orthogonal_slices_Z.png"
-            },
-            "Isosurface_images": {
-                "Front_view": "Classes_3D/front_view.png",
-                "Side_view": "Classes_3D/side_view.png",
-                "Top_view": "Classes_3D/top_view.png"
+            "Images_classes_3D": "Classes_3D/classes_3D.png",
+            "Volumes": {
+                "Volume_1": {
+                    "Orthogonal_slices": {
+                        "Orthogonal_slices_X": "Classes_3D/orthogonal_slices_volume1/orthogonal_slices_X.png",
+                        "Orthogonal_slices_Y": "Classes_3D/orthogonal_slices_volume1/orthogonal_slices_Y.png",
+                        "Orthogonal_slices_Z": "Classes_3D/orthogonal_slices_volume1/orthogonal_slices_Z.png"
+                    },
+                    "Isosurface_images": {
+                        "Front_view": "Classes_3D/isosurface_images_volume1/front_view.png",
+                        "Side_view": "Classes_3D/isosurface_images_volume1/side_view.png",
+                        "Top_view": "Classes_3D/isosurface_images_volume1/top_view.png"
+                    }
+                },
+                "Volume_2": {
+                    "Orthogonal_slices": {
+                        "Orthogonal_slices_X": "Classes_3D/orthogonal_slices_volume2/orthogonal_slices_X.png",
+                        "Orthogonal_slices_Y": "Classes_3D/orthogonal_slices_volume2/orthogonal_slices_Y.png",
+                        "Orthogonal_slices_Z": "Classes_3D/orthogonal_slices_volume2/orthogonal_slices_Z.png"
+                    },
+                    "Isosurface_images": {
+                        "Front_view": "Classes_3D/isosurface_images_volume2/front_view.png",
+                        "Side_view": "Classes_3D/isosurface_images_volume2/side_view.png",
+                        "Top_view": "Classes_3D/isosurface_images_volume2/top_view.png"
+                    }
+                }
             }
         }
     }
 
     @classmethod
     def setUpClass(cls):
+
+        import os
+        fname = "/home/lsanchez/debugs/test.txt"
+        if os.path.exists(fname):
+            os.remove(fname)
+        fjj = open(fname, "a+")
+        fjj.write('-------->onDebugMode PID {}'.format(os.getpid()))
+        fjj.close()
+        print('-------->onDebugMode PID {}'.format(os.getpid()))
+        import time
+        time.sleep(10)
 
         tests.setupTestProject(cls)
         cls.dataset = DataSet.getDataSet('OSCEM_jsons')
@@ -315,7 +341,7 @@ class TestOscemJson(BaseTest):
                             "CTF_estimation": self.test_data["CTF_estimation"],
                             "Particle_picking": self.test_data["Particle_picking"],
                             "Classes_2D": self.test_data["Classes_2D"],
-                            "Initial_volume":self.test_data["Initial_volume"],
+                            "Initial_volume": self.test_data["Initial_volume"],
                             "Classes_3D": self.test_data["Classes_3D"]}
 
         prot = self.newProtocol(ProtOSCEM,
