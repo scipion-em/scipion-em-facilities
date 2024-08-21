@@ -372,9 +372,9 @@ class TestOscemJson(BaseTest):
                         current_section_dict = current_dict.get(key_in, None)
                         current_value = current_section_dict.get(key_in_in, None)
                         self.assertIsNotNone(current_value, msg=f'In dictionary {key}, {key_in} is not found')
-                        if key_in_in == "Output_max_defocus" or key_in_in == "Output_min_defocus" or key_in_in == "Output_avg_defocus":
+                        if key_in_in == "Output_max_defocus_(A)" or key_in_in == "Output_min_defocus_(A)" or key_in_in == "Output_avg_defocus_(A)":
                             self.assertAlmostEqual(current_test_value_in, current_value, delta=3000)
-                        elif key_in_in == "Output_max_resolution" or key_in_in == "Output_min_resolution" or key_in_in == "Output_avg_resolution":
+                        elif key_in_in == "Output_max_resolution_(A)" or key_in_in == "Output_min_resolution_(A)" or key_in_in == "Output_avg_resolution_(A)":
                             self.assertAlmostEqual(current_test_value_in, current_value, delta=3000)
                         else:
                             self.assertEqual(current_test_value_in, current_value)
@@ -384,7 +384,7 @@ class TestOscemJson(BaseTest):
                     if key_in == "Discarded_movies":
                         # these values change each time alignment protocol is run
                         self.assertAlmostEqual(current_test_value, current_value, delta=2)
-                    elif key_in == "Output_avg_shift" or key_in == "Output_max_shift":
+                    elif key_in == "Output_avg_shift_(A)" or key_in == "Output_max_shift_(A)":
                         # these values change each time alignment protocol is run
                         self.assertAlmostEqual(current_test_value, current_value, delta=4)
                     elif key_in == "Particles_per_micrograph":
@@ -453,9 +453,9 @@ class TestOscemJson(BaseTest):
                         current_section_dict = current_dict.get(key_in, None)
                         current_value = current_section_dict.get(key_in_in, None)
                         self.assertIsNotNone(current_value, msg=f'In dictionary {key}, {key_in} is not found')
-                        if key_in_in == "Output_max_defocus" or key_in_in == "Output_min_defocus" or key_in_in == "Output_avg_defocus":
+                        if key_in_in == "Output_max_defocus_(A)" or key_in_in == "Output_min_defocus_(A)" or key_in_in == "Output_avg_defocus_(A)":
                             self.assertAlmostEqual(current_test_value_in, current_value, delta=3000)
-                        elif key_in_in == "Output_max_resolution" or key_in_in == "Output_min_resolution" or key_in_in == "Output_avg_resolution":
+                        elif key_in_in == "Output_max_resolution_(A)" or key_in_in == "Output_min_resolution_(A)" or key_in_in == "Output_avg_resolution_(A)":
                             self.assertAlmostEqual(current_test_value_in, current_value, delta=3000)
                         else:
                             self.assertEqual(current_test_value_in, current_value)
@@ -465,7 +465,7 @@ class TestOscemJson(BaseTest):
                     if key_in == "Discarded_movies":
                         # these values change each time alignment protocol is run
                         self.assertAlmostEqual(current_test_value, current_value, delta=2)
-                    elif key_in == "Output_avg_shift" or key_in == "Output_max_shift":
+                    elif key_in == "Output_avg_shift_(A)" or key_in == "Output_max_shift_(A)":
                         # these values change each time alignment protocol is run
                         self.assertAlmostEqual(current_test_value, current_value, delta=4)
                     else:
@@ -500,10 +500,10 @@ class TestOscemJson(BaseTest):
                         current_section_dict = current_dict.get(key_in, None)
                         current_value = current_section_dict.get(key_in_in, None)
                         self.assertIsNotNone(current_value, msg=f'In dictionary {key}, {key_in} is not found')
-                        if key_in_in == "Output_max_defocus" or key_in_in == "Output_min_defocus" or key_in_in == "Output_avg_defocus":
+                        if key_in_in == "Output_max_defocus_(A)" or key_in_in == "Output_min_defocus_(A)" or key_in_in == "Output_avg_defocus_(A)":
                             # these values change each time alignment protocol is run
                             self.assertAlmostEqual(current_test_value_in, current_value, delta=3000)
-                        elif key_in_in == "Output_max_resolution" or key_in_in == "Output_min_resolution" or key_in_in == "Output_avg_resolution":
+                        elif key_in_in == "Output_max_resolution_(A)" or key_in_in == "Output_min_resolution_(A)" or key_in_in == "Output_avg_resolution_(A)":
                             # these values change each time alignment protocol is run
                             self.assertAlmostEqual(current_test_value_in, current_value, delta=3000)
                         else:
