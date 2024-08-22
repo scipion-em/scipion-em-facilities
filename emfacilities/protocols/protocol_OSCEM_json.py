@@ -367,6 +367,7 @@ class ProtOSCEM(EMProtocol):
         ############################### OUTPUT #############################################
         # average and max shift
         max_shift = 0
+        shift_list = []
         for a, output in MaxShiftProt.iterOutputAttributes():
             if a == 'outputMovies':
                 for index, item in enumerate(output.iterItems()):
@@ -375,6 +376,9 @@ class ProtOSCEM(EMProtocol):
                     shiftX = attributes_dict.get('_xmipp_ShiftX')
                     shiftY = attributes_dict.get('_xmipp_ShiftY')
                     norm = np.linalg.norm([shiftX, shiftY], axis=0)
+
+                    # Shift
+                    shift_list.append(norm)
 
                     # Max shift
                     max_norm = np.max(norm)
@@ -387,8 +391,23 @@ class ProtOSCEM(EMProtocol):
                     else:
                         avg_shift = np.mean([avgXY, avg_shift])
 
+        # Histogram generation
+        # shift
+        plt.close('all')
+        plt.clf()
+        plt.cla()
+
+        plt.hist(shift_list, bins=5, edgecolor='black')
+        plt.xlabel('# Shift  (A)')
+        plt.ylabel('Frequency of frames')
+        plt.title('Shift histogram')
+        shift_hist_name = 'shift_hist.png'
+        shift_hist = self.hist_path(shift_hist_name)
+        plt.savefig(shift_hist)
+
         output_movie_maxshift = {'Output_avg_shift_(A)': round(avg_shift, 1),
-                                 'Output_max_shift_(A)': round(max_shift, 1)}
+                                 'Output_max_shift_(A)': round(max_shift, 1),
+                                 'Shift_histogram': shift_hist_name}
         movie_maxshift.update(output_movie_maxshift)
 
         return movie_maxshift
