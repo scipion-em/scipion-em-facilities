@@ -31,7 +31,9 @@ class TestOscemJson(BaseTest):
             "Amplitud_contrast": 0.1,
             "Pixel_size_(A/px)": 0.495,
             "Gain_image": "gain.mrc",
-            "Number_movies": 30
+            "Number_movies": 30,
+            "Frames_per_movie": 50,
+            "Frames_size_(pixels)": "3710 x 3838"
         },
         "Movie_alignment": {
             "Method": "XmippProtFlexAlign",
@@ -65,11 +67,12 @@ class TestOscemJson(BaseTest):
                 "Output_avg_resolution": 3.0,
                 "Resolution_histogram": "resolution_hist.png"
             },
-            "Astigmatism_(A)": {
+            "Astigmatism": {
                 "Astigmatism_histogram": "astigmatism_hist.png"
             }
         },
         "Particle_picking": {
+            "Number_particles": 2860,
             "Particles_per_micrograph": 136.2,
             "Particles_histogram": "particles_hist.png"
         },
@@ -372,9 +375,9 @@ class TestOscemJson(BaseTest):
                         current_section_dict = current_dict.get(key_in, None)
                         current_value = current_section_dict.get(key_in_in, None)
                         self.assertIsNotNone(current_value, msg=f'In dictionary {key}, {key_in} is not found')
-                        if key_in_in == "Output_max_defocus_(A)" or key_in_in == "Output_min_defocus_(A)" or key_in_in == "Output_avg_defocus_(A)":
+                        if key_in_in == "Output_max_defocus" or key_in_in == "Output_min_defocus" or key_in_in == "Output_avg_defocus":
                             self.assertAlmostEqual(current_test_value_in, current_value, delta=3000)
-                        elif key_in_in == "Output_max_resolution_(A)" or key_in_in == "Output_min_resolution_(A)" or key_in_in == "Output_avg_resolution_(A)":
+                        elif key_in_in == "Output_max_resolution" or key_in_in == "Output_min_resolution" or key_in_in == "Output_avg_resolution":
                             self.assertAlmostEqual(current_test_value_in, current_value, delta=3000)
                         else:
                             self.assertEqual(current_test_value_in, current_value)
@@ -387,6 +390,9 @@ class TestOscemJson(BaseTest):
                     elif key_in == "Output_avg_shift_(A)" or key_in == "Output_max_shift_(A)":
                         # these values change each time alignment protocol is run
                         self.assertAlmostEqual(current_test_value, current_value, delta=4)
+                    elif key_in == "Number_particles":
+                        # these values change each time alignment protocol is run
+                        self.assertAlmostEqual(current_test_value, current_value, delta=1000)
                     elif key_in == "Particles_per_micrograph":
                         # these values change each time alignment protocol is run
                         self.assertAlmostEqual(current_test_value, current_value, delta=10)
@@ -453,9 +459,9 @@ class TestOscemJson(BaseTest):
                         current_section_dict = current_dict.get(key_in, None)
                         current_value = current_section_dict.get(key_in_in, None)
                         self.assertIsNotNone(current_value, msg=f'In dictionary {key}, {key_in} is not found')
-                        if key_in_in == "Output_max_defocus_(A)" or key_in_in == "Output_min_defocus_(A)" or key_in_in == "Output_avg_defocus_(A)":
+                        if key_in_in == "Output_max_defocus" or key_in_in == "Output_min_defocus" or key_in_in == "Output_avg_defocus":
                             self.assertAlmostEqual(current_test_value_in, current_value, delta=3000)
-                        elif key_in_in == "Output_max_resolution_(A)" or key_in_in == "Output_min_resolution_(A)" or key_in_in == "Output_avg_resolution_(A)":
+                        elif key_in_in == "Output_max_resolution" or key_in_in == "Output_min_resolution" or key_in_in == "Output_avg_resolution":
                             self.assertAlmostEqual(current_test_value_in, current_value, delta=3000)
                         else:
                             self.assertEqual(current_test_value_in, current_value)
@@ -500,10 +506,10 @@ class TestOscemJson(BaseTest):
                         current_section_dict = current_dict.get(key_in, None)
                         current_value = current_section_dict.get(key_in_in, None)
                         self.assertIsNotNone(current_value, msg=f'In dictionary {key}, {key_in} is not found')
-                        if key_in_in == "Output_max_defocus_(A)" or key_in_in == "Output_min_defocus_(A)" or key_in_in == "Output_avg_defocus_(A)":
+                        if key_in_in == "Output_max_defocus" or key_in_in == "Output_min_defocus" or key_in_in == "Output_avg_defocus":
                             # these values change each time alignment protocol is run
                             self.assertAlmostEqual(current_test_value_in, current_value, delta=3000)
-                        elif key_in_in == "Output_max_resolution_(A)" or key_in_in == "Output_min_resolution_(A)" or key_in_in == "Output_avg_resolution_(A)":
+                        elif key_in_in == "Output_max_resolution" or key_in_in == "Output_min_resolution" or key_in_in == "Output_avg_resolution":
                             # these values change each time alignment protocol is run
                             self.assertAlmostEqual(current_test_value_in, current_value, delta=3000)
                         else:
