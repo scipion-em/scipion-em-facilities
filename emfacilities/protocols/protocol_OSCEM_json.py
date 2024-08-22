@@ -499,6 +499,8 @@ class ProtOSCEM(EMProtocol):
 
     def particles_generation(self):
         parts = self.particles.get()
+
+        n_particles = parts._size
         mic_numbers = []
         particle_counts = []
         for index, item in enumerate(parts.iterItems()):
@@ -526,7 +528,8 @@ class ProtOSCEM(EMProtocol):
         particles_hist = self.hist_path(hist_name)
         plt.savefig(particles_hist)
 
-        particles = {"Particles_per_micrograph": round(mean_particles_values, 1),
+        particles = {"Number_particles": n_particles,
+                     "Particles_per_micrograph": round(mean_particles_values, 1),
                      "Particles_histogram": hist_name}
         return particles
 
