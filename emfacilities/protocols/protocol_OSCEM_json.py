@@ -197,38 +197,53 @@ class ProtOSCEM(EMProtocol):
         }
 
         # Filter the dictionary and rename the keys
-        extra_folder = self._getExtraPath()
-        file_keys = ['outputMovies._gainFile', 'outputMovies._darkFile']
-        for key in file_keys:
-            if input_movies[key] is not None:
-                with mrcfile.open(input_movies[key], 'r') as mrc:
-                    # Read the data from the MRC file
-                    data = mrc.data
-
-                    # Normalize data to the range 0-255
-                    data_min, data_max = np.min(data), np.max(data)
-                    normalized_data = 255 * (data - data_min) / (data_max - data_min)
-                    image_data = normalized_data.astype(np.uint8)
-
-                    # Convert to a Pillow image
-                    image = Image.fromarray(image_data)
-                    image = image.convert('L')
-
-                    # Save the image as PNG to the specified path
-                    # Extract the base filename without extension
-                    base_filename = os.path.splitext(os.path.basename(input_movies[key]))[0]
-
-                    # Define the path for the PNG file by changing the extension
-                    png_path = os.path.join(extra_folder, f'{base_filename}.png')
-
-                    image.save(png_path)
-
-                # shutil.copy(input_movies[key], extra_folder)
-                path = input_movies[key]
-                input_movies[key] = os.path.basename(path)
+        # extra_folder = self._getExtraPath()
+        # file_keys = ['outputMovies._gainFile', 'outputMovies._darkFile']
+        # for key in file_keys:
+        #     if input_movies[key] is not None:
+        #         with mrcfile.open(input_movies[key], 'r') as mrc:
+        #             # Read the data from the MRC file
+        #             data = mrc.data
+        #
+        #         # Assuming the MRC file has only one image, select it
+        #         # Check the data range
+        #         data = data[:]
+        #         print(f"Data min: {np.min(data)}, Data max: {np.max(data)}")
+        #
+        #         min_val = np.min(data)
+        #         max_val = np.max(data)
+        #         image_data_normalized = (data - min_val) / (max_val - min_val) * 255
+        #         image_data_normalized = np.clip(image_data_normalized, 0, 255).astype(np.uint8)
+        #
+        #         # Convert numpy array to PIL Image
+        #         image = Image.fromarray(image_data_normalized)
+        #
+        #         # Save the image as PNG to the specified path
+        #         # Extract the base filename without extension
+        #         base_filename = os.path.splitext(os.path.basename(input_movies[key]))[0]
+        #
+        #         # Define the path for the PNG file by changing the extension
+        #         png_path = os.path.join(extra_folder, f'{base_filename}.png')
+        #
+        #         image.save(png_path)
+        # #
+        #         # shutil.copy(input_movies[key], extra_folder)
+        #         path = input_movies[key]
+        #         input_movies[key] = os.path.basename(path)
 
         import_movies = {key_mapping[key]: input_movies[key] for key in keys_to_retrieve if
                          key in input_movies and input_movies[key] is not None and input_movies[key] != 0}
+
+        # Retrieve nº of frames per movie and size of frames:
+        dims = input_movies['outputMovies._firstDim']
+        dims_list = dims.split(',')
+        dim1 = int(dims_list[0])
+        dim2 = int(dims_list[1])
+        n_frames = int(dims_list[2])
+        frame_dim = f'{dim1} x {dim2}'
+
+        import_movies['Frames_per_movie'] = n_frames
+        import_movies['Frames_size_(pixels)'] = frame_dim
 
         return import_movies
 
@@ -241,7 +256,6 @@ class ProtOSCEM(EMProtocol):
         # List of keys to retrieve
         keys_to_retrieve = ['binFactor', 'maxResForCorrelation', 'gainRot', 'gainFlip']
 
-        ## TOD: apply dose filter, where?
         # Mapping dictionary for key name changes
         key_mapping = {
             'binFactor': 'Binning_factor',
@@ -287,11 +301,8 @@ class ProtOSCEM(EMProtocol):
         frames_aligned = {key_mapping[key]: input_alignment[key] for key in keys_to_retrieve if
                           key in input_alignment and input_alignment[key] is not None}
 
-        print(frames_aligned)
-
         if frames_aligned['FrameN'] == 0:
             frames_aligned['FrameN'] = self.processing_json['Import_movies']["Number_movies"]
-            print(frames_aligned)
 
         movie_align['Frames_aligned'] = frames_aligned
 
@@ -316,7 +327,8 @@ class ProtOSCEM(EMProtocol):
                         avg_shift = np.mean([avgXY, avg_shift])
                         max_shift = max(max_shift, max_norm)
 
-            output_movie_align = {'Output_avg_shift_(A)': round(avg_shift, 1), 'Output_max_shift_(A)': round(max_shift, 1)}
+            output_movie_align = {'Output_avg_shift_(A)': round(avg_shift, 1),
+                                  'Output_max_shift_(A)': round(max_shift, 1)}
             movie_align.update(output_movie_align)
 
         return movie_align
@@ -375,7 +387,8 @@ class ProtOSCEM(EMProtocol):
                     else:
                         avg_shift = np.mean([avgXY, avg_shift])
 
-        output_movie_maxshift = {'Output_avg_shift_(A)': round(avg_shift, 1), 'Output_max_shift_(A)': round(max_shift, 1)}
+        output_movie_maxshift = {'Output_avg_shift_(A)': round(avg_shift, 1),
+                                 'Output_max_shift_(A)': round(max_shift, 1)}
         movie_maxshift.update(output_movie_maxshift)
 
         return movie_maxshift
@@ -455,11 +468,13 @@ class ProtOSCEM(EMProtocol):
 
         defocus = {'Output_max_defocus': round(max_defocus, 1), 'Output_min_defocus': round(min_defocus, 1),
                    'Output_avg_defocus': round(avg_defocus, 1), 'Defocus_histogram': defocus_hist_name}
-        resolution = {'Output_max_resolution': round(max_resolution, 1), 'Output_min_resolution': round(min_resolution, 1),
+        resolution = {'Output_max_resolution': round(max_resolution, 1),
+                      'Output_min_resolution': round(min_resolution, 1),
                       'Output_avg_resolution': round(avg_resolution, 1), 'Resolution_histogram': resolution_hist_name}
         CTF_estimation['Defocus_(A)'] = defocus
         CTF_estimation['Resolution_(A)'] = resolution
-        CTF_estimation['Astigmatism_(A)'] = {'Astigmatism_histogram': astigmatism_hist_name}
+        CTF_estimation['Astigmatism'] = {'Astigmatism_histogram': astigmatism_hist_name}
+        # CTF_estimation['Astigmatism_histogram'] = astigmatism_hist_name
 
         return CTF_estimation
 
@@ -745,7 +760,6 @@ class ProtOSCEM(EMProtocol):
 
                 Volumes_key = f'Volume_{i + 1}'
                 Volumes[Volumes_key] = volume
-
 
         # Creating collage in .png with all images ordered in descending order
         images = [Image.open(filename) for filename in img_filenames]
