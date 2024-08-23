@@ -14,7 +14,7 @@ from xmipp3.protocols import XmippProtMovieGain, XmippProtFlexAlign, XmippProtMo
     XmippProtCenterParticles, \
     XmippProtExtractParticles
 from ...protocols import ProtOSCEM
-from ...protocols.protocol_OSCEM_json import INPUT_MOVIES, INPUT_MICS
+from ...protocols.protocol_OSCEM_metadata import INPUT_MOVIES, INPUT_MICS
 
 
 class TestOscemJson(BaseTest):

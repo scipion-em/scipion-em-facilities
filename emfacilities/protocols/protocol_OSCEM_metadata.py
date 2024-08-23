@@ -22,7 +22,7 @@ import os
 
 INPUT_MOVIES = 0
 INPUT_MICS = 1
-OUTFILE = 'Processing_json.json'
+OUTFILE = 'Processing_metadata.json'
 
 
 class ProtOSCEM(EMProtocol):
