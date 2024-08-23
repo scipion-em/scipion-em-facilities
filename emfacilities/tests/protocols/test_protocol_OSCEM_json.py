@@ -7,7 +7,7 @@ from pwem import SYM_TETRAHEDRAL
 from relion.protocols import ProtRelionAutopickLoG, ProtRelionClassify3D
 
 from pyworkflow.object import Pointer
-from pwem.protocols import ProtImportMovies
+from pwem.protocols import ProtImportMovies, ProtImportVolumes
 from pyworkflow.tests import BaseTest, tests, DataSet
 from pyworkflow.utils import magentaStr
 from xmipp3.protocols import XmippProtMovieGain, XmippProtFlexAlign, XmippProtMovieMaxShift, XmippProtCTFMicrographs, \
@@ -30,7 +30,7 @@ class TestOscemJson(BaseTest):
             "Spherical_aberration_(mm)": 2.7,
             "Amplitud_contrast": 0.1,
             "Pixel_size_(A/px)": 0.495,
-            "Gain_image": "gain.mrc",
+            "Gain_image": "gain.png",
             "Number_movies": 30,
             "Frames_per_movie": 50,
             "Frames_size_(pixels)": "3710 x 3838"
@@ -182,20 +182,12 @@ class TestOscemJson(BaseTest):
     @classmethod
     def setUpClass(cls):
 
-        import os
-        fname = "/home/lsanchez/debugs/test.txt"
-        if os.path.exists(fname):
-            os.remove(fname)
-        fjj = open(fname, "a+")
-        fjj.write('-------->onDebugMode PID {}'.format(os.getpid()))
-        fjj.close()
-        print('-------->onDebugMode PID {}'.format(os.getpid()))
-        import time
-        time.sleep(10)
-
         tests.setupTestProject(cls)
         cls.dataset = DataSet.getDataSet('OSCEM_jsons')
         cls.protimportmovies, cls.importedmovies = cls.runImportMovies()
+
+        cls.protimportvolumes, cls.importedvolume = cls.runImportVolumes()
+
         cls.protmoviegain, cls.gainmovies = cls.runMovieGain()
         cls.protalignmovie, cls.alignedmovies = cls.runMovieAlign()
         cls.protmaxshift, cls.maxshiftmicro = cls.runMaxShift()
@@ -204,7 +196,7 @@ class TestOscemJson(BaseTest):
         cls.protextract, cls.particles = cls.runExtractParticles()
         cls.prot2Dclasses, cls.classes2D = cls.run2DClassification()
         cls.portCenter, cls.centeredClasses2D, cls.centeredParticles = cls.runCenterParticles()
-        cls.protInitVolume, cls.initVolClasses, cls.initVolVolumes = cls.runInitialVolume()
+        # cls.protInitVolume, cls.initVolClasses, cls.initVolVolumes = cls.runInitialVolume()
         cls.prot3DClassification, cls.classes3DClassification, cls.volumes3DClassification = cls.run3DClassification()
 
     @classmethod
@@ -218,6 +210,17 @@ class TestOscemJson(BaseTest):
 
         cls.launchProtocol(prot)
         output = getattr(prot, 'outputMovies', None)
+        return prot, output
+
+    @classmethod
+    def runImportVolumes(cls):
+
+        prot = cls.newProtocol(ProtImportVolumes,
+                               filesPath=cls.dataset.getFile('initial_volume'),
+                               samplingRate=1.24,)
+
+        cls.launchProtocol(prot)
+        output = getattr(prot, 'outputVolume', None)
         return prot, output
 
     @classmethod
@@ -325,7 +328,7 @@ class TestOscemJson(BaseTest):
     def run3DClassification(cls):
         prot = cls.newProtocol(ProtRelionClassify3D,
                                inputParticles=cls.centeredParticles,
-                               referenceVolume=cls.initVolVolumes,
+                               referenceVolume=cls.importedvolume,  #  initVolVolumes,
                                numberOfIterations=10,
                                symmetryGroup='O',
                                initialLowPassFilterA=15,
@@ -355,7 +358,7 @@ class TestOscemJson(BaseTest):
                                 CTF=self.CTFout,
                                 particles=self.particles,
                                 classes2D=self.classes2D,
-                                initVolume=Pointer(self.initVolVolumes.getFirstItem()),
+                                initVolume=self.importedvolume,  # Pointer(self.initVolVolumes.getFirstItem()),
                                 classes3D=self.classes3DClassification)
 
         self.launchProtocol(prot)

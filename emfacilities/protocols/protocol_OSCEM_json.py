@@ -4,7 +4,7 @@ import configparser
 import shutil
 from os.path import abspath, join, dirname, splitext
 
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFont, ImageOps, ImageEnhance
 from matplotlib import pyplot as plt
 import mrcfile
 
@@ -189,47 +189,50 @@ class ProtOSCEM(EMProtocol):
             'outputMovies._acquisition._sphericalAberration': 'Spherical_aberration_(mm)',
             'outputMovies._acquisition._amplitudeContrast': 'Amplitud_contrast',
             'outputMovies._samplingRate': 'Pixel_size_(A/px)',
-            'outputMovies._acquisition._dosePerFrame': 'Dose_per_image',
-            'outputMovies._acquisition._doseInitial': 'Initial_dose',
+            'outputMovies._acquisition._dosePerFrame': 'Dose_per_image_(e/A^2)',
+            'outputMovies._acquisition._doseInitial': 'Initial_dose_(e/A^2)',
             'outputMovies._gainFile': 'Gain_image',
             'outputMovies._darkFile': 'Dark_image',
             'outputMovies._size': 'Number_movies'
         }
 
-        # Filter the dictionary and rename the keys
-        # extra_folder = self._getExtraPath()
-        # file_keys = ['outputMovies._gainFile', 'outputMovies._darkFile']
-        # for key in file_keys:
-        #     if input_movies[key] is not None:
-        #         with mrcfile.open(input_movies[key], 'r') as mrc:
-        #             # Read the data from the MRC file
-        #             data = mrc.data
-        #
-        #         # Assuming the MRC file has only one image, select it
-        #         # Check the data range
-        #         data = data[:]
-        #         print(f"Data min: {np.min(data)}, Data max: {np.max(data)}")
-        #
-        #         min_val = np.min(data)
-        #         max_val = np.max(data)
-        #         image_data_normalized = (data - min_val) / (max_val - min_val) * 255
-        #         image_data_normalized = np.clip(image_data_normalized, 0, 255).astype(np.uint8)
-        #
-        #         # Convert numpy array to PIL Image
-        #         image = Image.fromarray(image_data_normalized)
-        #
-        #         # Save the image as PNG to the specified path
-        #         # Extract the base filename without extension
-        #         base_filename = os.path.splitext(os.path.basename(input_movies[key]))[0]
-        #
-        #         # Define the path for the PNG file by changing the extension
-        #         png_path = os.path.join(extra_folder, f'{base_filename}.png')
-        #
-        #         image.save(png_path)
-        # #
-        #         # shutil.copy(input_movies[key], extra_folder)
-        #         path = input_movies[key]
-        #         input_movies[key] = os.path.basename(path)
+         # Filter the dictionary and rename the keys
+        extra_folder = self._getExtraPath()
+        file_keys = ['outputMovies._gainFile', 'outputMovies._darkFile']
+        for key in file_keys:
+            if input_movies[key] is not None:
+                with mrcfile.open(input_movies[key], 'r') as mrc:
+                    # Read the data from the MRC file
+                    data = mrc.data
+
+                # Normalize the data to 8-bit (0-255) range
+                min_val = np.min(data)
+                max_val = np.max(data)
+                normalized_data = 255 * (data - min_val) / (max_val - min_val)
+                normalized_data = normalized_data.astype(np.uint8)
+
+                # Apply Histogram Equalization
+                # Convert to PIL Image
+                image = Image.fromarray(normalized_data)
+
+                image = ImageOps.equalize(image)
+
+                # Optionally, enhance contrast further
+                enhancer = ImageEnhance.Contrast(image)
+                image = enhancer.enhance(2.0)  # Increase the value for more contrast
+
+                # Save the image as PNG to the specified path
+                # Extract the base filename without extension
+                base_filename = os.path.splitext(os.path.basename(input_movies[key]))[0]
+
+                # Define the path for the PNG file by changing the extension
+                png_path = os.path.join(extra_folder, f'{base_filename}.png')
+
+                image.save(png_path)
+
+                image_path = os.path.basename(png_path)
+
+                input_movies[key] = os.path.basename(image_path)
 
         import_movies = {key_mapping[key]: input_movies[key] for key in keys_to_retrieve if
                          key in input_movies and input_movies[key] is not None and input_movies[key] != 0}
@@ -500,7 +503,6 @@ class ProtOSCEM(EMProtocol):
     def particles_generation(self):
         parts = self.particles.get()
 
-        n_particles = parts._size
         mic_numbers = []
         particle_counts = []
         for index, item in enumerate(parts.iterItems()):
@@ -528,7 +530,7 @@ class ProtOSCEM(EMProtocol):
         particles_hist = self.hist_path(hist_name)
         plt.savefig(particles_hist)
 
-        particles = {"Number_particles": n_particles,
+        particles = {"Number_particles": sum(particle_counts),
                      "Particles_per_micrograph": round(mean_particles_values, 1),
                      "Particles_histogram": hist_name}
         return particles

@@ -5,7 +5,8 @@ DataSet(name='OSCEM_jsons', folder='OSCEM_jsons',
             'processing_json': 'processing.json',
             'movies_dir': 'movies',
             'gain_im': 'gain.mrc',
-            'CTF_sqlite': 'ctfs.sqlite'})
+            'CTF_sqlite': 'ctfs.sqlite',
+            'initial_volume': 'initial_volume.mrc'})
 
 
 
