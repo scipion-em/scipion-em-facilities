@@ -6,7 +6,6 @@ from pwem import SYM_TETRAHEDRAL
 
 from relion.protocols import ProtRelionAutopickLoG, ProtRelionClassify3D
 
-from pyworkflow.object import Pointer
 from pwem.protocols import ProtImportMovies, ProtImportVolumes
 from pyworkflow.tests import BaseTest, tests, DataSet
 from pyworkflow.utils import magentaStr
@@ -29,7 +28,7 @@ class TestOscemJson(BaseTest):
             "Microscope_voltage_(kV)": 300.0,
             "Spherical_aberration_(mm)": 2.7,
             "Amplitud_contrast": 0.1,
-            "Pixel_size_(A/px)": 0.495,
+            "Pixel_size_(Å/px)": 0.495,
             "Gain_image": "gain.png",
             "Number_movies": 30,
             "Frames_per_movie": 50,
@@ -38,30 +37,30 @@ class TestOscemJson(BaseTest):
         "Movie_alignment": {
             "Method": "XmippProtFlexAlign",
             "Binning_factor": 1.0,
-            "Maximum_resolution_(A)": 30.0,
+            "Maximum_resolution_(Å)": 30.0,
             "Frames_aligned": {
                 "Frame0": 1,
                 "FrameN": 30
             },
-            "Output_avg_shift_(A)": 11.8,
-            "Output_max_shift_(A)": 34.0
+            "Output_avg_shift_(Å)": 11.8,
+            "Output_max_shift_(Å)": 34.0
         },
         "Movie_maxshift": {
             "Discarded_movies": 9,
-            "Max_frame_shift_(A)": 5.0,
-            "Max_movie_shift_(A)": 20.0,
+            "Max_frame_shift_(Å)": 5.0,
+            "Max_movie_shift_(Å)": 20.0,
             "Rejection_type": "By frame or movie",
-            "Output_avg_shift_(A)": 11.8,
-            "Output_max_shift_(A)": 29.6
+            "Output_avg_shift_(Å)": 11.8,
+            "Output_max_shift_(Å)": 29.6
         },
         "CTF_estimation": {
-            "Defocus_(A)": {
+            "Defocus_(Å)": {
                 "Output_max_defocus": 11850.8,
                 "Output_min_defocus": 1469.9,
                 "Output_avg_defocus": 1723.3,
                 "Defocus_histogram": "defocus_hist.png"
             },
-            "Resolution_(A)": {
+            "Resolution_(Å)": {
                 "Output_max_resolution": 5.2,
                 "Output_min_resolution": 2.1,
                 "Output_avg_resolution": 3.0,
@@ -390,7 +389,7 @@ class TestOscemJson(BaseTest):
                     if key_in == "Discarded_movies":
                         # these values change each time alignment protocol is run
                         self.assertAlmostEqual(current_test_value, current_value, delta=2)
-                    elif key_in == "Output_avg_shift_(A)" or key_in == "Output_max_shift_(A)":
+                    elif key_in == "Output_avg_shift_(Å)" or key_in == "Output_max_shift_(Å)":
                         # these values change each time alignment protocol is run
                         self.assertAlmostEqual(current_test_value, current_value, delta=4)
                     elif key_in == "Number_particles":
@@ -474,7 +473,7 @@ class TestOscemJson(BaseTest):
                     if key_in == "Discarded_movies":
                         # these values change each time alignment protocol is run
                         self.assertAlmostEqual(current_test_value, current_value, delta=2)
-                    elif key_in == "Output_avg_shift_(A)" or key_in == "Output_max_shift_(A)":
+                    elif key_in == "Output_avg_shift_(Å)" or key_in == "Output_max_shift_(Å)":
                         # these values change each time alignment protocol is run
                         self.assertAlmostEqual(current_test_value, current_value, delta=4)
                     else:

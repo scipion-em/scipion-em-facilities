@@ -1,7 +1,3 @@
-import copy
-
-import configparser
-import shutil
 from os.path import abspath, join, dirname, splitext
 
 from PIL import Image, ImageDraw, ImageFont, ImageOps, ImageEnhance
@@ -12,9 +8,6 @@ import pyworkflow.protocol.params as params
 import xmipp3
 from pwem.objects import Class2D, Class3D
 from pwem.protocols import EMProtocol
-from pwem.viewers import EmPlotter
-from pyworkflow.object import String
-import pyworkflow.utils as pwutils
 
 import numpy as np
 import json
@@ -111,7 +104,6 @@ class ProtOSCEM(EMProtocol):
     def generateJson(self):
 
         self.processing_json = {}
-        # self.processing_json['Description'] = 'OSCEM json for processing. Version 1.0'  ## !!!!
 
         if self.inputType.get() == 0:  # movies as input
             ###### IMPORT MOVIES ######
@@ -153,7 +145,7 @@ class ProtOSCEM(EMProtocol):
             classes_3D = self.classes3D_generation()
             self.processing_json['Classes_3D'] = classes_3D
 
-        print(json.dumps(self.processing_json, indent=4))
+        print(json.dumps(self.processing_json,ensure_ascii=False, indent=4))
 
     # -------------------------- INFO functions -------------------------------
     def _validate(self):
@@ -188,15 +180,15 @@ class ProtOSCEM(EMProtocol):
             'outputMovies._acquisition._voltage': 'Microscope_voltage_(kV)',
             'outputMovies._acquisition._sphericalAberration': 'Spherical_aberration_(mm)',
             'outputMovies._acquisition._amplitudeContrast': 'Amplitud_contrast',
-            'outputMovies._samplingRate': 'Pixel_size_(A/px)',
-            'outputMovies._acquisition._dosePerFrame': 'Dose_per_image_(e/A^2)',
-            'outputMovies._acquisition._doseInitial': 'Initial_dose_(e/A^2)',
+            'outputMovies._samplingRate': 'Pixel_size_(Å/px)',
+            'outputMovies._acquisition._dosePerFrame': 'Dose_per_image_(e/Å²)',
+            'outputMovies._acquisition._doseInitial': 'Initial_dose_(e/Å²)',
             'outputMovies._gainFile': 'Gain_image',
             'outputMovies._darkFile': 'Dark_image',
             'outputMovies._size': 'Number_movies'
         }
 
-         # Filter the dictionary and rename the keys
+        # Filter the dictionary and rename the keys
         extra_folder = self._getExtraPath()
         file_keys = ['outputMovies._gainFile', 'outputMovies._darkFile']
         for key in file_keys:
@@ -214,24 +206,16 @@ class ProtOSCEM(EMProtocol):
                 # Apply Histogram Equalization
                 # Convert to PIL Image
                 image = Image.fromarray(normalized_data)
-
                 image = ImageOps.equalize(image)
-
-                # Optionally, enhance contrast further
-                enhancer = ImageEnhance.Contrast(image)
-                image = enhancer.enhance(2.0)  # Increase the value for more contrast
 
                 # Save the image as PNG to the specified path
                 # Extract the base filename without extension
                 base_filename = os.path.splitext(os.path.basename(input_movies[key]))[0]
 
-                # Define the path for the PNG file by changing the extension
                 png_path = os.path.join(extra_folder, f'{base_filename}.png')
-
                 image.save(png_path)
 
                 image_path = os.path.basename(png_path)
-
                 input_movies[key] = os.path.basename(image_path)
 
         import_movies = {key_mapping[key]: input_movies[key] for key in keys_to_retrieve if
@@ -262,7 +246,7 @@ class ProtOSCEM(EMProtocol):
         # Mapping dictionary for key name changes
         key_mapping = {
             'binFactor': 'Binning_factor',
-            'maxResForCorrelation': 'Maximum_resolution_(A)',
+            'maxResForCorrelation': 'Maximum_resolution_(Å)',
             'gainRot': 'Rotate_gain_reference',
             'gainFlip': 'Flip_gain_reference'
         }
@@ -330,8 +314,8 @@ class ProtOSCEM(EMProtocol):
                         avg_shift = np.mean([avgXY, avg_shift])
                         max_shift = max(max_shift, max_norm)
 
-            output_movie_align = {'Output_avg_shift_(A)': round(avg_shift, 1),
-                                  'Output_max_shift_(A)': round(max_shift, 1)}
+            output_movie_align = {'Output_avg_shift_(Å)': round(avg_shift, 1),
+                                  'Output_max_shift_(Å)': round(max_shift, 1)}
             movie_align.update(output_movie_align)
 
         return movie_align
@@ -346,8 +330,8 @@ class ProtOSCEM(EMProtocol):
         # Mapping dictionary for key name changes
         key_mapping = {
             'outputMoviesDiscarded._size': 'Discarded_movies',
-            'maxFrameShift': 'Max_frame_shift_(A)',
-            'maxMovieShift': 'Max_movie_shift_(A)',
+            'maxFrameShift': 'Max_frame_shift_(Å)',
+            'maxMovieShift': 'Max_movie_shift_(Å)',
             'rejType': 'Rejection_type'
         }
 
@@ -369,7 +353,6 @@ class ProtOSCEM(EMProtocol):
 
         ############################### OUTPUT #############################################
         # average and max shift
-        max_shift = 0
         shift_list = []
         for a, output in MaxShiftProt.iterOutputAttributes():
             if a == 'outputMovies':
@@ -383,16 +366,16 @@ class ProtOSCEM(EMProtocol):
                     # Shift
                     shift_list.append(norm)
 
-                    # Max shift
+                    # Max and average shift
                     max_norm = np.max(norm)
-                    max_shift = max(max_shift, max_norm)
-
-                    # Average shift
                     avgXY = np.mean(norm)
                     if index == 0:
                         avg_shift = avgXY
+                        max_shift = max_norm
                     else:
                         avg_shift = np.mean([avgXY, avg_shift])
+                        max_shift = max(max_shift, max_norm)
+
 
         # Histogram generation
         # shift
@@ -401,15 +384,15 @@ class ProtOSCEM(EMProtocol):
         plt.cla()
 
         plt.hist(shift_list, bins=5, edgecolor='black')
-        plt.xlabel('# Shift  (A)')
+        plt.xlabel('# Shift (Å)')
         plt.ylabel('Frequency of frames')
         plt.title('Shift histogram')
         shift_hist_name = 'shift_hist.png'
         shift_hist = self.hist_path(shift_hist_name)
         plt.savefig(shift_hist)
 
-        output_movie_maxshift = {'Output_avg_shift_(A)': round(avg_shift, 1),
-                                 'Output_max_shift_(A)': round(max_shift, 1),
+        output_movie_maxshift = {'Output_avg_shift_(Å)': round(avg_shift, 1),
+                                 'Output_max_shift_(Å)': round(max_shift, 1),
                                  'Shift_histogram': shift_hist_name}
         movie_maxshift.update(output_movie_maxshift)
 
@@ -455,7 +438,7 @@ class ProtOSCEM(EMProtocol):
         plt.cla()
 
         plt.hist(defocus_list, bins='auto', edgecolor='black')
-        plt.xlabel('# Defocus (A)')
+        plt.xlabel('# Defocus (Å)')
         plt.ylabel('Frequency of Micrographs')
         plt.title('Defocus histogram')
         defocus_hist_name = 'defocus_hist.png'
@@ -468,7 +451,7 @@ class ProtOSCEM(EMProtocol):
         plt.cla()
 
         plt.hist(resolution_list, bins='auto', edgecolor='black')
-        plt.xlabel("Resolution")
+        plt.xlabel("Resolution (Å)")
         plt.ylabel('Frequency of Micrographs')
         plt.title('Resolution histogram')
         resolution_hist_name = 'resolution_hist.png'
@@ -493,10 +476,9 @@ class ProtOSCEM(EMProtocol):
         resolution = {'Output_max_resolution': round(max_resolution, 1),
                       'Output_min_resolution': round(min_resolution, 1),
                       'Output_avg_resolution': round(avg_resolution, 1), 'Resolution_histogram': resolution_hist_name}
-        CTF_estimation['Defocus_(A)'] = defocus
-        CTF_estimation['Resolution_(A)'] = resolution
+        CTF_estimation['Defocus_(Å)'] = defocus
+        CTF_estimation['Resolution_(Å)'] = resolution
         CTF_estimation['Astigmatism'] = {'Astigmatism_histogram': astigmatism_hist_name}
-        # CTF_estimation['Astigmatism_histogram'] = astigmatism_hist_name
 
         return CTF_estimation
 
@@ -694,7 +676,8 @@ class ProtOSCEM(EMProtocol):
             # data = img.getData()
 
             # Option 2:
-            file_name_without_suffix = file_name.split(':')[0]
+            if ':' in file_name:
+               file_name_without_suffix = file_name.split(':')[0]
 
             with mrcfile.open(file_name_without_suffix, 'r') as mrc:
                 data = mrc.data
@@ -798,8 +781,8 @@ class ProtOSCEM(EMProtocol):
 
     def saveJson(self):
         file_path = self.getOutFile()
-        with open(file_path, 'w') as json_file:
-            json.dump(self.processing_json, json_file, indent=4)
+        with open(file_path, 'w', encoding='utf-8') as json_file:
+            json.dump(self.processing_json, json_file, ensure_ascii=False,  indent=4)
         print(f"JSON data successfully saved to {file_path}")
 
     def getOutFile(self):
