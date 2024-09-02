@@ -376,6 +376,7 @@ class ProtOSCEM(EMProtocol):
                         avg_shift = np.mean([avgXY, avg_shift])
                         max_shift = max(max_shift, max_norm)
 
+        flattened_shift_list = np.hstack(shift_list)
 
         # Histogram generation
         # shift
@@ -383,7 +384,8 @@ class ProtOSCEM(EMProtocol):
         plt.clf()
         plt.cla()
 
-        plt.hist(shift_list, bins=5, edgecolor='black')
+        print(flattened_shift_list)
+        plt.hist(flattened_shift_list, edgecolor='black')
         plt.xlabel('# Shift (Å)')
         plt.ylabel('Frequency of frames')
         plt.title('Shift histogram')
@@ -438,7 +440,7 @@ class ProtOSCEM(EMProtocol):
         plt.cla()
 
         plt.hist(defocus_list, bins='auto', edgecolor='black')
-        plt.xlabel('# Defocus (Å)')
+        plt.xlabel('# Defocus')
         plt.ylabel('Frequency of Micrographs')
         plt.title('Defocus histogram')
         defocus_hist_name = 'defocus_hist.png'
@@ -451,7 +453,7 @@ class ProtOSCEM(EMProtocol):
         plt.cla()
 
         plt.hist(resolution_list, bins='auto', edgecolor='black')
-        plt.xlabel("Resolution (Å)")
+        plt.xlabel("Resolution")
         plt.ylabel('Frequency of Micrographs')
         plt.title('Resolution histogram')
         resolution_hist_name = 'resolution_hist.png'
