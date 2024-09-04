@@ -88,7 +88,7 @@ class ProtOSCEM(EMProtocol):
         form.addParam('classes3D', params.PointerParam,
                       label="Classes 3D",
                       pointerClass='SetOfClasses3D',
-                      help="Set of 2D classes",
+                      help="Set of 3D classes",
                       allowsNull=True)
 
         form.addParam('threshold_classes3D', params.IntParam, default=-1,
@@ -799,6 +799,7 @@ class ProtOSCEM(EMProtocol):
         if type(map) is str:
             V = self.readMap(map)
             mV = V.getData()
+            mV = np.squeeze(mV)
             Zdim, Ydim, Xdim = mV.shape
         else:
             mV = map
