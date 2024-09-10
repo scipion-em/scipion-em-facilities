@@ -195,7 +195,6 @@ class TestOscemJson(BaseTest):
         cls.protextract, cls.particles = cls.runExtractParticles()
         cls.prot2Dclasses, cls.classes2D = cls.run2DClassification()
         cls.portCenter, cls.centeredClasses2D, cls.centeredParticles = cls.runCenterParticles()
-        # cls.protInitVolume, cls.initVolClasses, cls.initVolVolumes = cls.runInitialVolume()
         cls.prot3DClassification, cls.classes3DClassification, cls.volumes3DClassification = cls.run3DClassification()
 
     @classmethod
@@ -339,7 +338,7 @@ class TestOscemJson(BaseTest):
         return prot, output1, output2
 
     def test_complete_input(self):
-        print(magentaStr(f"\n==> Running test with all input completed:"))
+        print(magentaStr("\n==> Running test with all input completed:"))
         test_data_import = {"Import_movies": self.test_data["Import_movies"],
                             "Movie_alignment": self.test_data["Movie_alignment"],
                             "Movie_maxshift": self.test_data["Movie_maxshift"],
@@ -373,16 +372,7 @@ class TestOscemJson(BaseTest):
             self.assertIsNotNone(current_dict, msg=f'Dictionary section {key} is not found')
             for key_in, current_test_value in section_test_dict.items():
                 if key == 'CTF_estimation':
-                    for key_in_in, current_test_value_in in current_test_value.items():
-                        current_section_dict = current_dict.get(key_in, None)
-                        current_value = current_section_dict.get(key_in_in, None)
-                        self.assertIsNotNone(current_value, msg=f'In dictionary {key}, {key_in} is not found')
-                        if key_in_in == "Output_max_defocus" or key_in_in == "Output_min_defocus" or key_in_in == "Output_avg_defocus":
-                            self.assertAlmostEqual(current_test_value_in, current_value, delta=3000)
-                        elif key_in_in == "Output_max_resolution" or key_in_in == "Output_min_resolution" or key_in_in == "Output_avg_resolution":
-                            self.assertAlmostEqual(current_test_value_in, current_value, delta=3000)
-                        else:
-                            self.assertEqual(current_test_value_in, current_value)
+                    self.CTF_comparison(current_test_value, current_dict, key_in, key)
                 else:
                     current_value = current_dict.get(key_in, None)
                     self.assertIsNotNone(current_value, msg=f'In dictionary {key}, {key_in} is not found')
@@ -407,7 +397,7 @@ class TestOscemJson(BaseTest):
                         self.assertEqual(current_test_value, current_value)
 
     def test_only_compulsory(self):
-        print(magentaStr(f"\n==> Running test with only compulsory input completed:"))
+        print(magentaStr("\n==> Running test with only compulsory input completed:"))
         test_data_import = {"Import_movies": self.test_data["Import_movies"]}
 
         prot = self.newProtocol(ProtOSCEM,
@@ -431,7 +421,7 @@ class TestOscemJson(BaseTest):
                 self.assertEqual(current_test_value, current_value)
 
     def test_medium_level(self):
-        print(magentaStr(f"\n==> Running test with compulsory and some optional input:"))
+        print(magentaStr("\n==> Running test with compulsory and some optional input:"))
         test_data_import = {"Import_movies": self.test_data["Import_movies"],
                             "Movie_alignment": self.test_data["Movie_alignment"],
                             "Movie_maxshift": self.test_data["Movie_maxshift"],
@@ -457,16 +447,7 @@ class TestOscemJson(BaseTest):
             self.assertIsNotNone(current_dict, msg=f'Dictionary section {key} is not found')
             for key_in, current_test_value in section_test_dict.items():
                 if key == 'CTF_estimation':
-                    for key_in_in, current_test_value_in in current_test_value.items():
-                        current_section_dict = current_dict.get(key_in, None)
-                        current_value = current_section_dict.get(key_in_in, None)
-                        self.assertIsNotNone(current_value, msg=f'In dictionary {key}, {key_in} is not found')
-                        if key_in_in == "Output_max_defocus" or key_in_in == "Output_min_defocus" or key_in_in == "Output_avg_defocus":
-                            self.assertAlmostEqual(current_test_value_in, current_value, delta=3000)
-                        elif key_in_in == "Output_max_resolution" or key_in_in == "Output_min_resolution" or key_in_in == "Output_avg_resolution":
-                            self.assertAlmostEqual(current_test_value_in, current_value, delta=3000)
-                        else:
-                            self.assertEqual(current_test_value_in, current_value)
+                    self.CTF_comparison(current_test_value, current_dict, key_in, key)
                 else:
                     current_value = current_dict.get(key_in, None)
                     self.assertIsNotNone(current_value, msg=f'In dictionary {key}, {key_in} is not found')
@@ -480,7 +461,7 @@ class TestOscemJson(BaseTest):
                         self.assertEqual(current_test_value, current_value)
 
     def test_micro_input(self):
-        print(magentaStr(f"\n==> Running test with micrographs as input:"))
+        print(magentaStr("\n==> Running test with micrographs as input:"))
         test_data_import = {"CTF_estimation": self.test_data["CTF_estimation"]}
 
         prot = self.newProtocol(ProtOSCEM,
@@ -508,11 +489,21 @@ class TestOscemJson(BaseTest):
                         current_section_dict = current_dict.get(key_in, None)
                         current_value = current_section_dict.get(key_in_in, None)
                         self.assertIsNotNone(current_value, msg=f'In dictionary {key}, {key_in} is not found')
-                        if key_in_in == "Output_max_defocus" or key_in_in == "Output_min_defocus" or key_in_in == "Output_avg_defocus":
-                            # these values change each time alignment protocol is run
-                            self.assertAlmostEqual(current_test_value_in, current_value, delta=3000)
-                        elif key_in_in == "Output_max_resolution" or key_in_in == "Output_min_resolution" or key_in_in == "Output_avg_resolution":
+                        if key_in_in == "Output_max_defocus" or key_in_in == "Output_min_defocus" or key_in_in == "Output_avg_defocus"\
+                                or key_in_in == "Output_max_resolution" or key_in_in == "Output_min_resolution" or key_in_in == "Output_avg_resolution":
                             # these values change each time alignment protocol is run
                             self.assertAlmostEqual(current_test_value_in, current_value, delta=3000)
                         else:
                             self.assertEqual(current_test_value_in, current_value)
+
+    def CTF_comparison(self, current_test_value, current_dict, key_in, key):
+        for key_in_in, current_test_value_in in current_test_value.items():
+            current_section_dict = current_dict.get(key_in, None)
+            current_value = current_section_dict.get(key_in_in, None)
+            self.assertIsNotNone(current_value, msg=f'In dictionary {key}, {key_in} is not found')
+            if key_in_in == "Output_max_defocus" or key_in_in == "Output_min_defocus" or key_in_in == "Output_avg_defocus":
+                self.assertAlmostEqual(current_test_value_in, current_value, delta=3000)
+            elif key_in_in == "Output_max_resolution" or key_in_in == "Output_min_resolution" or key_in_in == "Output_avg_resolution":
+                self.assertAlmostEqual(current_test_value_in, current_value, delta=3000)
+            else:
+                self.assertEqual(current_test_value_in, current_value)
