@@ -360,13 +360,7 @@ class TestOscemJson(BaseTest):
                                 initVolume=self.importedvolume,  # Pointer(self.initVolVolumes.getFirstItem()),
                                 classes3D=self.classes3DClassification)
 
-        self.launchProtocol(prot)
-
-        file_path = prot.getOutFile()
-        self.assertTrue(exists(file_path))
-
-        with open(abspath(file_path), 'r') as json_file:
-            load_json = json.load(json_file)
+        load_json = self.prot_and_load_json(prot)
 
         for key, section_test_dict in test_data_import.items():
             current_dict = load_json.get(key, None)
@@ -433,13 +427,7 @@ class TestOscemJson(BaseTest):
                                 maxShift=self.protmaxshift,
                                 CTF=self.CTFout)
 
-        self.launchProtocol(prot)
-
-        file_path = prot.getOutFile()
-        self.assertTrue(exists(file_path))
-
-        with open(abspath(file_path), 'r') as json_file:
-            load_json = json.load(json_file)
+        load_json = self.prot_and_load_json(prot)
 
         for key, section_test_dict in test_data_import.items():
             current_dict = load_json.get(key, None)
@@ -467,13 +455,7 @@ class TestOscemJson(BaseTest):
                                 inputType=INPUT_MICS,
                                 CTF=self.CTFout)
 
-        self.launchProtocol(prot)
-
-        file_path = prot.getOutFile()
-        self.assertTrue(exists(file_path))
-
-        with open(abspath(file_path), 'r') as json_file:
-            load_json = json.load(json_file)
+        load_json = self.prot_and_load_json(prot)
 
         for key, section_test_dict in test_data_import.items():
             current_dict = load_json.get(key, None)
@@ -506,3 +488,12 @@ class TestOscemJson(BaseTest):
                 self.assertAlmostEqual(current_test_value_in, current_value, delta=3000)
             else:
                 self.assertEqual(current_test_value_in, current_value)
+
+    def prot_and_load_json(self, prot):
+        self.launchProtocol(prot)
+        file_path = prot.getOutFile()
+        self.assertTrue(exists(file_path))
+        with open(abspath(file_path), 'r') as json_file:
+            load_json = json.load(json_file)
+
+        return load_json
