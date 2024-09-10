@@ -16,6 +16,7 @@ from ...protocols import ProtOSCEM
 from ...protocols.protocol_OSCEM_metadata import INPUT_MOVIES, INPUT_MICS
 
 
+box_size = 300
 class TestOscemJson(BaseTest):
     """
     """
@@ -265,7 +266,7 @@ class TestOscemJson(BaseTest):
     def runLoGPicking(cls):
         prot = cls.newProtocol(ProtRelionAutopickLoG,
                                inputMicrographs=cls.maxshiftmicro,
-                               boxSize=300,
+                               boxSize=box_size,
                                minDiameter=100,
                                maxDiameter=200)
 
@@ -280,7 +281,7 @@ class TestOscemJson(BaseTest):
                                ctfRelations=cls.CTFout,
                                doResize=True,
                                downFactor=2.5,
-                               boxSize=300)
+                               boxSize=box_size)
 
         cls.launchProtocol(prot)
         output = getattr(prot, 'outputParticles', None)
@@ -391,8 +392,6 @@ class TestOscemJson(BaseTest):
                     elif key_in == "Number_classes_2D":
                         # these values change each time alignment protocol is run
                         self.assertAlmostEqual(current_test_value, current_value, delta=2)
-                    elif key_in == "Particles_per_class":
-                        pass
                     else:
                         self.assertEqual(current_test_value, current_value)
 
