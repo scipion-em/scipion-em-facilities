@@ -337,16 +337,10 @@ class ProtOSCEM(EMProtocol):
 
         # Filter dictionary and rename keys
         movie_maxshift = {}
+        rejtype_list = ['By frame', 'By whole movie', 'By frame and movie', 'By frame or movie']
         for key in keys_to_retrieve:
             if key == 'rejType':
-                if input_shift[key] == 0:
-                    rej_type = 'By frame'
-                if input_shift[key] == 1:
-                    rej_type = 'By whole movie'
-                if input_shift[key] == 2:
-                    rej_type = 'By frame and movie'
-                if input_shift[key] == 3:
-                    rej_type = 'By frame or movie'
+                rej_type = rejtype_list[input_shift[key]]
                 movie_maxshift[key_mapping[key]] = rej_type
             elif key in input_shift and input_shift[key] is not None and input_shift[key] != 0:
                 movie_maxshift[key_mapping[key]] = input_shift[key]
