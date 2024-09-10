@@ -21,7 +21,7 @@ OUTFILE = 'Processing_metadata.json'
 class ProtOSCEM(EMProtocol):
     """ This is the class for generating the OSCEM metadata json file from Scipion workflow
     """
-    _label = 'OSCEM Json'
+    _label = 'OSCEM Metadata'
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
