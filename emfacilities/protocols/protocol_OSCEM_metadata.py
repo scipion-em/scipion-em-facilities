@@ -867,6 +867,7 @@ class ProtOSCEM(EMProtocol):
             windowsize 1300 700
             set bgColor white
             """
+
         if isMap:
             chimeraScript += \
                 """
@@ -874,11 +875,11 @@ class ProtOSCEM(EMProtocol):
                 volume voxelLimitForOpen %d
                 volume showPlane false
                 """ % (maxMemToUse, maxVoxelsToOpen)
-        chimeraScript += \
-            """
-            open %s
-            """ % fnMap
-        if isMap:
+            chimeraScript += \
+                """
+                open %s
+                """ % fnMap
+
             if threshold == -1:
                 chimeraScript += \
                     """show #1 models
