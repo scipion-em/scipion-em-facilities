@@ -613,25 +613,11 @@ class ProtOSCEM(EMProtocol):
         th = int(self.threshold_initVol.get())
 
         volume_file_abspath = abspath(volume_file)
-        working_path = dirname(volume_file_abspath)
-
-        # Front_view
         front_view_img = 'front_view.png'
-        output_path = abspath(join(isosurface_images_path, front_view_img))
-        self.generateChimeraView(fnWorkingDir=working_path, fnMap=volume_file_abspath,
-                                 fnView=output_path, threshold=th, angX=0, angY=0, angZ=0)
-
-        # Side view (rotated 90 degrees around Y-axis)
         side_view_img = 'side_view.png'
-        output_path = abspath(join(isosurface_images_path, side_view_img))
-        self.generateChimeraView(fnWorkingDir=working_path, fnMap=volume_file_abspath,
-                                 fnView=output_path, threshold=th, angX=0, angY=90, angZ=0)
-
-        # Top view (rotated 90 degrees around X-axis)
         top_view_img = 'top_view.png'
-        output_path = abspath(join(isosurface_images_path, top_view_img))
-        self.generateChimeraView(fnWorkingDir=working_path, fnMap=volume_file_abspath,
-                                 fnView=output_path, threshold=th, angX=90, angY=0, angZ=0)
+        self.generate_isosurfaces(isosurface_images_path, volume_file_abspath,
+                                  th, front_view_img, side_view_img, top_view_img)
 
         init_volume = {'Orthogonal_slices': {
             'Orthogonal_slices_X': join(initial_vol_folder_name, orthogonal_slices_folder, "orthogonal_slices_X.png"),
@@ -738,25 +724,11 @@ class ProtOSCEM(EMProtocol):
                 th = int(self.threshold_classes3D.get())
 
                 volume_file_abspath = abspath(file_name_without_suffix)
-                working_path = dirname(volume_file_abspath)
-
-                # Front_view
                 front_view_img = 'front_view.png'
-                output_path = abspath(join(isosurface_images_path, front_view_img))
-                self.generateChimeraView(fnWorkingDir=working_path, fnMap=volume_file_abspath,
-                                         fnView=output_path, threshold=th, angX=0, angY=0, angZ=0)
-
-                # Side view (rotated 90 degrees around Y-axis)
                 side_view_img = 'side_view.png'
-                output_path = abspath(join(isosurface_images_path, side_view_img))
-                self.generateChimeraView(fnWorkingDir=working_path, fnMap=volume_file_abspath,
-                                         fnView=output_path, threshold=th, angX=0, angY=90, angZ=0)
-
-                # Top view (rotated 90 degrees around X-axis)
                 top_view_img = 'top_view.png'
-                output_path = abspath(join(isosurface_images_path, top_view_img))
-                self.generateChimeraView(fnWorkingDir=working_path, fnMap=volume_file_abspath,
-                                         fnView=output_path, threshold=th, angX=90, angY=0, angZ=0)
+                self.generate_isosurfaces(isosurface_images_path, volume_file_abspath,
+                                          th, front_view_img, side_view_img, top_view_img)
 
                 # Dictionary fill in:
                 volume = {
@@ -943,3 +915,22 @@ class ProtOSCEM(EMProtocol):
         args = "--nogui --offscreen chimeraScript.cxc"
         Plugin.runChimeraProgram(Plugin.getProgram(), args, cwd=fnWorkingDir)
         # cleanPath(fnTmp)
+
+    def generate_isosurfaces(self, isosurface_img_path, volume_file_path,
+                             th, front_view_img, side_view_img, top_view_img):
+        working_path = dirname(volume_file_path)
+
+        # Front_view
+        output_path = abspath(join(isosurface_img_path, front_view_img))
+        self.generateChimeraView(fnWorkingDir=working_path, fnMap=volume_file_path,
+                                 fnView=output_path, threshold=th, angX=0, angY=0, angZ=0)
+
+        # Side view (rotated 90 degrees around Y-axis)
+        output_path = abspath(join(isosurface_img_path, side_view_img))
+        self.generateChimeraView(fnWorkingDir=working_path, fnMap=volume_file_path,
+                                 fnView=output_path, threshold=th, angX=0, angY=90, angZ=0)
+
+        # Top view (rotated 90 degrees around X-axis)
+        output_path = abspath(join(isosurface_img_path, top_view_img))
+        self.generateChimeraView(fnWorkingDir=working_path, fnMap=volume_file_path,
+                                 fnView=output_path, threshold=th, angX=90, angY=0, angZ=0)
