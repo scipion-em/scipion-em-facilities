@@ -29,6 +29,10 @@ _darkFile = 'outputMovies._darkFile'
 _size = 'outputMovies._size'
 _firstDim = 'outputMovies._firstDim'
 
+# y label of micrographs
+hist_ylabel_mic = 'Frequency of Micrographs'
+hist_ylabel_frames = 'Frequency of frames'
+
 class ProtOSCEM(EMProtocol):
     """ This is the class for generating the OSCEM metadata json file from Scipion workflow
     """
@@ -389,7 +393,7 @@ class ProtOSCEM(EMProtocol):
         print(flattened_shift_list)
         plt.hist(flattened_shift_list, edgecolor='black')
         plt.xlabel('# Shift (Å)')
-        plt.ylabel('Frequency of frames')
+        plt.ylabel(hist_ylabel_frames)
         plt.title('Shift histogram')
         shift_hist_name = 'shift_hist.png'
         shift_hist = self.hist_path(shift_hist_name)
@@ -443,7 +447,7 @@ class ProtOSCEM(EMProtocol):
 
         plt.hist(defocus_list, bins='auto', edgecolor='black')
         plt.xlabel('# Defocus')
-        plt.ylabel('Frequency of Micrographs')
+        plt.ylabel(hist_ylabel_mic)
         plt.title('Defocus histogram')
         defocus_hist_name = 'defocus_hist.png'
         defocus_hist = self.hist_path(defocus_hist_name)
@@ -456,7 +460,7 @@ class ProtOSCEM(EMProtocol):
 
         plt.hist(resolution_list, bins='auto', edgecolor='black')
         plt.xlabel("Resolution")
-        plt.ylabel('Frequency of Micrographs')
+        plt.ylabel(hist_ylabel_mic)
         plt.title('Resolution histogram')
         resolution_hist_name = 'resolution_hist.png'
         resolution_hist = self.hist_path(resolution_hist_name)
@@ -469,7 +473,7 @@ class ProtOSCEM(EMProtocol):
 
         plt.hist(astigmatism_list, bins='auto', edgecolor='black')
         plt.xlabel("Astigmatism")
-        plt.ylabel('Frequency of Micrographs')
+        plt.ylabel(hist_ylabel_mic)
         plt.title('Astigmatism histogram')
         astigmatism_hist_name = 'astigmatism_hist.png'
         astigmatism_hist = self.hist_path(astigmatism_hist_name)
@@ -509,7 +513,7 @@ class ProtOSCEM(EMProtocol):
 
         plt.hist(particle_counts, bins='auto', edgecolor='black')
         plt.xlabel('# Particles per Micrograph')
-        plt.ylabel('Frequency of Micrographs')
+        plt.ylabel(hist_ylabel_mic)
         plt.title('Histogram for particle number per micrograph')
 
         hist_name = 'particles_hist.png'
