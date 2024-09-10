@@ -17,6 +17,17 @@ INPUT_MOVIES = 0
 INPUT_MICS = 1
 OUTFILE = 'Processing_metadata.json'
 
+# input movies attributes:
+_voltage = 'outputMovies._acquisition._voltage'
+_sphericalAberration = 'outputMovies._acquisition._sphericalAberration'
+_amplitudeContrast = 'outputMovies._acquisition._amplitudeContrast'
+_samplingRate = 'outputMovies._samplingRate'
+_dosePerFrame = 'outputMovies._acquisition._dosePerFrame'
+_doseInitial = 'outputMovies._acquisition._doseInitial'
+_gainFile = 'outputMovies._gainFile'
+_darkFile = 'outputMovies._darkFile'
+_size = 'outputMovies._size'
+_firstDim = 'outputMovies._firstDim'
 
 class ProtOSCEM(EMProtocol):
     """ This is the class for generating the OSCEM metadata json file from Scipion workflow
@@ -145,7 +156,7 @@ class ProtOSCEM(EMProtocol):
             classes_3D = self.classes3D_generation()
             self.processing_json['Classes_3D'] = classes_3D
 
-        print(json.dumps(self.processing_json,ensure_ascii=False, indent=4))
+        print(json.dumps(self.processing_json, ensure_ascii=False, indent=4))
 
     # -------------------------- INFO functions -------------------------------
     def _validate(self):
@@ -165,32 +176,29 @@ class ProtOSCEM(EMProtocol):
         # List of keys to retrieve
         # if doseperframe has a value, then dose initial is also retrieved
         # Otherwise, none of them are retrieved.
-        if input_movies['outputMovies._acquisition._dosePerFrame'] is None:
-            keys_to_retrieve = ['outputMovies._acquisition._voltage', 'outputMovies._acquisition._sphericalAberration',
-                                'outputMovies._acquisition._amplitudeContrast', 'outputMovies._samplingRate',
-                                'outputMovies._gainFile', 'outputMovies._darkFile', 'outputMovies._size']
+        if input_movies[_dosePerFrame] is None:
+            keys_to_retrieve = [_voltage, _sphericalAberration, _amplitudeContrast, _samplingRate,
+                                _gainFile, _darkFile, _size]
         else:
-            keys_to_retrieve = ['outputMovies._acquisition._voltage', 'outputMovies._acquisition._sphericalAberration',
-                                'outputMovies._acquisition._amplitudeContrast', 'outputMovies._samplingRate',
-                                'outputMovies._acquisition._dosePerFrame', 'outputMovies._acquisition._doseInitial',
-                                'outputMovies._gainFile', 'outputMovies._darkFile', 'outputMovies._size']
+            keys_to_retrieve = [_voltage, _sphericalAberration, _amplitudeContrast, _samplingRate,
+                                _dosePerFrame, _doseInitial, _gainFile, _darkFile, _size]
 
         # Mapping dictionary for key name changes
         key_mapping = {
-            'outputMovies._acquisition._voltage': 'Microscope_voltage_(kV)',
-            'outputMovies._acquisition._sphericalAberration': 'Spherical_aberration_(mm)',
-            'outputMovies._acquisition._amplitudeContrast': 'Amplitud_contrast',
-            'outputMovies._samplingRate': 'Pixel_size_(Å/px)',
-            'outputMovies._acquisition._dosePerFrame': 'Dose_per_image_(e/Å²)',
-            'outputMovies._acquisition._doseInitial': 'Initial_dose_(e/Å²)',
-            'outputMovies._gainFile': 'Gain_image',
-            'outputMovies._darkFile': 'Dark_image',
-            'outputMovies._size': 'Number_movies'
+            _voltage: 'Microscope_voltage_(kV)',
+            _sphericalAberration: 'Spherical_aberration_(mm)',
+            _amplitudeContrast: 'Amplitud_contrast',
+            _samplingRate: 'Pixel_size_(Å/px)',
+            _dosePerFrame: 'Dose_per_image_(e/Å²)',
+            _doseInitial: 'Initial_dose_(e/Å²)',
+            _gainFile: 'Gain_image',
+            _darkFile: 'Dark_image',
+            _size: 'Number_movies'
         }
 
         # Filter the dictionary and rename the keys
         extra_folder = self._getExtraPath()
-        file_keys = ['outputMovies._gainFile', 'outputMovies._darkFile']
+        file_keys = [_gainFile, _darkFile]
         for key in file_keys:
             if input_movies[key] is not None:
                 with mrcfile.open(input_movies[key], 'r') as mrc:
@@ -222,7 +230,7 @@ class ProtOSCEM(EMProtocol):
                          key in input_movies and input_movies[key] is not None and input_movies[key] != 0}
 
         # Retrieve nº of frames per movie and size of frames:
-        dims = input_movies['outputMovies._firstDim']
+        dims = input_movies[_firstDim]
         dims_list = dims.split(',')
         dim1 = int(dims_list[0])
         dim2 = int(dims_list[1])
@@ -673,7 +681,7 @@ class ProtOSCEM(EMProtocol):
 
             # Option 2:
             if ':' in file_name:
-               file_name_without_suffix = file_name.split(':')[0]
+                file_name_without_suffix = file_name.split(':')[0]
 
             with mrcfile.open(file_name_without_suffix, 'r') as mrc:
                 data = mrc.data
@@ -778,7 +786,7 @@ class ProtOSCEM(EMProtocol):
     def saveJson(self):
         file_path = self.getOutFile()
         with open(file_path, 'w', encoding='utf-8') as json_file:
-            json.dump(self.processing_json, json_file, ensure_ascii=False,  indent=4)
+            json.dump(self.processing_json, json_file, ensure_ascii=False, indent=4)
         print(f"JSON data successfully saved to {file_path}")
 
     def getOutFile(self):
