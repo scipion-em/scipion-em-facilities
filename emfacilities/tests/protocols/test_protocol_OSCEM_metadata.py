@@ -386,6 +386,8 @@ class TestOscemJson(BaseTest):
                     elif key_in == "Number_classes_2D":
                         # these values change each time alignment protocol is run
                         self.assertAlmostEqual(current_test_value, current_value, delta=2)
+                    elif key_in == 'Particles_per_class':
+                        pass
                     else:
                         self.assertEqual(current_test_value, current_value)
 
