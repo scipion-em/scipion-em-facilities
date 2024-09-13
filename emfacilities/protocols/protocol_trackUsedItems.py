@@ -56,79 +56,78 @@ class UsedItemsTracker(EMProtocol):
     form.addSection(label='Input')
     form.addParam('inputVolumes', params.PointerParam,
                   pointerClass='Volume', allowsNull=False,
-                  label="Input volumes",
-                  help='Select the sets of volumes to track their used items')
+                  label='Input volumes',
+                  help='Select the volume to track their used items')
     form.addParam('saveJPG', params.BooleanParam, default=False,
                   label="Save images as JPG",
-                  help='Save micrographs and particles as jpg')
+                  help='Save items thumbnails (micrographs, particles, CTFs, etc.) as jpg')
 
     form.addSection(label='Tracking')
     group = form.addGroup('Particles')
-    group.addParam('trackParticles', params.BooleanParam, default=True,
+    group.addParam('trackParticles', params.BooleanParam, default=False,
                   label='Track used particles?',
                   help='The particles used in the final volume reconstruction will be tracked')
     group.addParam('originalParticles', params.PointerParam,
-                  pointerClass='SetOfParticles', expertLevel=params.LEVEL_ADVANCED,
-                  label="Original Particles", allowsNull=True,
+                  pointerClass='SetOfParticles',
+                  label="Original Particles", condition='trackParticles', allowsNull=False,
                   help='Set of Particles containing the complete set of original particles, including the used and '
-                       'filtered particles. If None, the set of particles with same sampling rate and furthest to the '
-                       'used particles will be used.')
+                       'filtered particles.')
 
     group = form.addGroup('Micrographs')
-    group.addParam('trackMics', params.BooleanParam, default=True,
+    group.addParam('trackMics', params.BooleanParam, default=False,
                   label='Track used micrographs?',
                   help='The micrographs with picked particles used in the final volume reconstruction '
                        'will be tracked and scored according to the number of used particles in them')
     group.addParam('originalMicrographs', params.PointerParam,
-                  pointerClass='SetOfMicrographs', expertLevel=params.LEVEL_ADVANCED,
-                  label="Original micrographs", condition='trackMics', allowsNull=True,
+                  pointerClass='SetOfMicrographs',
+                  label='Original micrographs', condition='trackMics', allowsNull=False,
                   help='Set of micrographs containing the complete set of original mics, including the used and '
-                       'filtered mics. If None, the first protocol with output micrographs will be used. '
-                       'Each of these micrographs will be scored depending on the number of used particles in them')
+                       'filtered mics.')
 
     group = form.addGroup('CTFs')
-    group.addParam('trackCTFs', params.BooleanParam, default=True,
+    group.addParam('trackCTFs', params.BooleanParam, default=False,
                   label='Track used CTFs?', condition='trackMics',
                   help='The CTFs from micrographs with picked particles used in the final volume reconstruction '
                        'will be tracked and scored according to the number of used particles in them')
+    group.addParam('originalCTFs', params.PointerParam,
+                  pointerClass='SetOfCTF',
+                  label='Original CTFs', condition='trackMics and trackCTFs', allowsNull=False,
+                  help='Set of CTFs derived from original mics (filtered and used).')
 
     group = form.addGroup('Coordinates')
-    group.addParam('trackCoordinates', params.BooleanParam, default=True,
+    group.addParam('trackCoordinates', params.BooleanParam, default=False,
                   label='Track used coordinates?', condition='trackMics',
                   help='The coordinates used in the final volume reconstruction will be tracked')
     group.addParam('originalCoordinates', params.PointerParam,
-                  pointerClass='SetOfCoordinates', expertLevel=params.LEVEL_ADVANCED,
-                  label="Original Coordinates", condition='trackCoordinates and trackMics', allowsNull=True,
-                  help='Set of Coordinates where to get the coordinates parameters. If None, the first protocol '
-                       'with output Coordinates will be used')
-    group.addParam('pickNoise', params.BooleanParam, default=False, expertLevel=params.LEVEL_ADVANCED,
+                  pointerClass='SetOfCoordinates',
+                  label='Original Coordinates', condition='trackCoordinates and trackMics', allowsNull=False,
+                  help='Set of Coordinates where to get the coordinates parameters.')
+    group.addParam('pickNoise', params.BooleanParam, default=False,
                   label='Pick negative coordinates', condition='trackCoordinates and trackMics',
                   help='Picks noise from the micrographs as negative particle examples')
     group.addParam('extractNoiseNumber', params.IntParam,
-                  default=-1, expertLevel=params.LEVEL_ADVANCED,
+                  default=-1,
                   label='Number of noise particles', condition="pickNoise",
                   help='Number of noise particles to extract from each micrograph. '
                        'Set to -1 for extracting the same amount of noise '
                        'particles as the number true particles for that micrograph')
 
     group = form.addGroup('Classes')
-    group.addParam('trackClasses2D', params.BooleanParam, default=True,
+    group.addParam('trackClasses2D', params.BooleanParam, default=False,
                   label='Track used Classes2D?',
                   help='The Classes2D used in the final volume reconstruction will be tracked')
     group.addParam('inputClasses2D', params.PointerParam,
-                  pointerClass='SetOfClasses2D', expertLevel=params.LEVEL_ADVANCED,
-                  label="Used Classes2D", condition='trackClasses2D', allowsNull=True,
-                  help='Set of Classes2D where to track the used items. If None, the newer protocol'
-                       'with output Classes2D will be used')
+                  pointerClass='SetOfClasses2D',
+                  label='Used Classes2D', condition='trackClasses2D', allowsNull=False,
+                  help='Set of Classes2D where to track the used items.')
 
-    group.addParam('trackClasses3D', params.BooleanParam, default=True,
+    group.addParam('trackClasses3D', params.BooleanParam, default=False,
                   label='Track used Classes3D?',
                   help='The Classes3D used in the final volume reconstruction will be tracked')
     group.addParam('inputClasses3D', params.PointerParam,
-                  pointerClass='SetOfClasses3D', expertLevel=params.LEVEL_ADVANCED,
-                  label="Used Classes3D", condition='trackClasses3D', allowsNull=True,
-                  help='Set of Classes3D where to track the used items. If None, the newer protocol'
-                       'with output Classes3D will be used')
+                  pointerClass='SetOfClasses3D',
+                  label='Used Classes3D', condition='trackClasses3D', allowsNull=False,
+                  help='Set of Classes3D where to track the used items.')
 
     form.addParallelSection(threads=4, mpi=1)
 
@@ -150,8 +149,6 @@ class UsedItemsTracker(EMProtocol):
 
     if self.saveJPG.get():
       self._insertFunctionStep('saveJPGsStep', prerequisites=allSteps)
-
-
 
   def getOutputGraphStep(self):
     self.project = self.getProject()
