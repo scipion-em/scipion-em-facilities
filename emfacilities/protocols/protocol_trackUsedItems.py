@@ -278,7 +278,7 @@ class UsedItemsTracker(EMProtocol):
   # --------------------------- UTILS functions -----------------------------
   def getUsedParticles(self):
     particlesCodes = self.getFurthestCodesFromNode(self.outGraph, 'root',
-                                                   nodeConditions=[('objType', 'SetOfParticles')])
+                                                   nodeConditions=[('objType', 'Particles')])
     particleSets = self.getCodesSets(particlesCodes)
     return particleSets, particlesCodes
 
@@ -286,7 +286,7 @@ class UsedItemsTracker(EMProtocol):
     if self.originalParticles.get() is None:
       partSamplingRate = self.particlesSet.getSamplingRate()
       originalParticlesCodes = self.getFurthestCodesFromNode(self.outGraph, self.particlesCodes[0],
-                                                             nodeConditions=[('objType', 'SetOfParticles'),
+                                                             nodeConditions=[('objType', 'Particles'),
                                                                              ('samplingRate', partSamplingRate)])
       particleSets = self.getCodesSets(originalParticlesCodes)
     else:
@@ -313,7 +313,7 @@ class UsedItemsTracker(EMProtocol):
   def getOriginalMicrographs(self):
     if self.originalMicrographs.get() is None:
       micCodes = self.getClosestCodesFromNode(self.outGraph, 'root',
-                                              nodeConditions=[('objType', 'SetOfMicrographs')])
+                                              nodeConditions=[('objType', 'Micrographs')])
       print('original mics codes: ', micCodes)
       micSets = self.getCodesSets(micCodes)
     else:
