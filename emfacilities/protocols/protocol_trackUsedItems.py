@@ -28,7 +28,7 @@
 import pyworkflow.utils as pwutils
 from pyworkflow.protocol import params, constants
 from pwem.protocols.protocol import EMProtocol
-from pwem.objects import Micrograph, Particle, Class3D, Class2D
+from pwem.objects import Micrograph, Particle, Class3D, Class2D, CTFModel
 from pwem.emlib.image import ImageHandler as ih
 from pwem.emlib import MDL_XCOOR, MDL_YCOOR, MDL_MICROGRAPH_ID
 
@@ -39,7 +39,7 @@ import numpy as np
 from scipy.spatial.distance import cdist
 from xmipp3.convert import (writeSetOfCoordinates, writeCoordsListToPosFname,
                             readPosCoordinates, readSetOfCoordsFromPosFnames)
-
+from pwem import emlib
 
 class UsedItemsTracker(EMProtocol):
   """
@@ -103,7 +103,7 @@ class UsedItemsTracker(EMProtocol):
                   label='Original Coordinates', condition='trackCoordinates and trackMics', allowsNull=False,
                   help='Set of Coordinates where to get the coordinates parameters.')
     group.addParam('pickNoise', params.BooleanParam, default=False,
-                  label='Pick negative coordinates', condition='trackCoordinates and trackMics',
+                  label='Pick negative coordinates', condition='trackMics and trackCoordinates',
                   help='Picks noise from the micrographs as negative particle examples')
     group.addParam('extractNoiseNumber', params.IntParam,
                   default=-1,
@@ -131,6 +131,7 @@ class UsedItemsTracker(EMProtocol):
 
     form.addParallelSection(threads=4, mpi=1)
 
+
   # --------------------------- INSERT steps functions ----------------------
   def _insertAllSteps(self):
     allSteps = []
@@ -144,81 +145,89 @@ class UsedItemsTracker(EMProtocol):
     if self.trackClasses2D.get():
       allSteps.append(self._insertFunctionStep('trackClasses2DStep', prerequisites=[usedStep]))
 
-    if self.trackClasses2D.get():
+    if self.trackClasses3D.get():
       allSteps.append(self._insertFunctionStep('trackClasses3DStep', prerequisites=[usedStep]))
 
     if self.saveJPG.get():
       self._insertFunctionStep('saveJPGsStep', prerequisites=allSteps)
 
+
   def getOutputGraphStep(self):
     self.project = self.getProject()
-
     self.inpDic, self.outDic = self.buildInputsDic(self.project), self.buildOutputsDic(self.project)
     self.protDic = self.project.getProtocolsDict()
     self.outGraph = self.generateOutputsGraphRec(self.getObjId())
 
-  def getUsedItemsStep(self):
-    #Used particles: further from root
-    particleSets, self.particlesCodes = self.getUsedParticles()
-    self.particlesSet = self.joinSets(particleSets)
 
-    #original particles: further from used with same sampling rate
+  def getUsedItemsStep(self):
+    # original particles
     originalParticlesSets, originalParticlesCodes = self.getOriginalParticles()
-    print('Used particles code: ', self.particlesCodes)
-    print('Original particles code: ', originalParticlesCodes)
-    #NotUsed: filtered from original to used
-    self.notParticlesSet = self.getUnused(particleSets, originalParticlesSets)
+    # used particles: further from root
+    usedParticleSets, usedParticlesCodes = self.getUsedParticles()
+    # set of particles (used and not used)
+    self.outputParticles, self.notOutputParticles = self.getOutputParticles(usedParticleSets, originalParticlesSets)
+
 
   def trackParticlesStep(self):
-      print('\nTracking used particles')
-      self._defineOutputs(usedParticles=self.particlesSet)
-      self._defineOutputs(notUsedParticles=self.notParticlesSet)
+      print('\nTracking particles')
+      self._defineOutputs(usedParticles=self.outputParticles)
+      self._defineOutputs(notUsedParticles=self.notOutputParticles)
+
 
   def trackMicrographsStep(self):
-      print('\nTracking used micrographs')
-      #Original mics: closest from root
-      micSets = self.getOriginalMicrographs()
-      #Counting particles per mic
-      self.micDic = self.buildMicDic(micSets)
-      self.micCountDic, _ = self.countParticlesPerMic(self.particlesSet)
-      self.createMicScoreOutput(self.micCountDic)
+      print('\nTracking micrographs')
+      # original mics
+      originalMicSets = self.getOriginalMicrographs()
 
-      self.outputMics = self.buildSetOfMics(micSets[0])
+      # used mics: furthest from root
+      usedMicSets = self.getUsedMicrographs()
+
+      # dictionary original and used micrographs
+      self.originalMicdic = self.buildMicDic(originalMicSets)
+      self.usedMicDic = self.buildMicDic(usedMicSets)
+
+      # set of micrographs (used and not used)
+      self.outputMics, self.notOutputMics = self.getOutputMicrographs(usedMicSets, originalMicSets)
+
       self._defineOutputs(usedMicrographs=self.outputMics)
+      self._defineOutputs(notUsedMicrographs=self.notOutputMics)
 
       if self.trackCTFs.get():
-        # Used CTFs: further from root
-        print('\nTracking used CTFs')
-        ctfSets = self.getUsedCTFs()
-        self.ctfSet = self.joinSets(ctfSets)
-        #Generating psd files with image handler
-        self.psdDic = self.generatePSDs()
-        self.createMicScoreOutput(self.micCountDic, ctfSet=self.ctfSet)
+        print('\nTracking CTFs')
+        # original CTFs
+        originalCtfSets = self.getOriginalCTFs()
 
-        self.outputCTF = self.buildSetOfCTF(self.ctfSet, ctfSets)
+        # used CTFs: further from root
+        usedCtfSets = self.getUsedCTFs()
+
+        # set of CTFs (from mics used and not used)
+        self.outputCTF, self.notOutputCTF = self.getOutputCTFs(usedCtfSets, originalCtfSets)
+
         self._defineOutputs(usedCTFs=self.outputCTF)
+        self._defineOutputs(notUsedCTFs=self.notOutputCTF)
 
       if self.trackCoordinates.get():
-        # Original coords: closest from root
-        print('\nTracking used coordinates')
-        coordSets = self.getOriginalCoordinates()
-        downSamplingFactor = self.getDownsampling(self.outputMics, self.particlesSet)
-        self.boxSize = coordSets[0].getBoxSize()
-        
-        #Getting coordinates from particles
-        coords = self.getParticleCoordinates(self.particlesSet)
+        print('\nTracking coordinates')
+        # original coords
+        originalCoordSets = self.getOriginalCoordinates()
+        downSamplingFactor = self.getDownsampling(self.outputMics, self.outputParticles)
+        self.boxSize = originalCoordSets[0].getBoxSize()
+
+        # coordinates from used particles
+        coords = self.getParticleCoordinates(self.outputParticles)
         coords = self.scaleCoords(coords, downSamplingFactor)
-        outputCoordinates = self.buildSetOfCoordinates(self.outputMics, coords, coordSets, '_used')
+        outputCoordinates = self.buildSetOfCoordinates(self.outputMics, coords, originalCoordSets, '_used')
         self._defineOutputs(usedCoordinates=outputCoordinates)
 
-        notCoords = self.getParticleCoordinates(self.notParticlesSet)
+        # coordinates from not used particles
+        notCoords = self.getParticleCoordinates(self.notOutputParticles)
         notCoords = self.scaleCoords(notCoords, downSamplingFactor)
-        notOutputCoordinates = self.buildSetOfCoordinates(self.outputMics, notCoords, coordSets, '_notUsed')
+        notOutputCoordinates = self.buildSetOfCoordinates(self.outputMics, notCoords, originalCoordSets, '_notUsed')
         self._defineOutputs(notUsedCoordinates=notOutputCoordinates)
 
         if self.pickNoise.get():
-          #Picking noise particles as negative examples using xmipp software
-          allCoordsSet = self.getAllCoordSet(coords, notCoords, downSamplingFactor, coordSets)
+          # picking noise particles as negative examples using xmipp software
+          allCoordsSet = self.getAllCoordSet(coords, notCoords, downSamplingFactor, originalCoordSets)
           allCoordsDir, noiseCoordsDir = self._getTmpPath('all_coords'), self._getExtraPath('noiseCoords')
           os.mkdir(allCoordsDir), os.mkdir(noiseCoordsDir)
           writeSetOfCoordinates(allCoordsDir, allCoordsSet)
@@ -229,12 +238,13 @@ class UsedItemsTracker(EMProtocol):
                                                      setOfInputCoords=outputCoordinates)
           self._defineOutputs(noiseCoordinates=noiseCoordinates)
 
+
   def trackClasses2DStep(self):
-      # Used classes2D: further from root
       print('\nTracking used classes2D')
+      # used classes2D
       classes2DSets, classes2DCodes = self.getUsedClasses(dd='2D')
       sampRate2D = classes2DSets[0].getFirstItem().getFirstItem().getSamplingRate()
-      #Getting used particles in class2D generation as the newer with same sampling rate
+      # getting used particles in class2D generation as the newer with same sampling rate
       usedParticlesSets2D = self.getClassesUsedParticles(sampRate2D)
 
       classes2DDic = self.buildClassesDic(classes2DSets)
@@ -244,13 +254,13 @@ class UsedItemsTracker(EMProtocol):
 
       self._defineOutputs(usedClasses2D=self.usedClasses2D, notUsedClasses2D=notUsedClasses2D)
 
+
   def trackClasses3DStep(self):
-    if self.trackClasses3D.get():
-      # Used Classes3D: further from root
       print('\nTracking used classes3D')
+      # used classes3D
       classes3DSets, classes3DCodes = self.getUsedClasses('3D')
       sampRate3D = classes3DSets[0].getFirstItem().getFirstItem().getSamplingRate()
-      # Getting used particles in class3D generation as the newer with same sampling rate
+      # getting used particles in class3D generation as the newer with same sampling rate
       usedParticlesSets3D = self.getClassesUsedParticles(sampRate3D)
 
       classes3DDic = self.buildClassesDic(classes3DSets)
@@ -259,109 +269,158 @@ class UsedItemsTracker(EMProtocol):
 
       self._defineOutputs(usedClasses3D=usedClasses3D, notUsedClasses3D=notUsedClasses3D)
 
+
   def saveJPGsStep(self):
     if self.trackParticles.get():
-      self.saveSetAsJPG(self.particlesSet, self._getExtraPath('usedParticles'))
+      self.saveSetAsJPG(self.outputParticles, self._getExtraPath('usedParticles'))
+      self.saveSetAsJPG(self.notOutputParticles, self._getExtraPath('notUsedParticles'))
 
     if self.trackMics.get():
       self.saveSetAsJPG(self.outputMics, self._getExtraPath('usedMics'))
-      self.createMicScoreOutput(self.micCountDic, jpg=True)
+      self.saveSetAsJPG(self.notOutputMics, self._getExtraPath('notUsedMics'))
 
-      if self.trackCTFs.get():
-        self.savePSDsAsJPG(self._getExtraPath('usedPSDs'))
-        self.createMicScoreOutput(self.micCountDic, ctfSet=self.ctfSet, jpg=True)
+    if self.trackCTFs.get():
+      self.saveSetAsJPG(self.outputCTF, self._getExtraPath('usedCTFs'))
+      self.saveSetAsJPG(self.notOutputCTF, self._getExtraPath('notUsedCTFs'))
 
     if self.trackClasses2D.get():
       self.saveSetAsJPG(self.usedClasses2D, self._getExtraPath('usedClasses2D'))
+      self.saveSetAsJPG(self.notUsedClasses2D, self._getExtraPath('notUsedClasses2D'))
       self.writeUsedClasses(jpg=True)
 
+
   # --------------------------- UTILS functions -----------------------------
+  def getOriginalParticles(self):
+      originalParticlesCodes = \
+          ['{}.{}'.format(self.originalParticles.getObjValue().strId(), self.originalParticles.getExtended())]
+      particleSets = [self.originalParticles.get()]
+
+      return particleSets, originalParticlesCodes
+
+
   def getUsedParticles(self):
     particlesCodes = self.getFurthestCodesFromNode(self.outGraph, 'root',
                                                    nodeConditions=[('objType', 'Particles')])
     particleSets = self.getCodesSets(particlesCodes)
+
     return particleSets, particlesCodes
 
-  def getOriginalParticles(self):
-    if self.originalParticles.get() is None:
-      partSamplingRate = self.particlesSet.getSamplingRate()
-      originalParticlesCodes = self.getFurthestCodesFromNode(self.outGraph, self.particlesCodes[0],
-                                                             nodeConditions=[('objType', 'Particles'),
-                                                                             ('samplingRate', partSamplingRate)])
-      particleSets = self.getCodesSets(originalParticlesCodes)
-    else:
-      originalParticlesCodes = \
-        ['{}.{}'.format(self.originalParticles.getObjValue().strId(), self.originalParticles.getExtended())]
-      particleSets = [self.originalParticles.get()]
-    return particleSets, originalParticlesCodes
 
-  def getUnused(self, usedParticlesSets, originalParticlesSets):
+  def getOutputParticles(self, usedParticlesSets, originalParticlesSets):
     usedParticlesIds = self.joinParticleSetsIds(usedParticlesSets)
-    notParticles, notUsedIds = [], []
-
+    particles, notParticles = [], []
     for particleSet in originalParticlesSets:
       for part in particleSet:
-        if not part.getObjId() in usedParticlesIds and not part.getObjId() in notUsedIds:
-          cPart = part.clone()
+        cPart = part.clone()
+        if not part.getObjId() in usedParticlesIds:
           notParticles.append(cPart)
-          notUsedIds.append(cPart.getObjId())
+        else:
+          particles.append(cPart)
 
+    particlesSet = self.createScipionSet(particles, '_used')
     notParticlesSet = self.createScipionSet(notParticles, '_unused')
+
+    if len(particles) == 0:
+        particlesSet = self._createSetOfMicrographs('_used')
+    elif len(notParticlesSet) == 0:
+        notParticlesSet = self._createSetOfParticles('_notUsed')
+
+    particlesSet.copyInfo(originalParticlesSets[0])
     notParticlesSet.copyInfo(originalParticlesSets[0])
-    return notParticlesSet
+
+    return particlesSet, notParticlesSet
+
 
   def getOriginalMicrographs(self):
-    if self.originalMicrographs.get() is None:
-      micCodes = self.getClosestCodesFromNode(self.outGraph, 'root',
-                                              nodeConditions=[('objType', 'Micrographs')])
-      print('original mics codes: ', micCodes)
-      micSets = self.getCodesSets(micCodes)
-    else:
-      micSets = [self.originalMicrographs.get()]
+    micSets = [self.originalMicrographs.get()]
+
     return micSets
+
+
+  def getUsedMicrographs(self):
+    microCodes = self.getFurthestCodesFromNode(self.outGraph, 'root',
+                                               nodeConditions=[('objType', 'Micrographs')])
+    microSets = self.getCodesSets(microCodes)
+
+    return microSets
+
+
+  def getOutputMicrographs(self, usedMicSets, originalMicSets):
+    usedMicIds = self.joinParticleSetsIds(usedMicSets)
+    mic, notMic = [], []
+    for micSet in originalMicSets:
+      for part in micSet:
+        cPart = part.clone()
+        if not part.getObjId() in usedMicIds:
+          notMic.append(cPart)
+        else:
+          mic.append(cPart)
+
+    micSet = self.createScipionSet(mic, '_used')
+    notMicSet = self.createScipionSet(notMic, '_notUsed')
+
+    if len(mic) == 0:
+      micSet = self._createSetOfMicrographs('_used')
+    elif len(notMic) == 0:
+      notMicSet = self._createSetOfMicrographs('_notUsed')
+
+    micSet.copyInfo(originalMicSets[0])
+    notMicSet.copyInfo(originalMicSets[0])
+
+    return micSet, notMicSet
+
+
+  def getOriginalCTFs(self):
+    ctfSets = [self.originalCTFs.get()]
+    return ctfSets
+
 
   def getUsedCTFs(self):
     ctfCodes = self.getFurthestCodesFromNode(self.outGraph, 'root',
                                              nodeConditions=[('objType', 'SetOfCTF')])
-    print('Used CTF codes: ', ctfCodes)
     ctfSets = self.getCodesSets(ctfCodes)
     return ctfSets
 
-  def getOriginalCTFs(self):
-    if self.originalCTFs.get() is None:
-      ctfCodes = self.getClosestCodesFromNode(self.outGraph, 'root',
-                                              nodeConditions=[('objType', 'SetOfCTF')])
-      print('Original CTF codes: ', ctfCodes)
-      ctfSets = self.getCodesSets(ctfCodes)
-    else:
-      ctfSets = [self.originalCTFs.get()]
-    return ctfSets
+
+  def getOutputCTFs(self, usedCtfSets, originalCtfSets):
+      usedCtfIds = self.joinParticleSetsIds(usedCtfSets)
+      ctf, notCtf = [], []
+      for ctfSet in originalCtfSets:
+        for part in ctfSet:
+          cPart = part.clone()
+          if not part.getObjId() in usedCtfIds:
+            notCtf.append(cPart)
+          else:
+            ctf.append(cPart)
+
+      ctfSet = self.createScipionSet(ctf, '_used')
+      notCtfSet = self.createScipionSet(notCtf, '_notUsed')
+
+      if len(ctfSet) == 0:
+          ctfSet = self._createSetOfCTF('_used')
+      elif len(notCtf) == 0:
+          notCtfSet = self._createSetOfCTF('_notUsed')
+
+      ctfSet.copyInfo(originalCtfSets[0])
+      notCtfSet.copyInfo(originalCtfSets[0])
+
+      return ctfSet, notCtfSet
+
 
   def getOriginalCoordinates(self):
-    if self.originalCoordinates.get() is None:
-      coordCodes = self.getClosestCodesFromNode(self.outGraph, 'root',
-                                                nodeConditions=[('objType', 'SetOfCoordinates')])
-      print('Original Coordinate codes: ', coordCodes)
-      coordSets = self.getCodesSets(coordCodes)
-    else:
-      coordSets = [self.originalCoordinates.get()]
+    coordSets = [self.originalCoordinates.get()]
     return coordSets
 
+
   def getUsedClasses(self, dd='3D'):
-    if (dd=='3D' and self.inputClasses3D.get() is None) or \
-            (dd=='2D' and self.inputClasses2D.get() is None):
-      clCodes = self.getFurthestCodesFromNode(self.outGraph, 'root',
-                                              nodeConditions=[('objType', 'SetOfClasses{}'.format(dd))])
-      print('Used classes{} codes: '.format(dd), clCodes)
-      clSets = self.getCodesSets(clCodes)
-    else:
-      if dd=='3D':
-        clSets = [self.inputClasses3D.get()]
-        clCodes = [self.inputClasses3D.getUniqueId()]
-      elif dd=='2D':
-        clSets = [self.inputClasses2D.get()]
-        clCodes = [self.inputClasses2D.getUniqueId()]
+    if dd=='3D':
+      clSets = [self.inputClasses3D.get()]
+      clCodes = [self.inputClasses3D.getUniqueId()]
+    elif dd=='2D':
+      clSets = [self.inputClasses2D.get()]
+      clCodes = [self.inputClasses2D.getUniqueId()]
     return clSets, clCodes
+
 
   def getUsedClasses2D(self, classes2DSets, oriParticlesSet):
     '''Returns the used and not used 2Dclasses sets based on the count of used particles per
@@ -379,6 +438,7 @@ class UsedItemsTracker(EMProtocol):
         else:
           notUsedClasses2D = self.updateClassSet(notUsedClasses2D, newClass, cl2D)
     return usedClasses2D, notUsedClasses2D
+
 
   def getUsedClasses3D(self, classes3DSets, oriParticlesSet, writeFile='usedClasses3D.tsv'):
     '''Returns the used and not used 3Dclasses sets based on the count of used particles per
@@ -401,36 +461,19 @@ class UsedItemsTracker(EMProtocol):
     f.close()
     return usedClasses3D, notUsedClasses3D
 
+
   def getClassesUsedParticles(self, sampRate):
     usedParticlesCodes = self.getFurthestCodesFromNode(self.outGraph, 'root',
-                                                           nodeConditions=[('objType', 'SetOfParticles'),
+                                                           nodeConditions=[('objType', 'Particles'),
                                                                            ('samplingRate', sampRate)])
     print('Classes particles codes: ', usedParticlesCodes)
     particleSets = self.getCodesSets(usedParticlesCodes)
     return particleSets
 
-  def generatePSDs(self):
-    outDir = self._getExtraPath('computedPSDs')
-    os.mkdir(outDir)
-    psdDic, argsList = {}, []
-    print('Computing micrographs PSD')
-    for micId, micFile in self.micDic.items():
-      micBase = os.path.basename(micFile)
-      micExt = pwutils.getExt(micFile)
-      psdFile = micBase.replace(micExt, '_psd.psd')
-      psdPath = os.path.join(outDir, psdFile)
-      psdDic[micFile] = psdPath
-
-      argsList.append((micFile, psdPath))
-
-    Parallel(n_jobs=self.numberOfThreads.get(), backend="multiprocessing", verbose=1)(
-      delayed(computeMicPSD)(*arg) for arg in argsList)
-
-    return psdDic
 
   def getNoiseCoordinates(self, coordsDir, outDir, noiseNumber=-1):
     micsBaseToFullName = {}
-    for micId, micPath in self.micDic.items():
+    for micId, micPath in self.originalMicdic.items():
       if micPath.endswith(".mrc") or micPath.endswith(".tif"):
         baseName, _ = os.path.splitext(os.path.basename(micPath))
         micsBaseToFullName[baseName] = micPath
@@ -439,6 +482,7 @@ class UsedItemsTracker(EMProtocol):
     xDim, yDim, _, _ = I.getDimensions()
 
     argsList = []
+
     for posName in os.listdir(coordsDir):
       if posName.endswith(".pos"):
         baseName, _ = os.path.splitext(os.path.basename(posName))
@@ -449,16 +493,13 @@ class UsedItemsTracker(EMProtocol):
     Parallel(n_jobs=self.numberOfThreads.get(), backend="multiprocessing", verbose=1)(
       delayed(pickNoiseOneMic)(*arg) for arg in argsList)
 
-  def getMicsDir(self):
-    for mic in self.outputMics:
-      dir = os.path.dirname(mic.getFileName())
-      return dir
 
   def getAllCoordSet(self, coords, notCoords, downSamplingFactor, coordSets):
     allCoords = coords + notCoords
     allCoords = self.scaleCoords(allCoords, downSamplingFactor)
     allCoordsSet = self.buildSetOfCoordinates(self.outputMics, allCoords, coordSets, '_all')
     return allCoordsSet
+
 
   def writeUsedClasses(self, writeFile='usedClasses2D.tsv', jpg=False):
     with open(self._getExtraPath(writeFile), 'w') as f:
@@ -472,11 +513,6 @@ class UsedItemsTracker(EMProtocol):
         else:
           f.write('{}\t{}\n'.format('class2D_{}.jpg'.format(cl2dId), self.classes2DCountDic[cl2dId]))
 
-  def savePSDsAsJPG(self, outDir):
-    os.mkdir(outDir)
-    for micFile, psdFile in self.psdDic.items():
-      jpgPath = outDir + '/' + os.path.basename(pwutils.replaceExt(psdFile, 'jpg'))
-      self.exportAsJpg(psdFile, jpgPath)
 
   def saveSetAsJPG(self, scipionSet, outDir):
     os.mkdir(outDir)
@@ -487,29 +523,38 @@ class UsedItemsTracker(EMProtocol):
         itemPath = cItem.getLocation()
         itemName = cItem.getBaseName()
         jpgPath = outDir + '/' + pwutils.replaceExt(itemName, 'jpg').replace('.jpg', '_{}.jpg'.format(itemId))
+        self.exportAsJpg(itemPath, jpgPath)
 
       elif isinstance(cItem, Micrograph):
         itemPath = cItem.getLocation()
         itemName = cItem.getBaseName()
         jpgPath = outDir + '/' + pwutils.replaceExt(itemName, 'jpg')
+        self.exportAsJpg(itemPath, jpgPath)
+
+      elif isinstance(cItem, CTFModel):
+        itemPath = cItem.getPsdFile()
+        itemName = os.path.basename(itemPath)
+        jpgPath = outDir + '/' + pwutils.replaceExt(itemName, 'jpg')
+
+        image = emlib.Image(itemPath)
+        data = image.getData()
+
+        GAMMA = 2.2  # apply a gamma correction
+        data = data ** (1 / GAMMA)
+        data = np.fft.fftshift(data)
+
+        image.setData(data)
+        image.write(jpgPath)
 
       elif isinstance(cItem, Class2D):
         itemPath = cItem.getRepresentative().getLocation()
         jpgPath = outDir + '/' + 'class2D_{}.jpg'.format(cItem.getObjId())
+        self.exportAsJpg(itemPath, jpgPath)
 
-      self.exportAsJpg(itemPath, jpgPath)
-
-  def convertPSDFile(self, psdFile):
-    psd = ih().read(psdFile)
-    psd.convertPSD()
-
-    psdName = psdFile.split('/')[-1]
-    outFile = self._getTmpPath(psdName)
-    psd.write(outFile)
-    return outFile
 
   def exportAsJpg(self, itemPath, jpgPath):
     ih().convert(itemPath, jpgPath)
+
 
   def updateClassSet(self, outClasses, newClass, cl3D):
     '''Updated the set of classes "outClassess" with a "newClass", conformed by the particles
@@ -523,11 +568,22 @@ class UsedItemsTracker(EMProtocol):
     outClasses.update(enabledClass)
     return outClasses
 
-  def createScipionSet(self, particles, suffix=''):
-    scipionSet = self._createSetOfParticles(suffix)
-    for part in particles:
-      scipionSet.append(part)
+
+  def createScipionSet(self, items, suffix=''):
+    scipionSet = []
+    for item in items:
+        cItem = item.clone()
+        if isinstance(cItem, Particle):
+            scipionSet = self._createSetOfParticles(suffix)
+        elif isinstance(cItem, Micrograph):
+            scipionSet = self._createSetOfMicrographs(suffix)
+        elif isinstance(cItem, CTFModel):
+            scipionSet = self._createSetOfCTF(suffix)
+
+    for item in items:
+        scipionSet.append(item)
     return scipionSet
+
 
   def joinParticleSetsIds(self, particleSets):
     ids = set([])
@@ -536,41 +592,32 @@ class UsedItemsTracker(EMProtocol):
         ids.add(part.getObjId())
     return ids
 
+
   def joinSets(self, sets):
     if len(sets) == 1:
       return sets[0]
     elif len(sets) > 1:
-      # todo: efectively join sets of particles
+      # todo: effectively join sets of particles
       print('Warning: several sets of used particles detected, outputing just ', sets[0])
       return sets[0]
 
   def getDownsampling(self, iniSet, finalSet):
     return finalSet.getSamplingRate() / iniSet.getSamplingRate()
 
+
   def scaleCoords(self, coords, factor):
     for co in coords:
       co.scale(factor)
     return coords
+
 
   def buildSetOfCoordinates(self, outputMics, coords, coordSets, suffix=''):
     outputCoordinates = self._createSetOfCoordinates(outputMics, suffix)
     outputCoordinates.copyInfo(coordSets[0])
     for coord in coords:
       outputCoordinates.append(coord.clone())
-
     return outputCoordinates
 
-  def buildSetOfCTF(self, ctfSet, ctfSets):
-    outputCTF = self._createSetOfCTF()
-    outputCTF.copyInfo(ctfSets[0])
-    for ctf in ctfSet:
-      mic = ctf.getMicrograph()
-      ctf.copyObjId(mic)
-      try:
-        outputCTF.append(ctf)
-      except:
-        pass
-    return outputCTF
 
   def buildSetOfMics(self, micSet):
     outputMics = self._createSetOfMicrographs()
@@ -581,63 +628,6 @@ class UsedItemsTracker(EMProtocol):
       outputMics.append(mic)
     return outputMics
 
-  def createMicScoreOutput(self, micCountDic, ctfSet=None, jpg=False, outName='micScores.tsv'):
-    outFile = self._getExtraPath(outName)
-    with open(outFile, 'w') as f:
-      if ctfSet is None:
-        f.write('Micrograph filename\tNumber of particles\n')
-        for micFile in micCountDic:
-          if jpg:
-            micName = pwutils.replaceExt(micFile, 'jpg').split('/')[-1]
-          else:
-            micName = micFile.split('/')[-1]
-          f.write('{}\t{}\n'.format(micName, micCountDic[micFile]))
-
-      else:
-        f.write('Micrograph filename\tNumber of particles\tPSD file\t'
-                'DefocusU\tDefocusV\tDefocusAngle\n')
-        ctfDic = self.getMic2CTFDic(ctfSet)
-        for micFile in micCountDic:
-          psdPath = self.psdDic[micFile]
-          if jpg:
-            micName = pwutils.replaceExt(micFile, 'jpg').split('/')[-1]
-            psdName = pwutils.replaceExt(psdPath, 'jpg').split('/')[-1]
-          else:
-            micName, psdName = micFile.split('/')[-1], psdPath.split('/')[-1]
-
-          if micFile in ctfDic:
-            dfU, dfV = ctfDic[micFile].getDefocusU(), ctfDic[micFile].getDefocusV()
-            dfA = ctfDic[micFile].getDefocusAngle()
-          else:
-            dfU, dfV, dfA = '-', '-', '-'
-          f.write('{}\t{}\t{}\t{}\t{}\t{}\n'.
-                  format(micName, micCountDic[micFile], psdName, dfU, dfV, dfA))
-
-  def getMic2CTFDic(self, ctfSet):
-    dic = {}
-    for ctf in ctfSet:
-      dic[ctf.getMicrograph().getFileName()] = ctf.clone()
-    return dic
-
-  def countParticlesPerMic(self, particlesSet):
-    micCountDic, nMicDic = {}, {}
-
-    for part in particlesSet:
-      micId = part.getMicId()
-      if micId in self.micDic:
-        micFile = self.micDic[micId]
-        if micFile in micCountDic:
-          micCountDic[micFile] += 1
-        else:
-          micCountDic[micFile] = 1
-          nMicDic[micId] = micFile
-
-    for micId, micFile in self.micDic.items():
-      if not micFile in micCountDic:
-        micCountDic[micFile] = 0
-
-    micCountDic = dict(sorted(micCountDic.items()))
-    return micCountDic, nMicDic
 
   def countParticlesPerClass(self, particlesSet, classDic):
     classCountDic = {}
@@ -651,6 +641,7 @@ class UsedItemsTracker(EMProtocol):
           classCountDic[classId] = 1
     return classCountDic
 
+
   def getLongestPath(self, outGraph, node1, node2, dir='both'):
     '''Return the longest path between two nodes in a directed graph'''
     if nx.has_path(outGraph, node1, node2) and dir in ['both', 'down']:
@@ -661,6 +652,7 @@ class UsedItemsTracker(EMProtocol):
       return max(allPaths, key=len)
     return None
 
+
   def validateConditions(self, node, conditions):
     '''Validates that a node has the specified conditions'''
     for condition in conditions:
@@ -668,29 +660,6 @@ class UsedItemsTracker(EMProtocol):
         return False
     return True
 
-  def checkPathExists(self, outGraph, oriNode, targetNode, dir='both'):
-    if nx.has_path(outGraph, oriNode, targetNode) and dir in ['both', 'down']:
-      return True
-    elif nx.has_path(outGraph, targetNode, oriNode) and dir in ['both', 'up']:
-      return True
-    else:
-      return False
-
-  def getGraphNeighbors(self, oriNode):
-    for nodeKey in self.outGraph.successors(oriNode):
-      yield nodeKey
-    for nodeKey in self.outGraph.predecessors(oriNode):
-      yield nodeKey
-
-  def getNeighborsCodes(self, oriNode, nodeConditions, dir='both'):
-    '''In a directed graph representing the project outputs, retrieves the output codes (protId.atrName)
-        of the outputs of type setType which are neighbors from oriNode, following the longest possible path'''
-    neighCodes = []
-    for nodeKey in self.getGraphNeighbors(oriNode):
-      if nodeKey != 'root' and self.validateConditions(self.outGraph.nodes[nodeKey], nodeConditions):
-        if self.checkPathExists(self.outGraph, oriNode, nodeKey, dir):
-          neighCodes.append(nodeKey)
-    return neighCodes
 
   def getFurthestCodesFromNode(self, outGraph, oriNode, nodeConditions, dir='both'):
     '''In a directed graph representing the project outputs, retrieves the output codes (protId.atrName)
@@ -709,45 +678,6 @@ class UsedItemsTracker(EMProtocol):
             furthestCodes.append(nodeKey)
     return furthestCodes
 
-  def getClosestCodesFromNode(self, outGraph, oriNode, nodeConditions, dir='both'):
-    '''In a directed graph representing the project outputs, retrieves the output codes (protId.atrName)
-    of the outputs of type setType which are closest from oriNode, following the longest possible path'''
-    minDist, closestCodes = 10000, []
-    for nodeKey in outGraph.nodes:
-      if nodeKey != 'root' and nodeKey.split('.')[0] != oriNode.split('.')[0] and \
-              self.validateConditions(outGraph.nodes[nodeKey], nodeConditions):
-        dist = len(self.getLongestPath(outGraph, oriNode, nodeKey, dir))
-        if dist < minDist:
-          minDist = dist
-          closestCodes = [nodeKey]
-        elif dist == minDist:
-          closestCodes.append(nodeKey)
-    return closestCodes
-
-  def getNodesIds(self, nodes):
-    labs = []
-    for nod in nodes:
-      if nod.run != None:
-        labs.append(nod.run.getObjId())
-    return labs
-
-  def getParentsDic(self, graph):
-    '''Dictionary of the form {protId: [parentProtsIds]}'''
-    pDic = {}
-    for node in graph.getNodes():
-      parentNodes = node.getParents()
-      if parentNodes:
-        pDic[node.run.getObjId()] = self.getNodesIds(parentNodes)
-    return pDic
-
-  def getChildrenDic(self, graph):
-    '''Dictionary of the form {protId: [childrenProtsIds]}'''
-    pDic = {}
-    for node in graph.getNodes():
-      childrenNodes = node.getChilds()
-      if childrenNodes:
-        pDic[node.run.getObjId()] = self.getNodesIds(childrenNodes)
-    return pDic
 
   def buildInputsDic(self, proj):
     '''Dictionary of protocol inputs of the form:
@@ -761,6 +691,7 @@ class UsedItemsTracker(EMProtocol):
         inpDic[protId][key] = ipointer
     return inpDic
 
+
   def buildOutputsDic(self, proj):
     '''Dictionary of protocol outputs of the form:
        {protId: {key: pointer}} '''
@@ -772,6 +703,7 @@ class UsedItemsTracker(EMProtocol):
         key, oValue = out
         outDic[protId][key] = oValue
     return outDic
+
 
   def generateOutputsGraphRec(self, curProtId, outGraph=nx.DiGraph(), prevCode=None):
     '''Generates a directed graph from a project with the protocol outputs as nodes, starting from the
@@ -798,6 +730,7 @@ class UsedItemsTracker(EMProtocol):
         outGraph = self.generateOutputsGraphRec(nextProId, outGraph, outCode)
     return outGraph
 
+
   def manageCodes(self, outCode):
     if outCode.split('.')[1] == '':
       # Special case of subset with entire protocol as input
@@ -807,6 +740,7 @@ class UsedItemsTracker(EMProtocol):
     else:
       parentProtId, outKey = int(outCode.split('.')[0]), outCode.split('.')[1]
     return parentProtId, outKey, outCode
+
 
   def addNode(self, outCode, outGraph):
     protId, outKey, outCode = self.manageCodes(outCode)
@@ -818,24 +752,13 @@ class UsedItemsTracker(EMProtocol):
 
     return outGraph, protId
 
+
   def tryGetSamplingRate(self, scipionSet):
     try:
       return scipionSet.getSamplingRate()
     except:
-      return scipionSet.getMicrographs().getSamplingRate()
+      return None
 
-  def getCodeType(self, code):
-    if len(code.split('.')) == 2:
-      protId, key = code.split('.')
-    elif len(code.split('.')) == 3:
-      protId, key, idx = code.split('.')
-    else:
-      print(code)
-
-    outObj = self.outDic[int(protId)][key]
-    objType = outObj.__str__().split()[0]
-    # print('Code: {}\nType: {}'.format(code, objType))
-    return objType
 
   def getCodesSets(self, codes):
     sets = []
@@ -848,12 +771,14 @@ class UsedItemsTracker(EMProtocol):
       sets.append(self.outDic[int(protId)][key])
     return sets
 
+
   def buildMicDic(self, micSets):
     micDic = {}
     for micSet in micSets:
       for mic in micSet:
         micDic[mic.getObjId()] = mic.getFileName()
     return micDic
+
 
   def buildClassesDic(self, classSets):
     '''Returns a dictionary: {partId: classID}'''
@@ -863,6 +788,7 @@ class UsedItemsTracker(EMProtocol):
         for part in classObj:
           classDic[part.getObjId()] = classObj.getObjId()
     return classDic
+
 
   def getParticleCoordinates(self, particlesSet):
     coords = []
@@ -874,57 +800,11 @@ class UsedItemsTracker(EMProtocol):
 
     return coords
 
-  def getCompleteSet(self, nodeKey):
-    '''A set is considered to be complete if there was no discarded item
-    (the maximum id equals the number of items)'''
-    protId, outKey, outCode = self.manageCodes(nodeKey)
-    scipionSet = self.outDic[protId][outKey]
-    try:
-      for item in scipionSet:
-        if item.getObjId() > len(scipionSet):
-          return False
-      return True
-    except:
-      return False
-
-  def searchCompleteSet(self, curCodes):
-    for curCode in curCodes:
-      if self.getCompleteSet(curCode):
-        return curCode
-    return None
-
-  def searchOriginalClassesSet(self, clCodes, dd='3D'):
-    '''Iterably looks to upward neighbors from used set to search for a complete set (max(ids) == len(ids))'''
-    conditions = [('objType', 'SetOfClasses{}'.format(dd))] #
-
-    completeCode = self.searchCompleteSet(clCodes)
-    curCodes = clCodes
-    while completeCode == None and len(curCodes)>0:
-      neighCodes = []
-      for curCode in curCodes:
-        neighCodes += self.getNeighborsCodes(curCode, conditions, dir='up')
-
-      curCodes = neighCodes.copy()
-      completeCode = self.searchCompleteSet(curCodes)
-
-    oriClassesSets = self.getCodesSets([completeCode])
-    return oriClassesSets[0], completeCode
-
-
-def computeMicPSD(micFile, psdPath):
-  imageMic = ih().read(micFile)
-  dimX, dimY, _, _ = imageMic.getDimensions()
-  psd1 = imageMic.computePSD(0.4, dimX, dimY, 1)
-  psd1.convertPSD()
-  psd1.write(psdPath)
 
 def pickNoiseOneMic(baseName, mic_fname, posName, mic_shape, outputRoot,
                     extractNoiseNumber, boxSize):
   """ Pick noise from one micrograph
   """
-
-  #print("pick noise one mic %s %s %s %s %s %s %s" % (baseName, mic_fname, posName, mic_shape,
-                                                     #outputRoot, extractNoiseNumber, boxSize))
 
   coords_in_mic_list = readPosCoordsFromFName(posName)
 
@@ -950,6 +830,7 @@ def pickNoiseOneMic(baseName, mic_fname, posName, mic_shape, outputRoot,
     good_new_coords = np.concatenate(good_new_coords)[:extractNoiseNumber]
     writeCoordsListToPosFname(mic_fname, good_new_coords, outputRoot)
 
+
 def readPosCoordsFromFName(fname, returnAlsoMicId=False):
   mData= readPosCoordinates(fname)
   coords=[]
@@ -966,3 +847,4 @@ def readPosCoordsFromFName(fname, returnAlsoMicId=False):
     return coords, micId
   else:
     return coords
+
