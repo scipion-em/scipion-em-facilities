@@ -8,6 +8,7 @@ import pyworkflow.protocol.params as params
 import xmipp3
 from pwem.objects import Class2D, Class3D
 from pwem.protocols import EMProtocol
+import pyworkflow.utils as pwutils
 
 import numpy as np
 import json
@@ -76,6 +77,12 @@ class ProtOSCEM(EMProtocol):
                       label="CTF",
                       pointerClass='SetOfCTF',
                       help="CTF micrographs",
+                      allowsNull=True)
+
+        form.addParam('coords', params.PointerParam,
+                      label="Coordinates",
+                      pointerClass='SetOfCoordinates',
+                      help="Coordinates",
                       allowsNull=True)
 
         form.addParam('particles', params.PointerParam,
@@ -390,7 +397,7 @@ class ProtOSCEM(EMProtocol):
         plt.clf()
         plt.cla()
 
-        print(flattened_shift_list)
+
         plt.hist(flattened_shift_list, edgecolor='black')
         plt.xlabel('# Shift (Å)')
         plt.ylabel(hist_ylabel_frames)
@@ -413,6 +420,8 @@ class ProtOSCEM(EMProtocol):
         defocus_list = []
         resolution_list = []
         astigmatism_list = []
+        # dictionary to show 3 micrographs (minimum defocus, medium defocus, max defocus)
+        dict_defocus = {}
 
         for index, item in enumerate(CTFs.iterItems()):
             # Min, max  and average defocus and resolution
@@ -423,6 +432,9 @@ class ProtOSCEM(EMProtocol):
             defocus_list.append(defocus)
             resolution_list.append(resolution)
             astigmatism_list.append(astigmatism)
+
+            # Dictionary to save defocus and paths to save 3 micrographs (min defocus, max defocus and medium defocus)
+            dict_defocus[f'mic_{index}'] = {'defocus': defocus, 'path_to_mic': item._micObj._filename.get()}
 
             if index == 0:
                 max_defocus = defocus
@@ -438,6 +450,76 @@ class ProtOSCEM(EMProtocol):
                 min_resolution = min(min_resolution, resolution)
                 avg_defocus = np.mean([avg_defocus, defocus])
                 avg_resolution = np.mean([avg_resolution, resolution])
+
+        # Sort the dictionary by defocus values
+        sorted_micrographs = sorted(dict_defocus.items(), key=lambda x: x[1]['defocus'])
+        # Extract paths for lowest, medium, and highest defocus values
+        medium_defocus_mic = min(sorted_micrographs, key=lambda x: abs(x[1]['defocus'] - avg_defocus))
+        lowest_defocus_path = sorted_micrographs[0][1]['path_to_mic']
+        highest_defocus_path = sorted_micrographs[-1][1]['path_to_mic']
+        medium_defocus_path = medium_defocus_mic[1]['path_to_mic']
+        medium_defocus_value = medium_defocus_mic[1]['defocus']
+
+        # To draw defocus value on image, we make images smaller and then larger
+        # since the default font cannot be increased in size
+        with mrcfile.open(lowest_defocus_path, permissive=True) as mrc1:
+            data1 = mrc1.data
+            img1 = Image.fromarray(np.uint8(data1 / np.max(data1) * 255))
+            img1 = img1.convert('RGB')
+            img1_resized = self.resize_image(img1, scale=0.05)
+        with mrcfile.open(medium_defocus_path, permissive=True) as mrc2:
+            data2 = mrc2.data
+            img2 = Image.fromarray(np.uint8(data2 / np.max(data2) * 255))
+            img2 = img2.convert('RGB')
+            img2_resized = self.resize_image(img2, scale=0.05)
+        with mrcfile.open(highest_defocus_path, permissive=True) as mrc3:
+            data3 = mrc3.data
+            img3 = Image.fromarray(np.uint8(data3 / np.max(data3) * 255))
+            img3 = img3.convert('RGB')
+            img3_resized = self.resize_image(img3, scale=0.05)
+
+
+        font = ImageFont.load_default()
+        # Draw text on images
+        draw1 = ImageDraw.Draw(img1_resized)
+        text1 = f'{min_defocus} A'
+        draw1.text((10, 10), text1, fill='#80FF00', font=font)
+
+        draw2 = ImageDraw.Draw(img2_resized)
+        text2 = f'{medium_defocus_value} A'
+        draw2.text((10, 10), text2, fill='#80FF00', font=font)
+
+        draw3 = ImageDraw.Draw(img3_resized)
+        text3 = f'{max_defocus} A'
+        draw3.text((10, 10), text3, fill='#80FF00', font=font)
+
+        # Define original sizes
+        img1_original_size = img1.size
+        img2_original_size = img2.size
+        img3_original_size = img3.size
+        # Return to original sizes
+        img1_final = self.resize_back(img1_resized, img1_original_size)
+        img2_final = self.resize_back(img2_resized, img2_original_size)
+        img3_final = self.resize_back(img3_resized, img3_original_size)
+
+        # Create collage with the 3 images
+        collage_width = img1_final.width + img2_final.width + img3_final.width
+        collage_height = max(img1_final.height, img2_final.height, img3_final.height)
+        collage = Image.new('RGB', (collage_width, collage_height))
+        # Paste images into the collage
+        collage.paste(img1_final, (0, 0))
+        collage.paste(img2_final, (img1_final.width, 0))
+        collage.paste(img3_final, (img1_final.width + img2_final.width, 0))
+
+        # Save the result
+        extra_folder = self._getExtraPath()
+        micro_folder_name = 'Micro_examples'
+        micro_folder_path = join(extra_folder, micro_folder_name)
+        os.makedirs(micro_folder_path, exist_ok=True)
+
+        micro_name = 'micro_defocus.png'
+        micro_path = join(micro_folder_path, micro_name)
+        collage.save(micro_path)
 
         # Histograms generation
         # DEFOCUS
@@ -480,7 +562,8 @@ class ProtOSCEM(EMProtocol):
         plt.savefig(astigmatism_hist)
 
         defocus = {'Output_max_defocus': round(max_defocus, 1), 'Output_min_defocus': round(min_defocus, 1),
-                   'Output_avg_defocus': round(avg_defocus, 1), 'Defocus_histogram': defocus_hist_name}
+                   'Output_avg_defocus': round(avg_defocus, 1), 'Defocus_histogram': defocus_hist_name,
+                   'Micrograph_examples': join(micro_folder_name, micro_name)}
         resolution = {'Output_max_resolution': round(max_resolution, 1),
                       'Output_min_resolution': round(min_resolution, 1),
                       'Output_avg_resolution': round(avg_resolution, 1), 'Resolution_histogram': resolution_hist_name}
@@ -492,21 +575,23 @@ class ProtOSCEM(EMProtocol):
 
     def particles_generation(self):
         parts = self.particles.get()
+        mic_dict = {}
 
-        mic_numbers = []
-        particle_counts = []
         for index, item in enumerate(parts.iterItems()):
-            micrograph_num = item._micId
-            key_name = f"mic_{micrograph_num}"
-            if index == 0 or key_name not in mic_numbers:
-                mic_numbers.append(key_name)
-                particle_counts.append(1)
+            micrograph_num = str(item._micId)
+            # Key of dictionary is the micrograph ID
+            # If the key already exists in the dictionary, increment the count
+            if micrograph_num in mic_dict:
+                mic_dict[micrograph_num] += 1
             else:
-                index = mic_numbers.index(key_name)
-                particle_counts[index] += 1
+                # Otherwise, add the key with an initial count of 1
+                mic_dict[micrograph_num] = 1
 
+        # Calculate the mean particle values
+        particle_counts = [data for data in mic_dict.values()]
         mean_particles_values = np.mean(particle_counts)
 
+        # Plot histogram of particle number
         plt.close('all')
         plt.clf()
         plt.cla()
@@ -520,9 +605,97 @@ class ProtOSCEM(EMProtocol):
         particles_hist = self.hist_path(hist_name)
         plt.savefig(particles_hist)
 
-        particles = {"Number_particles": sum(particle_counts),
-                     "Particles_per_micrograph": round(mean_particles_values, 1),
-                     "Particles_histogram": hist_name}
+
+        # Obtain 3 micrographs with particles drawn on them
+        # Retrieve mic ID of micrograph with higher, medium and lower number of particles:
+        if self.coords.get() is not None:
+            mic_closest_to_mean = min(mic_dict.items(), key=lambda x: abs(x[1]- mean_particles_values))[0]
+            mic_with_lowest_particles = min(mic_dict, key=lambda k: mic_dict[k])
+            mic_with_highest_particles = max(mic_dict, key=lambda k: mic_dict[k])
+
+            mic_ids = [int(mic_with_highest_particles), int(mic_closest_to_mean), int(mic_with_lowest_particles)]
+
+            # List to store the path of the 3 micrographs keeping mic_ids order
+            reduced_mics_dict = {mic_id: {"path": None,
+                                          "coordinates": []
+                                 #          "particles_num": mic_dict.get(str(mic_id), {}).get('particles_num', 0)
+                                           }
+                                 for mic_id in mic_ids
+                                          }
+
+            # Obtain micrograph path
+            CTFs = self.CTF.get()
+            for index, item in enumerate(CTFs.iterItems()):
+                if item._objId in reduced_mics_dict:
+                    mrc_path = item._micObj._filename.get()
+                    reduced_mics_dict[item._objId]["path"] = mrc_path
+
+            # Obtain coordinates
+            coords = self.coords.get()
+            for index, item in enumerate(coords.iterItems()):
+                if int(item._micId) in reduced_mics_dict:
+                    coordinates = [item._x.get(), item._y.get()]
+                    reduced_mics_dict[int(item._micId)]['coordinates'].append(coordinates)
+
+
+            # Draw particles in images
+            # List to store the images after drawing particles
+            images = []
+            for micrograph, values in reduced_mics_dict.items():
+                # image = Image.open(values['path']).convert('RGB')
+                with mrcfile.open(values['path'], permissive=True) as mrc:
+                    mrc_data = mrc.data
+                mrc_normalized = 255 * (mrc_data - np.min(mrc_data)) / (np.max(mrc_data) - np.min(mrc_data))
+                mrc_normalized = mrc_normalized.astype(np.uint8)
+                image = Image.fromarray(mrc_normalized).convert('RGB')
+
+                W_jpg, H_jpg = image.size
+                draw = ImageDraw.Draw(image)
+                r = W_jpg / 256
+
+                for coord in values['coordinates']:
+                    x = coord[0] # * (W_jpg / W_mic)
+                    y = coord[1] # * (H_jpg / H_mic)
+                    draw.ellipse((x - r, y - r, x + r, y + r), fill=(0, 255, 0))
+
+                # Draw number of particles
+                # font = ImageFont.load_default()
+                # # Draw text on images
+                # draw = ImageDraw.Draw(image)
+                # text = str(values['particles_num'])
+                # draw.text((10, 10), text, fill='#80FF00', font=font)
+
+                # Append the image to the list
+                images.append(image)
+
+            # Create collage
+            width, height = images[0].size
+            collage_width = 3 * width
+            collage_height = height
+            collage = Image.new('RGB', (collage_width, collage_height))
+            # Paste each image into the collage
+            for i, img in enumerate(images):
+                collage.paste(img, (i * width, 0))
+
+            extra_folder = self._getExtraPath()
+            micro_folder_name = 'Micro_examples'
+            micro_folder_path = join(extra_folder, micro_folder_name)
+
+            micro_name = 'micro_particles.jpg'
+            micro_path = join(micro_folder_path, micro_name)
+            collage.save(micro_path)
+
+            particles = {"Number_particles": sum(particle_counts),
+                         "Particles_per_micrograph": round(mean_particles_values, 1),
+                         "Particles_histogram": hist_name,
+                         'Micrograph_examples': join(micro_folder_name, micro_name)
+                         }
+        else:
+            particles = {"Number_particles": sum(particle_counts),
+                         "Particles_per_micrograph": round(mean_particles_values, 1),
+                         "Particles_histogram": hist_name
+                         }
+
         return particles
 
     def classes2D_generation(self):
@@ -934,3 +1107,16 @@ class ProtOSCEM(EMProtocol):
         output_path = abspath(join(isosurface_img_path, top_view_img))
         self.generateChimeraView(fnWorkingDir=working_path, fnMap=volume_file_path,
                                  fnView=output_path, threshold=th, angX=90, angY=0, angZ=0)
+
+    # Resize images to make text appear larger
+    def resize_image(self, image, scale):
+        width, height = image.size
+        new_size = (int(width * scale), int(height * scale))
+        return image.resize(new_size, Image.Resampling.LANCZOS)
+
+    # Resize images back to original size
+    def resize_back(self, image, original_size):
+        width, height = original_size
+        enlarge_factor= 1.5
+        new_size = (int(width * enlarge_factor), int(height * enlarge_factor))
+        return image.resize(new_size, Image.Resampling.LANCZOS)

@@ -59,7 +59,8 @@ class TestOscemJson(BaseTest):
                 "Output_max_defocus": 11850.8,
                 "Output_min_defocus": 1469.9,
                 "Output_avg_defocus": 1723.3,
-                "Defocus_histogram": "defocus_hist.png"
+                "Defocus_histogram": "defocus_hist.png",
+                "Micrograph_examples": "Micro_examples/micro_defocus.png"
             },
             "Resolution_(Å)": {
                 "Output_max_resolution": 5.2,
@@ -74,7 +75,8 @@ class TestOscemJson(BaseTest):
         "Particle_picking": {
             "Number_particles": 2860,
             "Particles_per_micrograph": 136.2,
-            "Particles_histogram": "particles_hist.png"
+            "Particles_histogram": "particles_hist.png",
+            "Micrograph_examples": "Micro_examples/micro_particles.jpg"
         },
         "Classes_2D": {
             "Number_classes_2D": 49,
@@ -192,7 +194,7 @@ class TestOscemJson(BaseTest):
         cls.protalignmovie, cls.alignedmovies = cls.runMovieAlign()
         cls.protmaxshift, cls.maxshiftmicro = cls.runMaxShift()
         cls.protCTF, cls.CTFout = cls.runCTFestimation()
-        cls.protpicking, cls.picked = cls.runLoGPicking()
+        cls.protpicking, cls.coordinates = cls.runLoGPicking()
         cls.protextract, cls.particles = cls.runExtractParticles()
         cls.prot2Dclasses, cls.classes2D = cls.run2DClassification()
         cls.portCenter, cls.centeredClasses2D, cls.centeredParticles = cls.runCenterParticles()
@@ -355,6 +357,7 @@ class TestOscemJson(BaseTest):
                                 movieAlignment=self.protalignmovie,
                                 maxShift=self.protmaxshift,
                                 CTF=self.CTFout,
+                                coords=self.coordinates,
                                 particles=self.particles,
                                 classes2D=self.classes2D,
                                 initVolume=self.importedvolume,  # Pointer(self.initVolVolumes.getFirstItem()),
