@@ -279,7 +279,7 @@ class TestOscemJson(BaseTest):
     @classmethod
     def runExtractParticles(cls):
         prot = cls.newProtocol(XmippProtExtractParticles,
-                               inputCoordinates=cls.picked,
+                               inputCoordinates=cls.coordinates,
                                ctfRelations=cls.CTFout,
                                doResize=True,
                                downFactor=2.5,
