@@ -30,7 +30,7 @@ class TestOscemJson(BaseTest):
             "Spherical_aberration_(mm)": 2.7,
             "Amplitud_contrast": 0.1,
             "Pixel_size_(Å/px)": 0.495,
-            "Gain_image": "gain.png",
+            "Gain_image": "gain.jpg",
             "Number_movies": 30,
             "Frames_per_movie": 50,
             "Frames_size_(pixels)": "3710 x 3838"
@@ -59,23 +59,23 @@ class TestOscemJson(BaseTest):
                 "Output_max_defocus": 11850.8,
                 "Output_min_defocus": 1469.9,
                 "Output_avg_defocus": 1723.3,
-                "Defocus_histogram": "defocus_hist.png",
-                "Micrograph_examples": "Micro_examples/micro_defocus.png"
+                "Defocus_histogram": "defocus_hist.jpg",
+                "Micrograph_examples": "Micro_examples/micro_defocus.jpg"
             },
             "Resolution_(Å)": {
                 "Output_max_resolution": 5.2,
                 "Output_min_resolution": 2.1,
                 "Output_avg_resolution": 3.0,
-                "Resolution_histogram": "resolution_hist.png"
+                "Resolution_histogram": "resolution_hist.jpg"
             },
             "Astigmatism": {
-                "Astigmatism_histogram": "astigmatism_hist.png"
+                "Astigmatism_histogram": "astigmatism_hist.jpg"
             }
         },
         "Particle_picking": {
             "Number_particles": 2860,
             "Particles_per_micrograph": 136.2,
-            "Particles_histogram": "particles_hist.png",
+            "Particles_histogram": "particles_hist.jpg",
             "Micrograph_examples": "Micro_examples/micro_particles.jpg"
         },
         "Classes_2D": {
@@ -131,18 +131,18 @@ class TestOscemJson(BaseTest):
                 4,
                 1
             ],
-            "Images_classes_2D": "classes_2D.png"
+            "Images_classes_2D": "classes_2D.jpg"
         },
         "Initial_volume": {
             "Orthogonal_slices": {
-                "Orthogonal_slices_X": "Initial_volume/orthogonal_slices/orthogonal_slices_X.png",
-                "Orthogonal_slices_Y": "Initial_volume/orthogonal_slices/orthogonal_slices_Y.png",
-                "Orthogonal_slices_Z": "Initial_volume/orthogonal_slices/orthogonal_slices_Z.png"
+                "Orthogonal_slices_X": "Initial_volume/orthogonal_slices/orthogonal_slices_X.jpg",
+                "Orthogonal_slices_Y": "Initial_volume/orthogonal_slices/orthogonal_slices_Y.jpg",
+                "Orthogonal_slices_Z": "Initial_volume/orthogonal_slices/orthogonal_slices_Z.jpg"
             },
             "Isosurface_images": {
-                "Front_view": "Initial_volume/isosurface_images/front_view.png",
-                "Side_view": "Initial_volume/isosurface_images/side_view.png",
-                "Top_view": "Initial_volume/isosurface_images/top_view.png"
+                "Front_view": "Initial_volume/isosurface_images/front_view.jpg",
+                "Side_view": "Initial_volume/isosurface_images/side_view.jpg",
+                "Top_view": "Initial_volume/isosurface_images/top_view.jpg"
             }
         },
         "Classes_3D": {
@@ -151,30 +151,30 @@ class TestOscemJson(BaseTest):
                 1985,
                 875
             ],
-            "Images_classes_3D": "Classes_3D/classes_3D.png",
+            "Images_classes_3D": "Classes_3D/classes_3D.jpg",
             "Volumes": {
                 "Volume_1": {
                     "Orthogonal_slices": {
-                        "Orthogonal_slices_X": "Classes_3D/orthogonal_slices_volume1/orthogonal_slices_X.png",
-                        "Orthogonal_slices_Y": "Classes_3D/orthogonal_slices_volume1/orthogonal_slices_Y.png",
-                        "Orthogonal_slices_Z": "Classes_3D/orthogonal_slices_volume1/orthogonal_slices_Z.png"
+                        "Orthogonal_slices_X": "Classes_3D/orthogonal_slices_volume1/orthogonal_slices_X.jpg",
+                        "Orthogonal_slices_Y": "Classes_3D/orthogonal_slices_volume1/orthogonal_slices_Y.jpg",
+                        "Orthogonal_slices_Z": "Classes_3D/orthogonal_slices_volume1/orthogonal_slices_Z.jpg"
                     },
                     "Isosurface_images": {
-                        "Front_view": "Classes_3D/isosurface_images_volume1/front_view.png",
-                        "Side_view": "Classes_3D/isosurface_images_volume1/side_view.png",
-                        "Top_view": "Classes_3D/isosurface_images_volume1/top_view.png"
+                        "Front_view": "Classes_3D/isosurface_images_volume1/front_view.jpg",
+                        "Side_view": "Classes_3D/isosurface_images_volume1/side_view.jpg",
+                        "Top_view": "Classes_3D/isosurface_images_volume1/top_view.jpg"
                     }
                 },
                 "Volume_2": {
                     "Orthogonal_slices": {
-                        "Orthogonal_slices_X": "Classes_3D/orthogonal_slices_volume2/orthogonal_slices_X.png",
-                        "Orthogonal_slices_Y": "Classes_3D/orthogonal_slices_volume2/orthogonal_slices_Y.png",
-                        "Orthogonal_slices_Z": "Classes_3D/orthogonal_slices_volume2/orthogonal_slices_Z.png"
+                        "Orthogonal_slices_X": "Classes_3D/orthogonal_slices_volume2/orthogonal_slices_X.jpg",
+                        "Orthogonal_slices_Y": "Classes_3D/orthogonal_slices_volume2/orthogonal_slices_Y.jpg",
+                        "Orthogonal_slices_Z": "Classes_3D/orthogonal_slices_volume2/orthogonal_slices_Z.jpg"
                     },
                     "Isosurface_images": {
-                        "Front_view": "Classes_3D/isosurface_images_volume2/front_view.png",
-                        "Side_view": "Classes_3D/isosurface_images_volume2/side_view.png",
-                        "Top_view": "Classes_3D/isosurface_images_volume2/top_view.png"
+                        "Front_view": "Classes_3D/isosurface_images_volume2/front_view.jpg",
+                        "Side_view": "Classes_3D/isosurface_images_volume2/side_view.jpg",
+                        "Top_view": "Classes_3D/isosurface_images_volume2/top_view.jpg"
                     }
                 }
             }

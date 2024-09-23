@@ -231,7 +231,7 @@ class ProtOSCEM(EMProtocol):
                 # Extract the base filename without extension
                 base_filename = os.path.splitext(os.path.basename(input_movies[key]))[0]
 
-                png_path = os.path.join(extra_folder, f'{base_filename}.png')
+                png_path = os.path.join(extra_folder, f'{base_filename}.jpg')
                 image.save(png_path)
 
                 image_path = os.path.basename(png_path)
@@ -402,7 +402,7 @@ class ProtOSCEM(EMProtocol):
         plt.xlabel('# Shift (Å)')
         plt.ylabel(hist_ylabel_frames)
         plt.title('Shift histogram')
-        shift_hist_name = 'shift_hist.png'
+        shift_hist_name = 'shift_hist.jpg'
         shift_hist = self.hist_path(shift_hist_name)
         plt.savefig(shift_hist)
 
@@ -517,7 +517,7 @@ class ProtOSCEM(EMProtocol):
         micro_folder_path = join(extra_folder, micro_folder_name)
         os.makedirs(micro_folder_path, exist_ok=True)
 
-        micro_name = 'micro_defocus.png'
+        micro_name = 'micro_defocus.jpg'
         micro_path = join(micro_folder_path, micro_name)
         collage.save(micro_path)
 
@@ -531,7 +531,7 @@ class ProtOSCEM(EMProtocol):
         plt.xlabel('# Defocus')
         plt.ylabel(hist_ylabel_mic)
         plt.title('Defocus histogram')
-        defocus_hist_name = 'defocus_hist.png'
+        defocus_hist_name = 'defocus_hist.jpg'
         defocus_hist = self.hist_path(defocus_hist_name)
         plt.savefig(defocus_hist)
 
@@ -544,7 +544,7 @@ class ProtOSCEM(EMProtocol):
         plt.xlabel("Resolution")
         plt.ylabel(hist_ylabel_mic)
         plt.title('Resolution histogram')
-        resolution_hist_name = 'resolution_hist.png'
+        resolution_hist_name = 'resolution_hist.jpg'
         resolution_hist = self.hist_path(resolution_hist_name)
         plt.savefig(resolution_hist)
 
@@ -557,7 +557,7 @@ class ProtOSCEM(EMProtocol):
         plt.xlabel("Astigmatism")
         plt.ylabel(hist_ylabel_mic)
         plt.title('Astigmatism histogram')
-        astigmatism_hist_name = 'astigmatism_hist.png'
+        astigmatism_hist_name = 'astigmatism_hist.jpg'
         astigmatism_hist = self.hist_path(astigmatism_hist_name)
         plt.savefig(astigmatism_hist)
 
@@ -601,7 +601,7 @@ class ProtOSCEM(EMProtocol):
         plt.ylabel(hist_ylabel_mic)
         plt.title('Histogram for particle number per micrograph')
 
-        hist_name = 'particles_hist.png'
+        hist_name = 'particles_hist.jpg'
         particles_hist = self.hist_path(hist_name)
         plt.savefig(particles_hist)
 
@@ -719,7 +719,7 @@ class ProtOSCEM(EMProtocol):
         classes = len(sorted_list_classes)  # Number of classes
 
         img_classes_file = classes2D.getFirstItem().getRepresentative().getFileName()
-        # Saving images in .png, drawing number of particles on them
+        # Saving images in .jpg, drawing number of particles on them
         particles_list = []
         img_filenames = []
         with mrcfile.open(img_classes_file, 'r') as mrc:
@@ -743,15 +743,15 @@ class ProtOSCEM(EMProtocol):
                 draw.text(position, str(particles), fill='#80FF00', font=font)
 
                 # Saving images
-                new_img_filename = splitext(img_classes_file)[0] + f'_image_{i}.png'
+                new_img_filename = splitext(img_classes_file)[0] + f'_image_{i}.jpg'
                 image.save(new_img_filename)
                 img_filenames.append(new_img_filename)
 
-            # Creating collage in .png with all images ordered in descending order
+            # Creating collage in .jpg with all images ordered in descending order
             images = [Image.open(filename) for filename in img_filenames]
 
             output_folder = self._getExtraPath()  # Extra path of current protocol
-            collage_filename = 'classes_2D.png'
+            collage_filename = 'classes_2D.jpg'
             collage_filepath = join(output_folder, collage_filename)
             self.create_collage(images, collage_filepath)
 
@@ -786,16 +786,16 @@ class ProtOSCEM(EMProtocol):
         th = int(self.threshold_initVol.get())
 
         volume_file_abspath = abspath(volume_file)
-        front_view_img = 'front_view.png'
-        side_view_img = 'side_view.png'
-        top_view_img = 'top_view.png'
+        front_view_img = 'front_view.jpg'
+        side_view_img = 'side_view.jpg'
+        top_view_img = 'top_view.jpg'
         self.generate_isosurfaces(isosurface_images_path, volume_file_abspath,
                                   th, front_view_img, side_view_img, top_view_img)
 
         init_volume = {'Orthogonal_slices': {
-            'Orthogonal_slices_X': join(initial_vol_folder_name, orthogonal_slices_folder, "orthogonal_slices_X.png"),
-            'Orthogonal_slices_Y': join(initial_vol_folder_name, orthogonal_slices_folder, "orthogonal_slices_Y.png"),
-            'Orthogonal_slices_Z': join(initial_vol_folder_name, orthogonal_slices_folder, "orthogonal_slices_Z.png")
+            'Orthogonal_slices_X': join(initial_vol_folder_name, orthogonal_slices_folder, "orthogonal_slices_X.jpg"),
+            'Orthogonal_slices_Y': join(initial_vol_folder_name, orthogonal_slices_folder, "orthogonal_slices_Y.jpg"),
+            'Orthogonal_slices_Z': join(initial_vol_folder_name, orthogonal_slices_folder, "orthogonal_slices_Z.jpg")
         },
             'Isosurface_images': {
                 'Front_view': join(initial_vol_folder_name, isosurface_images_folder, front_view_img),
@@ -830,7 +830,7 @@ class ProtOSCEM(EMProtocol):
         sorted_list_classes = sorted(list_classes, key=lambda x: x.getSize(), reverse=True)
         classes = len(sorted_list_classes)  # Number of classes
 
-        # Saving images in .png, drawing number of particles on them
+        # Saving images in .jpg, drawing number of particles on them
         particles_list = []
         img_filenames = []
 
@@ -872,7 +872,7 @@ class ProtOSCEM(EMProtocol):
                 draw.text(position, str(particles), fill='#80FF00', font=font)
 
                 # Saving images
-                new_img_filename = splitext(file_name)[0] + '.png'
+                new_img_filename = splitext(file_name)[0] + '.jpg'
                 image.save(new_img_filename)
                 img_filenames.append(new_img_filename)
 
@@ -897,9 +897,9 @@ class ProtOSCEM(EMProtocol):
                 th = int(self.threshold_classes3D.get())
 
                 volume_file_abspath = abspath(file_name_without_suffix)
-                front_view_img = 'front_view.png'
-                side_view_img = 'side_view.png'
-                top_view_img = 'top_view.png'
+                front_view_img = 'front_view.jpg'
+                side_view_img = 'side_view.jpg'
+                top_view_img = 'top_view.jpg'
                 self.generate_isosurfaces(isosurface_images_path, volume_file_abspath,
                                           th, front_view_img, side_view_img, top_view_img)
 
@@ -907,11 +907,11 @@ class ProtOSCEM(EMProtocol):
                 volume = {
                     "Orthogonal_slices": {
                         "Orthogonal_slices_X": join(classes_3D_folder_name, orthogonal_slices_folder,
-                                                    "orthogonal_slices_X.png"),
+                                                    "orthogonal_slices_X.jpg"),
                         "Orthogonal_slices_Y": join(classes_3D_folder_name, orthogonal_slices_folder,
-                                                    "orthogonal_slices_Y.png"),
+                                                    "orthogonal_slices_Y.jpg"),
                         "Orthogonal_slices_Z": join(classes_3D_folder_name, orthogonal_slices_folder,
-                                                    "orthogonal_slices_Z.png")},
+                                                    "orthogonal_slices_Z.jpg")},
                     'Isosurface_images': {
                         'Front_view': join(classes_3D_folder_name, isosurface_images_folder, front_view_img),
                         'Side_view': join(classes_3D_folder_name, isosurface_images_folder, side_view_img),
@@ -921,9 +921,9 @@ class ProtOSCEM(EMProtocol):
                 Volumes_key = f'Volume_{i + 1}'
                 Volumes[Volumes_key] = volume
 
-        # Creating collage in .png with all images ordered in descending order
+        # Creating collage in .jpg with all images ordered in descending order
         images = [Image.open(filename) for filename in img_filenames]
-        collage_filename = 'classes_3D.png'
+        collage_filename = 'classes_3D.jpg'
         collage_filepath = join(classes3D_folder_path, collage_filename)
         self.create_collage(images, collage_filepath)
 
@@ -970,9 +970,9 @@ class ProtOSCEM(EMProtocol):
         images_Y = self.slices_to_images(slices_Y)
         images_Z = self.slices_to_images(slices_Z)
 
-        collage_X_path = join(fnRoot, 'orthogonal_slices_X.png')
-        collage_Y_path = join(fnRoot, 'orthogonal_slices_Y.png')
-        collage_Z_path = join(fnRoot, 'orthogonal_slices_Z.png')
+        collage_X_path = join(fnRoot, 'orthogonal_slices_X.jpg')
+        collage_Y_path = join(fnRoot, 'orthogonal_slices_Y.jpg')
+        collage_Z_path = join(fnRoot, 'orthogonal_slices_Z.jpg')
 
         self.create_collage(images_X, collage_X_path)
         self.create_collage(images_Y, collage_Y_path)
