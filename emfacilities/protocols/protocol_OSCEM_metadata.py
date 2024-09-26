@@ -1,3 +1,4 @@
+from functools import reduce
 from os.path import abspath, join, dirname, splitext
 
 from PIL import Image, ImageDraw, ImageFont, ImageOps, ImageEnhance
@@ -77,12 +78,6 @@ class ProtOSCEM(EMProtocol):
                       label="CTF",
                       pointerClass='SetOfCTF',
                       help="CTF micrographs",
-                      allowsNull=True)
-
-        form.addParam('coords', params.PointerParam,
-                      label="Coordinates",
-                      pointerClass='SetOfCoordinates',
-                      help="Coordinates",
                       allowsNull=True)
 
         form.addParam('particles', params.PointerParam,
@@ -579,16 +574,29 @@ class ProtOSCEM(EMProtocol):
 
         for index, item in enumerate(parts.iterItems()):
             micrograph_num = str(item._micId)
+            sampling_rate_part = item._samplingRate.get()
+            sampling_rate_ctf = item._ctfModel._xmipp_ctfSamplingRate.get()
+            scale = sampling_rate_part/sampling_rate_ctf
+
+            # coordinates scaled
+            coordinates_scaled = [item._coordinate._x.get() * scale, item._coordinate._y.get() * scale]
+
             # Key of dictionary is the micrograph ID
             # If the key already exists in the dictionary, increment the count
             if micrograph_num in mic_dict:
-                mic_dict[micrograph_num] += 1
+                mic_dict[micrograph_num]['particles_num'] += 1
+                mic_dict[micrograph_num]['coordinates'].append(coordinates_scaled)
+
             else:
                 # Otherwise, add the key with an initial count of 1
-                mic_dict[micrograph_num] = 1
+                mic_dict[micrograph_num] = {
+                    'particles_num': 1,
+                    'coordinates': [coordinates_scaled],
+                    'mic_path': item._ctfModel._micObj._filename.get()
+                }
 
         # Calculate the mean particle values
-        particle_counts = [data for data in mic_dict.values()]
+        particle_counts = [data['particles_num'] for data in mic_dict.values()]
         mean_particles_values = np.mean(particle_counts)
 
         # Plot histogram of particle number
@@ -608,55 +616,39 @@ class ProtOSCEM(EMProtocol):
 
         # Obtain 3 micrographs with particles drawn on them
         # Retrieve mic ID of micrograph with higher, medium and lower number of particles:
-        if self.coords.get() is not None:
-            mic_closest_to_mean = min(mic_dict.items(), key=lambda x: abs(x[1]- mean_particles_values))[0]
-            mic_with_lowest_particles = min(mic_dict, key=lambda k: mic_dict[k])
-            mic_with_highest_particles = max(mic_dict, key=lambda k: mic_dict[k])
+        mic_closest_to_mean = min(mic_dict.items(), key=lambda x: abs(x[1]['particles_num']- mean_particles_values))[0]
+        mic_with_lowest_particles = min(mic_dict, key=lambda k: mic_dict[k]['particles_num'])
+        mic_with_highest_particles = max(mic_dict, key=lambda k: mic_dict[k]['particles_num'])
 
-            mic_ids = [int(mic_with_highest_particles), int(mic_closest_to_mean), int(mic_with_lowest_particles)]
+        mic_ids = [int(mic_with_highest_particles), int(mic_closest_to_mean), int(mic_with_lowest_particles)]
 
-            # List to store the path of the 3 micrographs keeping mic_ids order
-            reduced_mics_dict = {mic_id: {"path": None,
-                                          "coordinates": []
-                                 #          "particles_num": mic_dict.get(str(mic_id), {}).get('particles_num', 0)
-                                           }
-                                 for mic_id in mic_ids
-                                          }
+        # List to store the path of the 3 micrographs keeping mic_ids order
+        reduced_mics_dict = {mic_id: {"mic_path": mic_dict.get(str(mic_id), {}).get('mic_path', 0), #None,
+                                      "coordinates": mic_dict.get(str(mic_id), {}).get('coordinates', 0)
+                             #        "particles_num": mic_dict.get(str(mic_id), {}).get('particles_num', 0)
+                                       }
+                             for mic_id in mic_ids
+                                      }
 
-            # Obtain micrograph path
-            CTFs = self.CTF.get()
-            for index, item in enumerate(CTFs.iterItems()):
-                if item._objId in reduced_mics_dict:
-                    mrc_path = item._micObj._filename.get()
-                    reduced_mics_dict[item._objId]["path"] = mrc_path
+        # Draw particles in images
+        # List to store the images after drawing particles
+        images = []
+        for micrograph, values in reduced_mics_dict.items():
+            # image = Image.open(values['path']).convert('RGB')
+            with mrcfile.open(values['mic_path'], permissive=True) as mrc:
+                mrc_data = mrc.data
+            mrc_normalized = 255 * (mrc_data - np.min(mrc_data)) / (np.max(mrc_data) - np.min(mrc_data))
+            mrc_normalized = mrc_normalized.astype(np.uint8)
+            image = Image.fromarray(mrc_normalized).convert('RGB')
 
-            # Obtain coordinates
-            coords = self.coords.get()
-            for index, item in enumerate(coords.iterItems()):
-                if int(item._micId) in reduced_mics_dict:
-                    coordinates = [item._x.get(), item._y.get()]
-                    reduced_mics_dict[int(item._micId)]['coordinates'].append(coordinates)
+            W_jpg, H_jpg = image.size
+            draw = ImageDraw.Draw(image)
+            r = W_jpg / 256
 
-
-            # Draw particles in images
-            # List to store the images after drawing particles
-            images = []
-            for micrograph, values in reduced_mics_dict.items():
-                # image = Image.open(values['path']).convert('RGB')
-                with mrcfile.open(values['path'], permissive=True) as mrc:
-                    mrc_data = mrc.data
-                mrc_normalized = 255 * (mrc_data - np.min(mrc_data)) / (np.max(mrc_data) - np.min(mrc_data))
-                mrc_normalized = mrc_normalized.astype(np.uint8)
-                image = Image.fromarray(mrc_normalized).convert('RGB')
-
-                W_jpg, H_jpg = image.size
-                draw = ImageDraw.Draw(image)
-                r = W_jpg / 256
-
-                for coord in values['coordinates']:
-                    x = coord[0] # * (W_jpg / W_mic)
-                    y = coord[1] # * (H_jpg / H_mic)
-                    draw.ellipse((x - r, y - r, x + r, y + r), fill=(0, 255, 0))
+            for coord in values['coordinates']:
+                x = coord[0]
+                y = coord[1]
+                draw.ellipse((x - r, y - r, x + r, y + r), fill=(0, 255, 0))
 
                 # Draw number of particles
                 # font = ImageFont.load_default()
@@ -665,36 +657,31 @@ class ProtOSCEM(EMProtocol):
                 # text = str(values['particles_num'])
                 # draw.text((10, 10), text, fill='#80FF00', font=font)
 
-                # Append the image to the list
-                images.append(image)
+            # Append the image to the list
+            images.append(image)
 
-            # Create collage
-            width, height = images[0].size
-            collage_width = 3 * width
-            collage_height = height
-            collage = Image.new('RGB', (collage_width, collage_height))
-            # Paste each image into the collage
-            for i, img in enumerate(images):
-                collage.paste(img, (i * width, 0))
+        # Create collage
+        width, height = images[0].size
+        collage_width = 3 * width
+        collage_height = height
+        collage = Image.new('RGB', (collage_width, collage_height))
+        # Paste each image into the collage
+        for i, img in enumerate(images):
+            collage.paste(img, (i * width, 0))
 
-            extra_folder = self._getExtraPath()
-            micro_folder_name = 'Micro_examples'
-            micro_folder_path = join(extra_folder, micro_folder_name)
+        extra_folder = self._getExtraPath()
+        micro_folder_name = 'Micro_examples'
+        micro_folder_path = join(extra_folder, micro_folder_name)
 
-            micro_name = 'micro_particles.jpg'
-            micro_path = join(micro_folder_path, micro_name)
-            collage.save(micro_path)
+        micro_name = 'micro_particles.jpg'
+        micro_path = join(micro_folder_path, micro_name)
+        collage.save(micro_path)
 
-            particles = {"Number_particles": sum(particle_counts),
-                         "Particles_per_micrograph": round(mean_particles_values, 1),
-                         "Particles_histogram": hist_name,
-                         'Micrograph_examples': join(micro_folder_name, micro_name)
-                         }
-        else:
-            particles = {"Number_particles": sum(particle_counts),
-                         "Particles_per_micrograph": round(mean_particles_values, 1),
-                         "Particles_histogram": hist_name
-                         }
+        particles = {"Number_particles": sum(particle_counts),
+                     "Particles_per_micrograph": round(mean_particles_values, 1),
+                     "Particles_histogram": hist_name,
+                     'Micrograph_examples': join(micro_folder_name, micro_name)
+                     }
 
         return particles
 
