@@ -622,7 +622,7 @@ class ProtOSCEM(EMProtocol):
 
         mic_ids = [int(mic_with_highest_particles), int(mic_closest_to_mean), int(mic_with_lowest_particles)]
 
-        # List to store the path of the 3 micrographs keeping mic_ids order
+        # Dict to store the path and coordinates of the 3 micrographs keeping mic_ids order
         reduced_mics_dict = {mic_id: {"mic_path": mic_dict.get(str(mic_id), {}).get('mic_path', 0), #None,
                                       "coordinates": mic_dict.get(str(mic_id), {}).get('coordinates', 0)
                              #        "particles_num": mic_dict.get(str(mic_id), {}).get('particles_num', 0)
@@ -631,10 +631,8 @@ class ProtOSCEM(EMProtocol):
                                       }
 
         # Draw particles in images
-        # List to store the images after drawing particles
-        images = []
+        images = [] # List to store the images after drawing particles
         for micrograph, values in reduced_mics_dict.items():
-            # image = Image.open(values['path']).convert('RGB')
             with mrcfile.open(values['mic_path'], permissive=True) as mrc:
                 mrc_data = mrc.data
             mrc_normalized = 255 * (mrc_data - np.min(mrc_data)) / (np.max(mrc_data) - np.min(mrc_data))
