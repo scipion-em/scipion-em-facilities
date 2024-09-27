@@ -558,7 +558,7 @@ class ProtOSCEM(EMProtocol):
 
         defocus = {'Output_max_defocus': round(max_defocus, 1), 'Output_min_defocus': round(min_defocus, 1),
                    'Output_avg_defocus': round(avg_defocus, 1), 'Defocus_histogram': defocus_hist_name,
-                   'Micrograph_examples': join(micro_folder_name, micro_name)}
+                   'Defocus_mic_examples': join(micro_folder_name, micro_name)}
         resolution = {'Output_max_resolution': round(max_resolution, 1),
                       'Output_min_resolution': round(min_resolution, 1),
                       'Output_avg_resolution': round(avg_resolution, 1), 'Resolution_histogram': resolution_hist_name}
@@ -678,7 +678,7 @@ class ProtOSCEM(EMProtocol):
         particles = {"Number_particles": sum(particle_counts),
                      "Particles_per_micrograph": round(mean_particles_values, 1),
                      "Particles_histogram": hist_name,
-                     'Micrograph_examples': join(micro_folder_name, micro_name)
+                     'Particles_mic_examples': join(micro_folder_name, micro_name)
                      }
 
         return particles

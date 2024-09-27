@@ -60,7 +60,7 @@ class TestOscemJson(BaseTest):
                 "Output_min_defocus": 1469.9,
                 "Output_avg_defocus": 1723.3,
                 "Defocus_histogram": "defocus_hist.jpg",
-                "Micrograph_examples": "Micro_examples/micro_defocus.jpg"
+                "Defocus_mic_examples": "Micro_examples/micro_defocus.jpg"
             },
             "Resolution_(Å)": {
                 "Output_max_resolution": 5.2,
@@ -76,7 +76,7 @@ class TestOscemJson(BaseTest):
             "Number_particles": 2860,
             "Particles_per_micrograph": 136.2,
             "Particles_histogram": "particles_hist.jpg",
-            "Micrograph_examples": "Micro_examples/micro_particles.jpg"
+            "Particles_mic_examples": "Micro_examples/micro_particles.jpg"
         },
         "Classes_2D": {
             "Number_classes_2D": 49,
