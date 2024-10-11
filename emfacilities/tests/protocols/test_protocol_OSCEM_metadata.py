@@ -68,11 +68,24 @@ class TestOscemJson(BaseTest):
         },
         "Movie_maxshift": {
             "Discarded_movies": 9,
-            "Max_frame_shift_(Å)": 5.0,
-            "Max_movie_shift_(Å)": 20.0,
+            "Max_frame_shift": {
+                "value": 5.0,
+                "unit": "Å"
+            },
+            "Max_movie_shift": {
+                "value": 20.0,
+                "unit": "Å"
+            },
             "Rejection_type": "By frame or movie",
-            "Output_avg_shift_(Å)": 11.8,
-            "Output_max_shift_(Å)": 29.6
+            "Output_avg_shift": {
+                "value": 11.8,
+                "unit": "Å"
+            },
+            "Output_max_shift": {
+                "value": 29.6,
+                "unit": "Å"
+            },
+            "Shift_histogram": "shift_hist.jpg"
         },
         "CTF_estimation": {
             "Amplitude_contrast": 0.1,

@@ -383,20 +383,28 @@ class ProtOSCEM(EMProtocol):
         # Mapping dictionary for key name changes
         key_mapping = {
             'outputMoviesDiscarded._size': 'Discarded_movies',
-            'maxFrameShift': 'Max_frame_shift_(Å)',
-            'maxMovieShift': 'Max_movie_shift_(Å)',
+            'maxFrameShift': 'Max_frame_shift',
+            'maxMovieShift': 'Max_movie_shift',
             'rejType': 'Rejection_type'
         }
 
         # Filter dictionary and rename keys
         movie_maxshift = {}
         rejtype_list = ['By frame', 'By whole movie', 'By frame and movie', 'By frame or movie']
+
         for key in keys_to_retrieve:
             if key == 'rejType':
                 rej_type = rejtype_list[input_shift[key]]
                 movie_maxshift[key_mapping[key]] = rej_type
             elif key in input_shift and input_shift[key] is not None and input_shift[key] != 0:
-                movie_maxshift[key_mapping[key]] = input_shift[key]
+                if key in ['maxFrameShift', 'maxMovieShift']:
+                    movie_maxshift[key_mapping[key]] = {
+                        'value': input_shift[key],
+                        'unit': 'Å'
+                    }
+                else:
+                    movie_maxshift[key_mapping[key]] = input_shift[key]
+
 
         ############################### OUTPUT #############################################
         # average and max shift
@@ -440,9 +448,18 @@ class ProtOSCEM(EMProtocol):
         shift_hist = self.hist_path(shift_hist_name)
         plt.savefig(shift_hist)
 
-        output_movie_maxshift = {'Output_avg_shift_(Å)': round(avg_shift, 1),
-                                 'Output_max_shift_(Å)': round(max_shift, 1),
-                                 'Shift_histogram': shift_hist_name}
+        output_movie_maxshift = {
+            'Output_avg_shift': {
+                'value': round(avg_shift, 1),
+                'unit': 'Å'
+            },
+            'Output_max_shift': {
+                'value': round(max_shift, 1),
+                'unit': 'Å'
+            },
+            'Shift_histogram': shift_hist_name
+        }
+
         movie_maxshift.update(output_movie_maxshift)
 
         return movie_maxshift
