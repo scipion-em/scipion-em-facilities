@@ -279,31 +279,77 @@ class ProtOSCEM(EMProtocol):
         }
 
         # Filter the dictionary and rename the keys
-        input_movie_align = {key_mapping[key]: input_alignment[key] for key in keys_to_retrieve if
-                             key in input_alignment and input_alignment[key] is not None and input_alignment[key] != 0}
+        # input_movie_align = {key_mapping[key]: input_alignment[key] for key in keys_to_retrieve if
+        #                      key in input_alignment and input_alignment[key] is not None and input_alignment[key] != 0}
+        #
+        # Map values for the schema
+        input_movie_align = {}
+        for key in keys_to_retrieve:
+            if key in input_alignment and input_alignment[key] is not None and input_alignment[key] != 0:
+                if key == 'maxResForCorrelation':
+                    input_movie_align['Maximum_resolution'] = {
+                        'value': input_alignment[key],
+                        'unit': 'Å'
+                    }
+                else:
+                    input_movie_align[key_mapping[key]] = input_alignment[key]
+
         movie_align.update(input_movie_align)
 
         # Dictionary for crop offsets
-        keys_to_retrieve = ['cropOffsetX', 'cropOffsetY']
-        key_mapping = {
-            'cropOffsetX': 'Crop_offsetX',
-            'cropOffsetY': 'Crop_offsetX',
+        # keys_to_retrieve = ['cropOffsetX', 'cropOffsetY']
+        # key_mapping = {
+        #     'cropOffsetX': 'Crop_offsetX',
+        #     'cropOffsetY': 'Crop_offsetX',
+        # }
+        # crop_offsets = {key_mapping[key]: input_alignment[key] for key in keys_to_retrieve if
+        #                 key in input_alignment and input_alignment[key] is not None and input_alignment[key] != 0}
+        # if crop_offsets:
+        #     movie_align['Crop_offsets_(pixels)'] = crop_offsets
+        # Dictionary for crop offsets
+        crop_keys = ['cropOffsetX', 'cropOffsetY']
+        crop_mapping = {
+            'cropOffsetX': 'Crop_offsets',
+            'cropOffsetY': 'Crop_offsets',
         }
-        crop_offsets = {key_mapping[key]: input_alignment[key] for key in keys_to_retrieve if
-                        key in input_alignment and input_alignment[key] is not None and input_alignment[key] != 0}
+        crop_offsets = {}
+        for key in crop_keys:
+            if key in input_alignment and input_alignment[key] is not None and input_alignment[key] != 0:
+                crop_offsets[f'Crop_offset{key[-1]}'] = {
+                    'value': input_alignment[key],
+                    'unit': 'pixels'
+                }
         if crop_offsets:
-            movie_align['Crop_offsets_(pixels)'] = crop_offsets
+            movie_align['Crop_offsets'] = crop_offsets
+
 
         # Dictionary for crop dims
-        keys_to_retrieve = ['cropDimX', 'cropDimY']
-        key_mapping = {
-            'cropDimX': 'Crop_dimsX',
-            'cropDimY': 'Crop_dimsY',
-        }
-        crop_dims = {key_mapping[key]: input_alignment[key] for key in keys_to_retrieve if
-                     key in input_alignment and input_alignment[key] is not None and input_alignment[key] != 0}
-        if crop_dims:
-            movie_align['Crop_dims_(pixels)'] = crop_dims
+        # keys_to_retrieve = ['cropDimX', 'cropDimY']
+        # key_mapping = {
+        #     'cropDimX': 'Crop_dimsX',
+        #     'cropDimY': 'Crop_dimsY',
+        # }
+        # crop_dims = {key_mapping[key]: input_alignment[key] for key in keys_to_retrieve if
+        #              key in input_alignment and input_alignment[key] is not None and input_alignment[key] != 0}
+        # if crop_dims:
+        #     movie_align['Crop_dims_(pixels)'] = crop_dims
+
+            # Dictionary for crop dimensions
+            crop_dim_keys = ['cropDimX', 'cropDimY']
+            crop_dim_mapping = {
+                'cropDimX': 'Crop_dims',
+                'cropDimY': 'Crop_dims',
+            }
+            crop_dims = {}
+            for key in crop_dim_keys:
+                if key in input_alignment and input_alignment[key] is not None and input_alignment[key] != 0:
+                    crop_dims[f'Crop_dims{key[-1]}'] = {
+                        'value': input_alignment[key],
+                        'unit': 'pixels'
+                    }
+            if crop_dims:
+                movie_align['Crop_dims'] = crop_dims
+
 
         # Dictionary for frames aligned
         # if input_alignment['alignFrameN'] != 0:
@@ -341,9 +387,18 @@ class ProtOSCEM(EMProtocol):
                         avg_shift = np.mean([avgXY, avg_shift])
                         max_shift = max(max_shift, max_norm)
 
-            output_movie_align = {'Output_avg_shift_(Å)': round(avg_shift, 1),
-                                  'Output_max_shift_(Å)': round(max_shift, 1)}
-            movie_align.update(output_movie_align)
+            # output_movie_align = {'Output_avg_shift_(Å)': round(avg_shift, 1),
+            #                       'Output_max_shift_(Å)': round(max_shift, 1)}
+            # movie_align.update(output_movie_align)
+            movie_align['Output_avg_shift'] = {
+                'value': round(avg_shift, 1),
+                'unit': 'Å'
+            }
+            movie_align['Output_max_shift'] = {
+                'value': round(max_shift, 1),
+                'unit': 'Å'
+            }
+
 
         return movie_align
 

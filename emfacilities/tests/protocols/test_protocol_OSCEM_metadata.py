@@ -49,13 +49,22 @@ class TestOscemJson(BaseTest):
         "Movie_alignment": {
             "Method": "XmippProtFlexAlign",
             "Binning_factor": 1.0,
-            "Maximum_resolution_(Å)": 30.0,
+            "Maximum_resolution": {
+                "value": 30.0,
+                "unit": "Å"
+            },
             "Frames_aligned": {
                 "Frame0": 1,
                 "FrameN": 30
             },
-            "Output_avg_shift_(Å)": 11.8,
-            "Output_max_shift_(Å)": 34.0
+            "Output_avg_shift": {
+                "value": 11.8,
+                "unit": "Å"
+            },
+            "Output_max_shift": {
+                "value": 34.0,
+                "unit": "Å"
+            }
         },
         "Movie_maxshift": {
             "Discarded_movies": 9,
