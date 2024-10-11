@@ -179,7 +179,7 @@ class ProtOSCEM(EMProtocol):
         input_movies = ImportMoviesProt.getObjDict()
 
         # List of keys to retrieve
-        # if doseperframe has a value, then dose initial is also retrieved
+        # if dosePerFrame has a value, then dose initial is also retrieved
         # Otherwise, none of them are retrieved.
         if input_movies[_dosePerFrame] is None:
             keys_to_retrieve = [_voltage, _sphericalAberration, _samplingRate,
@@ -190,11 +190,11 @@ class ProtOSCEM(EMProtocol):
 
         # Mapping dictionary for key name changes
         key_mapping = {
-            _voltage: 'Microscope_voltage_(kV)',
-            _sphericalAberration: 'Spherical_aberration_(mm)',
-            _samplingRate: 'Pixel_size_(Å/px)',
-            _dosePerFrame: 'Dose_per_image_(e/Å²)',
-            _doseInitial: 'Initial_dose_(e/Å²)',
+            _voltage: ('Microscope_voltage', 'kV'),
+            _sphericalAberration: ('Spherical_aberration', 'mm'),
+            _samplingRate: ('Pixel_size', 'Å/px'),
+            _dosePerFrame: ('Dose_per_image', 'e/Å²'),
+            _doseInitial: ('Initial_dose', 'e/Å²'),
             _gainFile: 'Gain_image',
             _darkFile: 'Dark_image',
             _size: 'Number_movies'
@@ -230,8 +230,20 @@ class ProtOSCEM(EMProtocol):
                 image_path = os.path.basename(png_path)
                 input_movies[key] = os.path.basename(image_path)
 
-        import_movies = {key_mapping[key]: input_movies[key] for key in keys_to_retrieve if
-                         key in input_movies and input_movies[key] is not None and input_movies[key] != 0}
+        # Creating the dictionary
+        import_movies = {}
+        for key in keys_to_retrieve:
+            if key in input_movies and input_movies[key] is not None and input_movies[key] != 0:
+                if key in key_mapping:
+                    mapped_key = key_mapping[key]
+                    if isinstance(mapped_key, tuple):  # Value-unit pair
+                        field, unit = mapped_key
+                        import_movies[field] = {
+                            "value": input_movies[key],
+                            "unit": unit
+                        }
+                    else:
+                        import_movies[mapped_key] = input_movies[key]
 
         # Retrieve nº of frames per movie and size of frames:
         dims = input_movies[_firstDim]
@@ -242,7 +254,10 @@ class ProtOSCEM(EMProtocol):
         frame_dim = f'{dim1} x {dim2}'
 
         import_movies['Frames_per_movie'] = n_frames
-        import_movies['Frames_size_(pixels)'] = frame_dim
+        import_movies['Frames_size'] = {
+            "value": frame_dim,
+            "unit": "pixels"
+        }
 
         return import_movies
 
