@@ -613,16 +613,43 @@ class ProtOSCEM(EMProtocol):
         astigmatism_hist = self.hist_path(astigmatism_hist_name)
         plt.savefig(astigmatism_hist)
 
-        CTF_estimation['Amplitude_contrast'] = amplitude_contrast
-        defocus = {'Output_max_defocus': round(max_defocus, 1), 'Output_min_defocus': round(min_defocus, 1),
-                   'Output_avg_defocus': round(avg_defocus, 1), 'Defocus_histogram': defocus_hist_name,
-                   'Defocus_mic_examples': join(micro_folder_name, micro_name)}
-        resolution = {'Output_max_resolution': round(max_resolution, 1),
-                      'Output_min_resolution': round(min_resolution, 1),
-                      'Output_avg_resolution': round(avg_resolution, 1), 'Resolution_histogram': resolution_hist_name}
-        CTF_estimation['Defocus_(Å)'] = defocus
-        CTF_estimation['Resolution_(Å)'] = resolution
-        CTF_estimation['Astigmatism'] = {'Astigmatism_histogram': astigmatism_hist_name}
+        CTF_estimation = {
+            'Amplitude_contrast': amplitude_contrast,
+            'Defocus': {
+                'Output_min_defocus': {
+                    'value': round(min_defocus, 1),
+                    'unit': 'Å'
+                },
+                'Output_max_defocus': {
+                    'value': round(max_defocus, 1),
+                    'unit': 'Å'
+                },
+                'Ouput_avg_defocus': {
+                    'value': round(avg_defocus, 1),
+                    'unit': 'Å'
+                },
+                'Defocus_histogram': defocus_hist_name,
+                'Micrograph_examples': join(micro_folder_name, micro_name)
+            },
+            'Resolution': {
+                'Output_min_resolution': {
+                    'value': round(min_resolution, 1),
+                    'unit': 'Å'
+                },
+                'Output_max_resolution': {
+                    'value': round(max_resolution, 1),
+                    'unit': 'Å'
+                },
+                'Ouput_avg_resolution': {
+                    'value': round(avg_resolution, 1),
+                    'unit': 'Å'
+                },
+                'Resolution_histogram': resolution_hist_name
+            },
+            'Astigmatism': {
+                'Astigmatism_histogram': astigmatism_hist_name
+            }
+        }
 
         return CTF_estimation
 

@@ -89,17 +89,35 @@ class TestOscemJson(BaseTest):
         },
         "CTF_estimation": {
             "Amplitude_contrast": 0.1,
-            "Defocus_(Å)": {
-                "Output_max_defocus": 11850.8,
-                "Output_min_defocus": 1469.9,
-                "Output_avg_defocus": 1723.3,
+            "Defocus": {
+                "Output_min_defocus": {
+                    "value": 1469.9,
+                    "unit": "Å"
+                },
+                "Output_max_defocus": {
+                    "value": 11850.8,
+                    "unit": "Å"
+                },
+                "Ouput_avg_defocus": {
+                    "value": 1723.3,
+                    "unit": "Å"
+                },
                 "Defocus_histogram": "defocus_hist.jpg",
-                "Defocus_mic_examples": "Micro_examples/micro_defocus.jpg"
+                "Micrograph_examples": "Micro_examples/micro_defocus.jpg"
             },
-            "Resolution_(Å)": {
-                "Output_max_resolution": 5.2,
-                "Output_min_resolution": 2.1,
-                "Output_avg_resolution": 3.0,
+            "Resolution": {
+                "Output_min_resolution": {
+                    "value": 2.1,
+                    "unit": "Å"
+                },
+                "Output_max_resolution": {
+                    "value": 5.2,
+                    "unit": "Å"
+                },
+                "Ouput_avg_resolution": {
+                    "value": 3.0,
+                    "unit": "Å"
+                },
                 "Resolution_histogram": "resolution_hist.jpg"
             },
             "Astigmatism": {
