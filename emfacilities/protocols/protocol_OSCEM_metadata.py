@@ -22,7 +22,6 @@ OUTFILE = 'Processing_metadata.json'
 # input movies attributes:
 _voltage = 'outputMovies._acquisition._voltage'
 _sphericalAberration = 'outputMovies._acquisition._sphericalAberration'
-_amplitudeContrast = 'outputMovies._acquisition._amplitudeContrast'
 _samplingRate = 'outputMovies._samplingRate'
 _dosePerFrame = 'outputMovies._acquisition._dosePerFrame'
 _doseInitial = 'outputMovies._acquisition._doseInitial'
@@ -183,17 +182,16 @@ class ProtOSCEM(EMProtocol):
         # if doseperframe has a value, then dose initial is also retrieved
         # Otherwise, none of them are retrieved.
         if input_movies[_dosePerFrame] is None:
-            keys_to_retrieve = [_voltage, _sphericalAberration, _amplitudeContrast, _samplingRate,
+            keys_to_retrieve = [_voltage, _sphericalAberration, _samplingRate,
                                 _gainFile, _darkFile, _size]
         else:
-            keys_to_retrieve = [_voltage, _sphericalAberration, _amplitudeContrast, _samplingRate,
+            keys_to_retrieve = [_voltage, _sphericalAberration, _samplingRate,
                                 _dosePerFrame, _doseInitial, _gainFile, _darkFile, _size]
 
         # Mapping dictionary for key name changes
         key_mapping = {
             _voltage: 'Microscope_voltage_(kV)',
             _sphericalAberration: 'Spherical_aberration_(mm)',
-            _amplitudeContrast: 'Amplitud_contrast',
             _samplingRate: 'Pixel_size_(Å/px)',
             _dosePerFrame: 'Dose_per_image_(e/Å²)',
             _doseInitial: 'Initial_dose_(e/Å²)',
@@ -419,6 +417,7 @@ class ProtOSCEM(EMProtocol):
         dict_defocus = {}
 
         for index, item in enumerate(CTFs.iterItems()):
+            amplitude_contrast = float(item._micObj._acquisition._amplitudeContrast)
             # Min, max  and average defocus and resolution
             defocus = np.mean([float(item._defocusU), float(item._defocusV)])
             resolution = float(item._resolution)
@@ -556,6 +555,7 @@ class ProtOSCEM(EMProtocol):
         astigmatism_hist = self.hist_path(astigmatism_hist_name)
         plt.savefig(astigmatism_hist)
 
+        CTF_estimation['Amplitude_contrast'] = amplitude_contrast
         defocus = {'Output_max_defocus': round(max_defocus, 1), 'Output_min_defocus': round(min_defocus, 1),
                    'Output_avg_defocus': round(avg_defocus, 1), 'Defocus_histogram': defocus_hist_name,
                    'Defocus_mic_examples': join(micro_folder_name, micro_name)}

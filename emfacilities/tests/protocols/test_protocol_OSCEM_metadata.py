@@ -28,7 +28,6 @@ class TestOscemJson(BaseTest):
         "Import_movies": {
             "Microscope_voltage_(kV)": 300.0,
             "Spherical_aberration_(mm)": 2.7,
-            "Amplitud_contrast": 0.1,
             "Pixel_size_(Å/px)": 0.495,
             "Gain_image": "gain.jpg",
             "Number_movies": 30,
@@ -55,6 +54,7 @@ class TestOscemJson(BaseTest):
             "Output_max_shift_(Å)": 29.6
         },
         "CTF_estimation": {
+            "Amplitude_contrast": 0.1,
             "Defocus_(Å)": {
                 "Output_max_defocus": 11850.8,
                 "Output_min_defocus": 1469.9,
