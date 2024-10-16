@@ -20,15 +20,10 @@ INPUT_MICS = 1
 OUTFILE = 'Processing_metadata.json'
 
 # input movies attributes:
-_voltage = 'outputMovies._acquisition._voltage'
-_sphericalAberration = 'outputMovies._acquisition._sphericalAberration'
-_samplingRate = 'outputMovies._samplingRate'
 _dosePerFrame = 'outputMovies._acquisition._dosePerFrame'
 _doseInitial = 'outputMovies._acquisition._doseInitial'
 _gainFile = 'outputMovies._gainFile'
 _darkFile = 'outputMovies._darkFile'
-_size = 'outputMovies._size'
-_firstDim = 'outputMovies._firstDim'
 
 # y label of micrographs
 hist_ylabel_mic = 'Frequency of Micrographs'
@@ -182,22 +177,16 @@ class ProtOSCEM(EMProtocol):
         # if dosePerFrame has a value, then dose initial is also retrieved
         # Otherwise, none of them are retrieved.
         if input_movies[_dosePerFrame] is None:
-            keys_to_retrieve = [_voltage, _sphericalAberration, _samplingRate,
-                                _gainFile, _darkFile, _size]
+            keys_to_retrieve = [_gainFile, _darkFile]
         else:
-            keys_to_retrieve = [_voltage, _sphericalAberration, _samplingRate,
-                                _dosePerFrame, _doseInitial, _gainFile, _darkFile, _size]
+            keys_to_retrieve = [_dosePerFrame, _doseInitial, _gainFile, _darkFile]
 
         # Mapping dictionary for key name changes
         key_mapping = {
-            _voltage: ('Microscope_voltage', 'kV'),
-            _sphericalAberration: ('Spherical_aberration', 'mm'),
-            _samplingRate: ('Pixel_size', 'Å/px'),
             _dosePerFrame: ('Dose_per_image', 'e/Å²'),
             _doseInitial: ('Initial_dose', 'e/Å²'),
             _gainFile: 'Gain_image',
-            _darkFile: 'Dark_image',
-            _size: 'Number_movies'
+            _darkFile: 'Dark_image'
         }
 
         # Filter the dictionary and rename the keys
@@ -244,20 +233,6 @@ class ProtOSCEM(EMProtocol):
                         }
                     else:
                         import_movies[mapped_key] = input_movies[key]
-
-        # Retrieve nº of frames per movie and size of frames:
-        dims = input_movies[_firstDim]
-        dims_list = dims.split(',')
-        dim1 = int(dims_list[0])
-        dim2 = int(dims_list[1])
-        n_frames = int(dims_list[2])
-        frame_dim = f'{dim1} x {dim2}'
-
-        import_movies['Frames_per_movie'] = n_frames
-        import_movies['Frames_size'] = {
-            "value": frame_dim,
-            "unit": "pixels"
-        }
 
         return import_movies
 

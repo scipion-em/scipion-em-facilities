@@ -26,25 +26,7 @@ class TestOscemJson(BaseTest):
     high_res = 0.5
     test_data = {
         "Import_movies": {
-            "Microscope_voltage": {
-                "value": 300.0,
-                "unit": "kV"
-            },
-            "Spherical_aberration": {
-                "value": 2.7,
-                "unit": "mm"
-            },
-            "Pixel_size": {
-                "value": 0.495,
-                "unit": "Å/px"
-            },
             "Gain_image": "gain.jpg",
-            "Number_movies": 30,
-            "Frames_per_movie": 50,
-            "Frames_size": {
-                "value": "3710 x 3838",
-                "unit": "pixels"
-            }
         },
         "Movie_alignment": {
             "Method": "XmippProtFlexAlign",
