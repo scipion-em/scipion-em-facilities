@@ -1,5 +1,6 @@
 
 
+from .protocol_data_sampler import ProtDataSampler
 from .protocol_monitor import ProtMonitor, Monitor, PrintNotifier
 from .protocol_monitor_system import SYSTEM_LOG_SQLITE
 
