@@ -117,13 +117,13 @@ class ProtDataSampler(EMProtocol):
         self._checkNewOutput()
 
     def _checkNewInput(self):
-        # Check if there are new ctf to process from the input set
+        # Check if there are new images to process from the input set
         self.lastCheck = getattr(self, 'lastCheck', datetime.now())
         mTime = datetime.fromtimestamp(os.path.getmtime(self.inputFn))
         self.debug('Last check: %s, modification: %s'
                     % (pwutils.prettyTime(self.lastCheck),
                         pwutils.prettyTime(mTime)))
-        # If the input movies.sqlite have not changed since our last check,
+        # If the input.sqlite have not changed since our last check,
         # it does not make sense to check for new input data
         if self.lastCheck > mTime and self.insertedIds:  # If this is empty it is dut to a static "continue" action or it is the first round
             return None
@@ -257,7 +257,6 @@ class ProtDataSampler(EMProtocol):
             doneIds.extend(list(self.outputSet.getIdSet()))
 
         return doneIds, sizeOutput
-
 
     def _summary(self):
         pass

@@ -251,14 +251,14 @@ class ProtDataCounter(EMProtocol):
             self.delayRegister()
             if self.boolTimer.get():
                 self.info('Using timer:')
-                self.waitingStep()
+                self.timerStep()
 
     def delayRegister(self):
         delay = self.delay.get()
         self.info('Sleeping for delay time: %d' %delay)
         time.sleep(delay)
 
-    def waitingStep(self):
+    def timerStep(self):
         endTime = self.lastTimeCheckTimer + timedelta(seconds=self.timeoutSecs)
         now = datetime.now()
         remainingTime = (endTime - now).total_seconds()
