@@ -23,11 +23,11 @@
 from pyworkflow.tests import BaseTest, setupTestProject, DataSet
 from pwem.protocols.protocol_import import ProtImportParticles
 from pyworkflow.object import Pointer
-from emfacilities.protocols.protocol_data_sampler import ProtDataSampler
+from emfacilities.protocols.protocol_data_counter import ProtDataCounter
 
 
-class TestDataSampler(BaseTest):
-    """ Test data sampler protocol """
+class TestDataCounter(BaseTest):
+    """ Test data counter protocol """
 
     @classmethod
     def setData(cls):
@@ -56,18 +56,17 @@ class TestDataSampler(BaseTest):
 
         cls.launchProtocol(cls.protImport)
 
-    def testDataSampler25(self):
-        prot = self._runDataSampler("Random sampling of 0.25 proportion", batch=1000, proportion=0.25)
-        self.assertSetSize(prot.outputSet, size=1175)
+    def testDataCounter2000(self):
+        prot = self._runDataCounter("Counter images till 2000", outputSize=2000)
+        self.assertSetSize(prot.outputSet, size=2000)
 
-    def testDataSampler50(self):
-        prot = self._runDataSampler("Random sampling of 0.5 proportion", batch=1000,  proportion=0.5)
-        self.assertSetSize(prot.outputSet, size=2350)
+    def testDataCounter4000(self):
+        prot = self._runDataCounter("Counter images till 4000", outputSize=4000)
+        self.assertSetSize(prot.outputSet, size=4000)
 
-    def _runDataSampler(cls, label, batch, proportion):
-        protDataSampler = cls.newProtocol(ProtDataSampler,
-                                          batchSize=batch,
-                                          samplingProportion=proportion,
+    def _runDataCounter(cls, label, outputSize):
+        protDataSampler = cls.newProtocol(ProtDataCounter,
+                                          outputSize=outputSize,
                                           delay=3)
         protDataSampler.inputImages = Pointer(cls.protImport, extended='outputParticles')
         protDataSampler.setObjLabel(label)
