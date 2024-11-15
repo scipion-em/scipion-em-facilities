@@ -47,7 +47,7 @@ OUTPUT = "outputSet"
 class ProtDataSampler(EMProtocol):
     """
     Protocol to make a subset of images from the original one.
-    Waits until certain batch of images is prepared and then it samples a percentage of it and send them to output
+    Waits until certain batch of images is prepared, then it samples a percentage of it and send them to output.
     The protocol will accept Micrographs, Particles, ..., and any kind of object that inherits from Image base class.
     """
     _label = 'data sampler'
