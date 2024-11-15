@@ -158,7 +158,6 @@ class ProtDataSampler(EMProtocol):
 
     def _checkNewOutput(self):
         doneListIds, currentOutputSize = self._getAllDoneIds()
-        #processedIds = copy.deepcopy(self.processedIds)
         sampleIds = copy.deepcopy(self.sampleIds)
         newDone = [imageId for imageId in sampleIds if imageId not in doneListIds]
         allDone = len(doneListIds) + len(newDone)
