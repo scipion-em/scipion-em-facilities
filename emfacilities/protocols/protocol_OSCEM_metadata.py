@@ -1093,7 +1093,7 @@ class ProtOSCEM(EMProtocol):
         particles_list = []
         img_filenames = []
 
-        Volumes = {}  # Dictionary to store image path for each volume
+        volumes_list = []  # List to store volume data
 
         for i, class_3D in enumerate(sorted_list_classes):
             file_name = sorted_list_classes[i].getRepresentative().getFileName()
@@ -1176,9 +1176,8 @@ class ProtOSCEM(EMProtocol):
                         'Side_view': join(classes_3D_folder_name, isosurface_images_folder, side_view_img),
                         'Top_view': join(classes_3D_folder_name, isosurface_images_folder, top_view_img)
                     }}
-
-                Volumes_key = f'Volume_{i + 1}'
-                Volumes[Volumes_key] = volume
+                # Add this volume to the volumes list
+                volumes_list.append(volume)
 
         # Creating collage in .jpg with all images ordered in descending order
         images = [Image.open(filename) for filename in img_filenames]
@@ -1188,7 +1187,7 @@ class ProtOSCEM(EMProtocol):
 
         classes_3D = {"Number_classes_3D": classes, "Particles_per_class": particles_list,
                       "Images_classes_3D": join(classes_3D_folder_name, collage_filename),
-                      "Volumes": Volumes}
+                      "Volumes": volumes_list}
         return classes_3D
 
     def preprocess_data(self, data):
