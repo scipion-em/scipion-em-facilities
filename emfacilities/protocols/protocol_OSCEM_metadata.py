@@ -13,17 +13,20 @@ import pyworkflow.utils as pwutils
 
 import numpy as np
 import json
+import yaml
 import os
 
 INPUT_MOVIES = 0
 INPUT_MICS = 1
-OUTFILE = 'Processing_metadata.json'
+# OUTFILE = 'Processing_metadata.json'
+OUTFILE = 'Processing_metadata.yaml'
 
 # input movies attributes:
 _dosePerFrame = 'outputMovies._acquisition._dosePerFrame'
 _doseInitial = 'outputMovies._acquisition._doseInitial'
 _gainFile = 'outputMovies._gainFile'
 _darkFile = 'outputMovies._darkFile'
+_size = 'outputMovies._size'
 
 # y label of micrographs
 hist_ylabel_mic = 'Frequency of Micrographs'
@@ -234,6 +237,8 @@ class ProtOSCEM(EMProtocol):
                     else:
                         import_movies[mapped_key] = input_movies[key]
 
+
+        self.number_movies = input_movies[_size]
         return import_movies
 
     def movie_alignment_generation(self):
@@ -311,7 +316,7 @@ class ProtOSCEM(EMProtocol):
                           key in input_alignment and input_alignment[key] is not None}
 
         if frames_aligned['FrameN'] == 0:
-            frames_aligned['FrameN'] = self.processing_json['Import_movies']["Number_movies"]
+            frames_aligned['FrameN'] = self.number_movies
 
         movie_align['Frames_aligned'] = frames_aligned
 
@@ -977,11 +982,32 @@ class ProtOSCEM(EMProtocol):
                       "Volumes": Volumes}
         return classes_3D
 
+    def preprocess_data(self, data):
+        """Recursively convert complex objects into YAML-compatible types."""
+        if isinstance(data, dict):
+            return {key: self.preprocess_data(value) for key, value in data.items()}
+        elif isinstance(data, list):
+            return [self.preprocess_data(item) for item in data]
+        elif isinstance(data, np.ndarray):  # Convert numpy arrays to lists
+            return data.tolist()
+        elif isinstance(data, (np.float64, np.float32, np.int64, np.int32)):  # Convert numpy numbers
+            return data.item()
+        elif isinstance(data, bytes):  # Convert binary data to strings if applicable
+            return data.decode("utf-8")
+        else:
+            return data
+
     def saveJson(self):
         file_path = self.getOutFile()
-        with open(file_path, 'w', encoding='utf-8') as json_file:
-            json.dump(self.processing_json, json_file, ensure_ascii=False, indent=4)
-        print(f"JSON data successfully saved to {file_path}")
+        # with open(file_path, 'w', encoding='utf-8') as json_file:
+        #     json.dump(self.processing_json, json_file, ensure_ascii=False, indent=4)
+        # print(f"JSON data successfully saved to {file_path}")
+        # Save the data in YAML format
+        file_path = self.getOutFile().replace('.json', '.yaml')
+        preprocessed_data = self.preprocess_data(self.processing_json)  # Preprocess the data
+        with open(file_path, 'w', encoding='utf-8') as yaml_file:
+            yaml.dump(preprocessed_data, yaml_file, allow_unicode=True, sort_keys=False, indent=4)
+        print(f"YAML data successfully saved to {file_path}")
 
     def getOutFile(self):
         return self._getExtraPath(OUTFILE)
