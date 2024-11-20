@@ -137,17 +137,17 @@ class ProtOSCEM(EMProtocol):
         if self.CTF.get() is not None:
             ###### CTF ######
             CTF = self.CTF_generation()
-            self.processing_json['CTF_estimation'] = CTF
+            self.processing_json['CTFs'] = CTF
 
         if self.particles.get() is not None:
             ###### PARTICLES ######
             particles = self.particles_generation()
-            self.processing_json['Particle_picking'] = particles
+            self.processing_json['Coordinates'] = particles
 
         if self.classes2D.get() is not None:
             ###### CLASSES 2D ######
             classes_2D = self.classes2D_generation()
-            self.processing_json['Classes_2D'] = classes_2D
+            self.processing_json['Classes2D'] = classes_2D
 
         if self.initVolume.get() is not None:
             ###### INITIAL VOLUME ######
@@ -1212,7 +1212,8 @@ class ProtOSCEM(EMProtocol):
         #     json.dump(self.processing_json, json_file, ensure_ascii=False, indent=4)
         # print(f"JSON data successfully saved to {file_path}")
         # Save the data in YAML format
-        preprocessed_data = self.preprocess_data(self.processing_json)  # Preprocess the data
+        preprocessed_data = self.preprocess_data(self.processing_json)
+
         with open(file_path, 'w', encoding='utf-8') as yaml_file:
             yaml.dump(preprocessed_data, yaml_file, allow_unicode=True, sort_keys=False, indent=4)
         print(f"YAML data successfully saved to {file_path}")
