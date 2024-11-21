@@ -149,15 +149,18 @@ class ProtOSCEM(EMProtocol):
             classes_2D = self.classes2D_generation()
             self.processing_json['Classes2D'] = classes_2D
 
-        if self.initVolume.get() is not None:
-            ###### INITIAL VOLUME ######
-            volume = self.init_volume_generation()
-            self.processing_json['Initial_volume'] = volume
-
         if self.classes3D.get() is not None:
             ###### CLASSES 3D ######
             classes_3D = self.classes3D_generation()
             self.processing_json['Classes_3D'] = classes_3D
+
+        if self.initVolume.get() is not None:
+            ###### INITIAL VOLUME ######
+            volumes = []
+            init_volume = self.init_volume_generation()
+            volumes.append(init_volume)
+            # self.processing_json['Initial_volume'] = volume
+            self.processing_json['Volumes'] = volumes
 
         print(json.dumps(self.processing_json, ensure_ascii=False, indent=4))
 
@@ -1051,7 +1054,9 @@ class ProtOSCEM(EMProtocol):
         self.generate_isosurfaces(isosurface_images_path, volume_file_abspath,
                                   th, front_view_img, side_view_img, top_view_img)
 
-        init_volume = {'Orthogonal_slices': {
+        init_volume = {
+            'Volume_type': 'initial volume',
+            'Orthogonal_slices': {
             'Orthogonal_slices_X': join(initial_vol_folder_name, orthogonal_slices_folder, "orthogonal_slices_X.jpg"),
             'Orthogonal_slices_Y': join(initial_vol_folder_name, orthogonal_slices_folder, "orthogonal_slices_Y.jpg"),
             'Orthogonal_slices_Z': join(initial_vol_folder_name, orthogonal_slices_folder, "orthogonal_slices_Z.jpg")
