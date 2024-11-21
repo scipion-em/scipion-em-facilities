@@ -71,6 +71,12 @@ class ProtOSCEM(EMProtocol):
                       condition=CONDITION_MOVIES,
                       allowsNull=True)
 
+        form.addParam('micrographs', params.PointerParam,
+                      label="Micrographs",
+                      pointerClass='SetOfMicrographs',
+                      help="Micrographs",
+                      allowsNull=True)
+
         form.addParam('CTF', params.PointerParam,
                       label="CTF",
                       pointerClass='SetOfCTF',
@@ -133,6 +139,11 @@ class ProtOSCEM(EMProtocol):
             #     ###### MAX SHIFT ######
             #     max_shift = self.max_shift_generation()
             #     self.processing_json['Movie_maxshift'] = max_shift
+
+        if self.micrographs.get() is not None:
+            ###### MICROGRAPHS ######
+            micrographs = self.micrographs_generation()
+            self.processing_json['Micrographs'] = micrographs
 
         if self.CTF.get() is not None:
             ###### CTF ######
@@ -655,6 +666,16 @@ class ProtOSCEM(EMProtocol):
     #     movie_maxshift.update(output_movie_maxshift)
     #
     #     return movie_maxshift
+
+    def micrographs_generation(self):
+        mics = self.micrographs.get()
+        size = mics.getSize()
+
+        micrographs = {
+            'number_micrographs': size
+        }
+
+        return micrographs
 
     def CTF_generation(self):
         CTFs = self.CTF.get()
@@ -1221,6 +1242,23 @@ class ProtOSCEM(EMProtocol):
         with open(file_path, 'w', encoding='utf-8') as yaml_file:
             yaml.dump(preprocessed_data, yaml_file, allow_unicode=True, sort_keys=False, indent=4)
         print(f"YAML data successfully saved to {file_path}")
+
+
+        ### JSON TO SEE
+        # Now, convert the YAML to JSON and save it as well
+        file_path_json = file_path.replace('.yaml', '.json')  # Change extension from .yaml to .json
+
+        # Convert the data back to JSON
+        with open(file_path, 'r', encoding='utf-8') as yaml_file:
+            yaml_data = yaml.safe_load(yaml_file)  # Load YAML into a Python object
+
+        # Save the JSON data to a new file
+        with open(file_path_json, 'w', encoding='utf-8') as json_file:
+            json.dump(yaml_data, json_file, ensure_ascii=False, indent=4)
+        print(f"JSON data successfully saved to {file_path_json}")
+
+
+
 
     def getOutFile(self):
         return self._getExtraPath(OUTFILE)
