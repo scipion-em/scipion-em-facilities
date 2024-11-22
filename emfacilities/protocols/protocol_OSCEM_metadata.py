@@ -115,6 +115,38 @@ class ProtOSCEM(EMProtocol):
                       label="3D Classes threshold",
                       help='Threshold to obtain isosurface of classes 3D')
 
+        form.addParam('finalVolume', params.PointerParam,
+                      label="Final volume",
+                      pointerClass='Volume',
+                      help="Final volume",
+                      allowsNull=True)
+
+        form.addParam('threshold_finalVol', params.IntParam, default=-1,
+                      label="Final volume threshold",
+                      help='Threshold to obtain isosurface of volume')
+
+        form.addParam('polishedVolume', params.PointerParam,
+                      label="Polished volume",
+                      pointerClass='Volume',
+                      help="Polished volume",
+                      allowsNull=True)
+
+        form.addParam('threshold_polishedVol', params.IntParam, default=-1,
+                      label="Polished volume threshold",
+                      help='Threshold to obtain isosurface of volume')
+
+        form.addParam('enhancedVolume', params.PointerParam,
+                      label="Enhanced volume",
+                      pointerClass='Volume',
+                      help="Enhanced volume",
+                      allowsNull=True)
+
+        form.addParam('threshold_enhancedVol', params.IntParam, default=-1,
+                      label="Enhanced volume threshold",
+                      help='Threshold to obtain isosurface of volume')
+
+
+
     # -------------------------- INSERT steps functions -----------------------
     def _insertAllSteps(self):
         self._insertFunctionStep(self.generateJson)
@@ -165,12 +197,46 @@ class ProtOSCEM(EMProtocol):
             classes_3D = self.classes3D_generation()
             self.processing_json['Classes_3D'] = classes_3D
 
+        volumes = []
         if self.initVolume.get() is not None:
             ###### INITIAL VOLUME ######
-            volumes = []
-            init_volume = self.init_volume_generation()
+            volume_type = 'initial volume'
+            folder_name = 'Initial_volume'
+            volume = self.initVolume.get()
+            th = int(self.threshold_initVol.get())
+            init_volume = self.volume_generation(volume_type, folder_name, volume, th)
             volumes.append(init_volume)
             # self.processing_json['Initial_volume'] = volume
+            self.processing_json['Volumes'] = volumes
+
+        if self.finalVolume.get() is not None:
+            ###### FINAL VOLUME ######
+            volume_type = 'final volume'
+            folder_name = 'Final_volume'
+            volume = self.finalVolume.get()
+            th = int(self.threshold_finalVol.get())
+            final_volume = self.volume_generation(volume_type, folder_name, volume, th)
+            volumes.append(final_volume)
+            self.processing_json['Volumes'] = volumes
+
+        if self.enhancedVolume.get() is not None:
+            ###### ENHANCED VOLUME ######
+            volume_type = 'enhanced volume'
+            folder_name = 'Enhanced_volume'
+            volume = self.enhancedVolume.get()
+            th = int(self.threshold_enhancedVol.get())
+            enhanced_volume = self.volume_generation(volume_type, folder_name, volume, th)
+            volumes.append(enhanced_volume)
+            self.processing_json['Volumes'] = volumes
+
+        if self.polishedVolume.get() is not None:
+            ###### POLISHED VOLUME ######
+            volume_type = 'polished volume'
+            folder_name = 'Polished_volume'
+            volume = self.polisheddVolume.get()
+            th = int(self.threshold_polishedVol.get())
+            polished_volume = self.volume_generation(volume_type, folder_name, volume, th)
+            volumes.append(polished_volume)
             self.processing_json['Volumes'] = volumes
 
         print(json.dumps(self.processing_json, ensure_ascii=False, indent=4))
@@ -1043,19 +1109,18 @@ class ProtOSCEM(EMProtocol):
 
         return classes_2D
 
-    def init_volume_generation(self):
+    def volume_generation(self, volume_type, folder_name, volume, th):
         extra_folder = self._getExtraPath()
-        initial_vol_folder_name = 'Initial_volume'
-        initial_vol_folder_path = join(extra_folder, initial_vol_folder_name)
-        os.makedirs(initial_vol_folder_path, exist_ok=True)
-
-        volume = self.initVolume.get()
+        # initial_vol_folder_name = 'Initial_volume'
+        folder_path = join(extra_folder, folder_name)
+        os.makedirs(folder_path, exist_ok=True)
+        # volume = self.initVolume.get()
         volume_file = volume.getFileName()
 
         # Getting orthogonal slices in X, Y and Z
         # Folder to store orthogonal slices
         orthogonal_slices_folder = 'orthogonal_slices'
-        orthogonal_slices_path = join(initial_vol_folder_path, orthogonal_slices_folder)
+        orthogonal_slices_path = join(folder_path, orthogonal_slices_folder)
         os.makedirs(orthogonal_slices_path, exist_ok=True)
 
         self.orthogonalSlices(fnRoot=orthogonal_slices_path, map=volume_file)
@@ -1063,10 +1128,10 @@ class ProtOSCEM(EMProtocol):
         # Getting 3 isosurface images
         # Folder to store isosurface images
         isosurface_images_folder = 'isosurface_images'
-        isosurface_images_path = join(initial_vol_folder_path, isosurface_images_folder)
+        isosurface_images_path = join(folder_path, isosurface_images_folder)
         os.makedirs(isosurface_images_path, exist_ok=True)
 
-        th = int(self.threshold_initVol.get())
+        # th = int(self.threshold_initVol.get())
 
         volume_file_abspath = abspath(volume_file)
         front_view_img = 'front_view.jpg'
@@ -1075,20 +1140,20 @@ class ProtOSCEM(EMProtocol):
         self.generate_isosurfaces(isosurface_images_path, volume_file_abspath,
                                   th, front_view_img, side_view_img, top_view_img)
 
-        init_volume = {
-            'Volume_type': 'initial volume',
+        volume = {
+            'Volume_type': volume_type,
             'Orthogonal_slices': {
-            'Orthogonal_slices_X': join(initial_vol_folder_name, orthogonal_slices_folder, "orthogonal_slices_X.jpg"),
-            'Orthogonal_slices_Y': join(initial_vol_folder_name, orthogonal_slices_folder, "orthogonal_slices_Y.jpg"),
-            'Orthogonal_slices_Z': join(initial_vol_folder_name, orthogonal_slices_folder, "orthogonal_slices_Z.jpg")
+            'Orthogonal_slices_X': join(folder_name, orthogonal_slices_folder, "orthogonal_slices_X.jpg"),
+            'Orthogonal_slices_Y': join(folder_name, orthogonal_slices_folder, "orthogonal_slices_Y.jpg"),
+            'Orthogonal_slices_Z': join(folder_name, orthogonal_slices_folder, "orthogonal_slices_Z.jpg")
         },
             'Isosurface_images': {
-                'Front_view': join(initial_vol_folder_name, isosurface_images_folder, front_view_img),
-                'Side_view': join(initial_vol_folder_name, isosurface_images_folder, side_view_img),
-                'Top_view': join(initial_vol_folder_name, isosurface_images_folder, top_view_img)
+                'Front_view': join(folder_name, isosurface_images_folder, front_view_img),
+                'Side_view': join(folder_name, isosurface_images_folder, side_view_img),
+                'Top_view': join(folder_name, isosurface_images_folder, top_view_img)
             }}
 
-        return init_volume
+        return volume
 
     def classes3D_generation(self):
         classes3D = self.classes3D.get()
