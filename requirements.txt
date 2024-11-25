@@ -1,9 +1,0 @@
-scipion-pyworkflow>=3.0.31
-scipion-em
-nvidia-ml-py3
-pytz
-paramiko
-influxdb
-joblib
-networkx
-scipion-em-xmipp

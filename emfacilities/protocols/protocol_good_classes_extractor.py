@@ -49,7 +49,7 @@ class ProtGoodClassesExtractor(EMProtocol, ProtStreamingBase):
 
     _label = "good classes extractor"
     outputsToDefine = {}
-    _devStatus = NEW
+    _devStatus = PROD
 
     _possibleOutputs = {OUTPUT_PARTICLES: SetOfParticles,
                         OUTPUT_DISCARDED_PARTICLES: SetOfParticles}

@@ -41,7 +41,7 @@ class ProtMonitor2dStreamer(ProtMonitor):
      of the input particles as the 2D classification input.
     """
     _label = '2d classification launcher'
-    _devStatus = UPDATED
+    _devStatus = PROD
 
     NONE_OPTION = 0
     CLASSIFICATION_JOBS = 1

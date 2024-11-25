@@ -1,3 +1,10 @@
+V3.2.0
+- New protocols: Data Counter and Data Sampler
+- New pyproject.toml file replacing setup.py
+
+V3.1.1
+- Labels on protocols
+
 V3.1.0 
 - Monitor summary: validation for publish command
 - Monitor summary: verbose error if publish command fails

@@ -41,7 +41,7 @@ class ProtVolumeExtractor(EMProtocol):
     """
 
     _label = "volume extractor"
-    _devStatus = NEW
+    _devStatus = PROD
 
     _possibleOutputs = {OUTPUT_PARTICLES: emobj.SetOfParticles,
                         OUTPUT_VOLUME: emobj.Volume}
