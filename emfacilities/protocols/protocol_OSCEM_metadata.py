@@ -1,3 +1,4 @@
+import sqlite3
 from functools import reduce
 from os.path import abspath, join, dirname, splitext
 
@@ -233,7 +234,7 @@ class ProtOSCEM(EMProtocol):
             ###### POLISHED VOLUME ######
             volume_type = 'polished volume'
             folder_name = 'Polished_volume'
-            volume = self.polisheddVolume.get()
+            volume = self.polishedVolume.get()
             th = int(self.threshold_polishedVol.get())
             polished_volume = self.volume_generation(volume_type, folder_name, volume, th)
             volumes.append(polished_volume)
@@ -1110,12 +1111,41 @@ class ProtOSCEM(EMProtocol):
         return classes_2D
 
     def volume_generation(self, volume_type, folder_name, volume, th):
+        print(f"att: {dir(volume)}")
+        print(f" file name: {volume.getFileName()}")
+
         extra_folder = self._getExtraPath()
         # initial_vol_folder_name = 'Initial_volume'
         folder_path = join(extra_folder, folder_name)
         os.makedirs(folder_path, exist_ok=True)
         # volume = self.initVolume.get()
         volume_file = volume.getFileName()
+
+        # Access to particles.sqlite to obtain particles in volume:
+        reference_path = volume.getFileName()
+        base_directory = os.path.dirname(os.path.dirname(reference_path))
+        sqlite_file = os.path.join(base_directory, "particles.sqlite")
+
+        if not os.path.exists(sqlite_file):
+            print(f"SQLite file not found: {sqlite_file}")
+        else:
+            # Connect to the SQLite database
+            conn = sqlite3.connect(sqlite_file)
+            cursor = conn.cursor()
+
+            query = "SELECT value FROM properties WHERE key = '_size'"
+            cursor.execute(query)
+
+            particle_num = cursor.fetchone()
+
+            if particle_num:
+                # Extract the number from the tuple
+                size_value = particle_num[0]
+                print(f"The value of '_size' is: {size_value}")
+            else:
+                print("Key '_size' not found in the properties table.")
+            conn.close()
+
 
         # Getting orthogonal slices in X, Y and Z
         # Folder to store orthogonal slices
@@ -1140,18 +1170,33 @@ class ProtOSCEM(EMProtocol):
         self.generate_isosurfaces(isosurface_images_path, volume_file_abspath,
                                   th, front_view_img, side_view_img, top_view_img)
 
-        volume = {
-            'Volume_type': volume_type,
-            'Orthogonal_slices': {
-            'Orthogonal_slices_X': join(folder_name, orthogonal_slices_folder, "orthogonal_slices_X.jpg"),
-            'Orthogonal_slices_Y': join(folder_name, orthogonal_slices_folder, "orthogonal_slices_Y.jpg"),
-            'Orthogonal_slices_Z': join(folder_name, orthogonal_slices_folder, "orthogonal_slices_Z.jpg")
-        },
-            'Isosurface_images': {
-                'Front_view': join(folder_name, isosurface_images_folder, front_view_img),
-                'Side_view': join(folder_name, isosurface_images_folder, side_view_img),
-                'Top_view': join(folder_name, isosurface_images_folder, top_view_img)
-            }}
+        if 'size_value' in locals():
+            volume = {
+                'Volume_type': volume_type,
+                'number_particles': int(size_value),
+                'Orthogonal_slices': {
+                    'Orthogonal_slices_X': join(folder_name, orthogonal_slices_folder, "orthogonal_slices_X.jpg"),
+                    'Orthogonal_slices_Y': join(folder_name, orthogonal_slices_folder, "orthogonal_slices_Y.jpg"),
+                    'Orthogonal_slices_Z': join(folder_name, orthogonal_slices_folder, "orthogonal_slices_Z.jpg")
+                },
+                'Isosurface_images': {
+                    'Front_view': join(folder_name, isosurface_images_folder, front_view_img),
+                    'Side_view': join(folder_name, isosurface_images_folder, side_view_img),
+                    'Top_view': join(folder_name, isosurface_images_folder, top_view_img)
+                }}
+        else:
+            volume = {
+                'Volume_type': volume_type,
+                'Orthogonal_slices': {
+                'Orthogonal_slices_X': join(folder_name, orthogonal_slices_folder, "orthogonal_slices_X.jpg"),
+                'Orthogonal_slices_Y': join(folder_name, orthogonal_slices_folder, "orthogonal_slices_Y.jpg"),
+                'Orthogonal_slices_Z': join(folder_name, orthogonal_slices_folder, "orthogonal_slices_Z.jpg")
+            },
+                'Isosurface_images': {
+                    'Front_view': join(folder_name, isosurface_images_folder, front_view_img),
+                    'Side_view': join(folder_name, isosurface_images_folder, side_view_img),
+                    'Top_view': join(folder_name, isosurface_images_folder, top_view_img)
+                }}
 
         return volume
 
