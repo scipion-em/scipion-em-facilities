@@ -904,7 +904,7 @@ class ProtOSCEM(EMProtocol):
                     'value': round(max_defocus, 1),
                     'unit': 'Å'
                 },
-                'Ouput_avg_defocus': {
+                'Output_avg_defocus': {
                     'value': round(avg_defocus, 1),
                     'unit': 'Å'
                 },
@@ -920,7 +920,7 @@ class ProtOSCEM(EMProtocol):
                     'value': round(max_resolution, 1),
                     'unit': 'Å'
                 },
-                'Ouput_avg_resolution': {
+                'Output_avg_resolution': {
                     'value': round(avg_resolution, 1),
                     'unit': 'Å'
                 },
