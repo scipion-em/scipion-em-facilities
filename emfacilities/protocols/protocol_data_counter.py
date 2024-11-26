@@ -44,13 +44,15 @@ OUTPUT = "outputSet"
 
 class ProtDataCounter(EMProtocol):
     """
-    Protocol to make a subset of images from the original one.
-    Waits until certain number of images is prepared and then send them to output.
-    It can be done in 3 ways:
-        - If simple mode: once the number of items is reached, a setOfImages is returned and
+    Protocol to make a subset of images from the original one. Waits until certain number of images is prepared and then send them to output.
+    It can works in 2 ways:
+        - Simple mode: once the number of items is reached, a setOfImages is returned and
             the protocol finishes (ending the streaming from this point).
+        - If timer activated: either once the number of items is reached, or the timer is consumed
+            a setOfImages is returned and the protocol finishes (ending the streaming from this point).
     The protocol will accept Micrographs, Particles and any kind of object that inherits from Image base class.
     """
+
     _label = 'data counter'
     _devStatus = NEW
     _lastUpdateVersion = VERSION_3_0
@@ -266,9 +268,11 @@ class ProtDataCounter(EMProtocol):
         if remainingTime <= 0:
             self.timerOut = True
             self.info("  timer is consumed terminating protocol.")
+            self.summaryVar.set("Timer is consumed terminating protocol.")
         else:
-            self.info(f"  remaining time: {int(remainingTime)} seconds.")
             self.timeoutSecs = int(remainingTime)
+            self.info(f"  remaining time: {int(remainingTime)} seconds.")
+            self.summaryVar.set("Time activated remaining time: %d seconds" % self.timeoutSecs)
 
         # Update the last time check
         self.lastTimeCheckTimer = now
@@ -299,4 +303,18 @@ class ProtDataCounter(EMProtocol):
         return seconds
 
     def _summary(self):
-        pass
+        summary = []
+        if not hasattr(self, OUTPUT):
+            summary.append("Output set not ready yet.")
+        else:
+            outputExpectedSize = self.outputSize.get()
+            outputSize = self.outputSet.getSize()
+            per = (outputSize/outputExpectedSize) * 100
+
+            summary.append("%.1f %% of the expected output length: %d / %d "
+                           % (per, outputSize, outputExpectedSize))
+
+        if self.boolTimer.get():
+            summary.append(self.summaryVar.get())
+
+        return summary

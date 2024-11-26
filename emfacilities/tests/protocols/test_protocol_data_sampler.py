@@ -20,9 +20,10 @@
 # *  All comments concerning this program package may be sent to the
 # *  e-mail address 'scipion@cnb.csic.es'
 # ***************************************************************************/
-from pyworkflow.tests import BaseTest, setupTestProject, DataSet
-from pwem.protocols.protocol_import import ProtImportParticles
+from pyworkflow.tests import BaseTest, DataSet
+from pwem.protocols.protocol_import import ProtImportMicrographs
 from pyworkflow.object import Pointer
+import pyworkflow.tests as tests
 from emfacilities.protocols.protocol_data_sampler import ProtDataSampler
 
 
@@ -30,46 +31,42 @@ class TestDataSampler(BaseTest):
     """ Test data sampler protocol """
 
     @classmethod
-    def setData(cls):
-        cls.dsRelion = DataSet.getDataSet('relion_tutorial')
-
-    @classmethod
     def setUpClass(cls):
-        setupTestProject(cls)
-        cls.setData()
-        # Run needed protocols
-        cls.runImportParticles()
+        tests.setupTestProject(cls)
+        cls.dataset = DataSet.getDataSet('xmipp_tutorial')
+        cls.micsFn = cls.dataset.getFile('allMics')
+        cls.protImport = cls.runImportMicrographs(cls.micsFn)
+
 
     @classmethod
-    def runImportParticles(cls):
+    def runImportMicrographs(cls, micsFn):
         """
-        Import an EMX file with Particles and defocus
+        Import Micrographs
         """
-        cls.protImport = cls.newProtocol(ProtImportParticles,
-                                         objLabel='from relion (classify 2d)',
-                                         importFrom=ProtImportParticles.IMPORT_FROM_RELION,
-                                         starFile=cls.dsRelion.getFile('import/classify2d/extra/relion_it015_data.star'),
-                                         magnification=10000,
-                                         samplingRate=7.08,
-                                         haveDataBeenPhaseFlipped=True
-                                         )
+        protImport = cls.newProtocol(ProtImportMicrographs,
+                                     filesPath=micsFn,
+                                     samplingRate=1.237,
+                                     voltage=300)
+        cls.launchProtocol(protImport)
 
-        cls.launchProtocol(cls.protImport)
+        return protImport
+
 
     def testDataSampler25(self):
-        prot = self._runDataSampler("Random sampling of 0.25 proportion", batch=1000, proportion=0.25)
-        self.assertSetSize(prot.outputSet, size=1175)
+        prot = self._runDataSampler("Random sampling of 0.35 proportion", batch=4, proportion=0.35)
+        self.assertSetSize(prot.outputSet, size=1)
+
 
     def testDataSampler50(self):
-        prot = self._runDataSampler("Random sampling of 0.5 proportion", batch=1000,  proportion=0.5)
-        self.assertSetSize(prot.outputSet, size=2350)
+        prot = self._runDataSampler("Random sampling of 0.70 proportion", batch=4,  proportion=0.70)
+        self.assertSetSize(prot.outputSet, size=2)
 
     def _runDataSampler(cls, label, batch, proportion):
         protDataSampler = cls.newProtocol(ProtDataSampler,
                                           batchSize=batch,
                                           samplingProportion=proportion,
                                           delay=3)
-        protDataSampler.inputImages = Pointer(cls.protImport, extended='outputParticles')
+        protDataSampler.inputImages = Pointer(cls.protImport, extended='outputMicrographs')
         protDataSampler.setObjLabel(label)
         cls.launchProtocol(protDataSampler)
 

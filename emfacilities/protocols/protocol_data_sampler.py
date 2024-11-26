@@ -27,9 +27,7 @@ import os
 from datetime import datetime
 import time
 import copy
-import numpy as np
 import random
-from collections import defaultdict
 
 from pyworkflow import VERSION_3_0
 from pwem.objects import SetOfImages, Set
@@ -38,7 +36,7 @@ import pyworkflow.utils as pwutils
 
 from pwem.protocols import EMProtocol
 from pyworkflow import UPDATED, NEW
-from pyworkflow.protocol.constants import STATUS_NEW, STEPS_PARALLEL
+from pyworkflow.protocol.constants import STATUS_NEW
 
 
 
@@ -70,7 +68,7 @@ class ProtDataSampler(EMProtocol):
         form.addParam('samplingProportion', params.FloatParam, default=0.25,
                       label='Sampling proportion',
                       help='What proportion of images need to be output from '
-                           'the random sampling.')
+                           'the random sampling (1 means all images and 0 means none).')
         form.addSection(label='Stream of data timer')
         form.addParam('delay', params.IntParam, default=10, label="Delay (sec)",
                       validators=[params.GT(2, "must be larger than 3sec.")],
