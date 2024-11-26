@@ -1126,27 +1126,6 @@ class ProtOSCEM(EMProtocol):
         base_directory = os.path.dirname(os.path.dirname(reference_path))
         sqlite_file = os.path.join(base_directory, "particles.sqlite")
 
-        if not os.path.exists(sqlite_file):
-            print(f"SQLite file not found: {sqlite_file}")
-        else:
-            # Connect to the SQLite database
-            conn = sqlite3.connect(sqlite_file)
-            cursor = conn.cursor()
-
-            query = "SELECT value FROM properties WHERE key = '_size'"
-            cursor.execute(query)
-
-            particle_num = cursor.fetchone()
-
-            if particle_num:
-                # Extract the number from the tuple
-                size_value = particle_num[0]
-                print(f"The value of '_size' is: {size_value}")
-            else:
-                print("Key '_size' not found in the properties table.")
-            conn.close()
-
-
         # Getting orthogonal slices in X, Y and Z
         # Folder to store orthogonal slices
         orthogonal_slices_folder = 'orthogonal_slices'
@@ -1170,10 +1149,16 @@ class ProtOSCEM(EMProtocol):
         self.generate_isosurfaces(isosurface_images_path, volume_file_abspath,
                                   th, front_view_img, side_view_img, top_view_img)
 
-        if 'size_value' in locals():
+        if os.path.exists(sqlite_file):
+
+            particles = self._createSetOfParticles()
+            particles._mapperPath.set('%s, %s' % (sqlite_file, ''))
+            particles.load()
+            size = len(particles)
+
             volume = {
                 'Volume_type': volume_type,
-                'number_particles': int(size_value),
+                'number_particles': size,
                 'Orthogonal_slices': {
                     'Orthogonal_slices_X': join(folder_name, orthogonal_slices_folder, "orthogonal_slices_X.jpg"),
                     'Orthogonal_slices_Y': join(folder_name, orthogonal_slices_folder, "orthogonal_slices_Y.jpg"),
