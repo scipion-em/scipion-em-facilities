@@ -1,8 +1,7 @@
-import sqlite3
-from functools import reduce
+import logging
 from os.path import abspath, join, dirname, splitext
 
-from PIL import Image, ImageDraw, ImageFont, ImageOps, ImageEnhance
+from PIL import Image, ImageDraw, ImageFont, ImageOps
 from matplotlib import pyplot as plt
 import mrcfile
 
@@ -10,12 +9,22 @@ import pyworkflow.protocol.params as params
 import xmipp3
 from pwem.objects import Class2D, Class3D
 from pwem.protocols import EMProtocol
-import pyworkflow.utils as pwutils
+
+from pwem import emlib
 
 import numpy as np
 import json
 import yaml
 import os
+
+from pyworkflow.utils import weakImport, cyanStr
+
+logger = logging.getLogger(__name__)
+
+program_fso = None
+with weakImport("xmipp3"):
+    program_fso = 'xmipp_resolution_fso'
+
 
 INPUT_MOVIES = 0
 INPUT_MICS = 1
@@ -1113,6 +1122,14 @@ class ProtOSCEM(EMProtocol):
     def volume_generation(self, volume_type, folder_name, volume, th):
         print(f"att: {dir(volume)}")
         print(f" file name: {volume.getFileName()}")
+        print(f"half maps: {volume.getHalfMaps()}")
+        if volume_type == 'final volume':
+            half_maps = volume.getHalfMaps()
+            half_maps1, half_maps2 = half_maps.split(',')
+            print(cyanStr(f"halfmap1 : {half_maps1}"))
+            print(cyanStr(f"halfmap2 : {half_maps2}"))
+
+
 
         extra_folder = self._getExtraPath()
         # initial_vol_folder_name = 'Initial_volume'
@@ -1124,7 +1141,7 @@ class ProtOSCEM(EMProtocol):
         # Access to particles.sqlite to obtain particles in volume:
         reference_path = volume.getFileName()
         base_directory = os.path.dirname(os.path.dirname(reference_path))
-        sqlite_file = os.path.join(base_directory, "particles.sqlite")
+        sqlite_particles_file = os.path.join(base_directory, "particles.sqlite")
 
         # Getting orthogonal slices in X, Y and Z
         # Folder to store orthogonal slices
@@ -1149,16 +1166,81 @@ class ProtOSCEM(EMProtocol):
         self.generate_isosurfaces(isosurface_images_path, volume_file_abspath,
                                   th, front_view_img, side_view_img, top_view_img)
 
-        if os.path.exists(sqlite_file):
+        resolution = None
+        if program_fso:
+            try:
+                half_maps = volume.getHalfMaps()
+                half_maps1, half_maps2 = half_maps.split(',')
+
+                if half_maps:
+                    print(cyanStr('there are half maps'))
+                    sampling_rate = volume.getSamplingRate()
+                    args = (f"--half1 {half_maps1}:mrc --half2 {half_maps2}:mrc --sampling {sampling_rate:.3f} "
+                            f"-o {self._getTmpPath()}")
+                    self.runJob(program_fso, args, env=xmipp3.Plugin.getEnviron())
+                    print(cyanStr('fso runned'))
+
+                    # Calculating resolution
+                    path_to_fso = os.path.join(self._getTmpPath(), 'GlobalFSC.xmd')
+                    metadata_fso = emlib.MetaData(path_to_fso)
+
+
+                    x = metadata_fso.getColumnValues(emlib.MDL_RESOLUTION_FRC)
+                    y = metadata_fso.getColumnValues(emlib.MDL_RESOLUTION_FREQREAL)
+                    resolution = self.calculateResolution(x,y)
+                    print(resolution)
+                else:
+                    logger.warning(cyanStr("Unable to get the resolution since no half maps were detected."))
+            except Exception as e:
+                print(e)
+                logger.warning(cyanStr("Unable to get the resolution."))
+        else:
+            logger.warning(cyanStr('Xmipp3 is not detected: unable to get the resolution'))
+
+
+        if os.path.exists(sqlite_particles_file) and resolution:
 
             particles = self._createSetOfParticles()
-            particles._mapperPath.set('%s, %s' % (sqlite_file, ''))
+            particles._mapperPath.set('%s, %s' % (sqlite_particles_file, ''))
             particles.load()
             size = len(particles)
 
             volume = {
                 'volume_type': volume_type,
                 'number_particles': size,
+                'resolution': resolution,
+                'orthogonal_slices': {
+                    'orthogonal_slices_X': join(folder_name, orthogonal_slices_folder, "orthogonal_slices_X.jpg"),
+                    'orthogonal_slices_Y': join(folder_name, orthogonal_slices_folder, "orthogonal_slices_Y.jpg"),
+                    'orthogonal_slices_Z': join(folder_name, orthogonal_slices_folder, "orthogonal_slices_Z.jpg")
+                },
+                'isosurface_images': {
+                    'Front_view': join(folder_name, isosurface_images_folder, front_view_img),
+                    'Side_view': join(folder_name, isosurface_images_folder, side_view_img),
+                    'Top_view': join(folder_name, isosurface_images_folder, top_view_img)
+                }}
+        elif os.path.exists(sqlite_particles_file):
+            particles = self._createSetOfParticles()
+            particles._mapperPath.set('%s, %s' % (sqlite_particles_file, ''))
+            particles.load()
+            size = len(particles)
+            volume = {
+                'volume_type': volume_type,
+                'number_particles': size,
+                'orthogonal_slices': {
+                    'orthogonal_slices_X': join(folder_name, orthogonal_slices_folder, "orthogonal_slices_X.jpg"),
+                    'orthogonal_slices_Y': join(folder_name, orthogonal_slices_folder, "orthogonal_slices_Y.jpg"),
+                    'orthogonal_slices_Z': join(folder_name, orthogonal_slices_folder, "orthogonal_slices_Z.jpg")
+                },
+                'isosurface_images': {
+                    'Front_view': join(folder_name, isosurface_images_folder, front_view_img),
+                    'Side_view': join(folder_name, isosurface_images_folder, side_view_img),
+                    'Top_view': join(folder_name, isosurface_images_folder, top_view_img)
+                }}
+        elif resolution:
+            volume = {
+                'volume_type': volume_type,
+                'resolution': resolution,
                 'orthogonal_slices': {
                     'orthogonal_slices_X': join(folder_name, orthogonal_slices_folder, "orthogonal_slices_X.jpg"),
                     'orthogonal_slices_Y': join(folder_name, orthogonal_slices_folder, "orthogonal_slices_Y.jpg"),
@@ -1537,3 +1619,18 @@ class ProtOSCEM(EMProtocol):
         enlarge_factor= 1.5
         new_size = (int(width * enlarge_factor), int(height * enlarge_factor))
         return image.resize(new_size, Image.Resampling.LANCZOS)
+
+    def calculateResolution(self, x, y, threshold=0.143):
+        """
+        Calculate the FSC resolution value
+        """
+        dataLength = len(x)
+        for i in range(dataLength):
+            if float(y[i]) < threshold or i == dataLength - 1:
+                above_res = float(x[i - 1])
+                above_fsc = float(y[i - 1])
+                below_res = float(x[i])
+                below_fsc = float(y[i])
+                break
+        resolution = below_res - ((threshold - below_fsc) / (above_fsc - below_fsc) * (below_res - above_res))
+        return 1 / resolution
