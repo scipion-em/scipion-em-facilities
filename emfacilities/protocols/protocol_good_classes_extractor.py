@@ -112,6 +112,7 @@ class ProtGoodClassesExtractor(EMProtocol, ProtStreamingBase):
                                                        prerequisites=selectStep)
 
                 self.newDeps.append(extractStep)
+                classSet.close()
 
             if self.isStreamClosed == Set.STREAM_CLOSED:
                 self.info('Stream closed')
