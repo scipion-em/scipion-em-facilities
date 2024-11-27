@@ -161,7 +161,7 @@ class ProtOSCEM(EMProtocol):
         if self.inputType.get() == 0:  # movies as input
             ###### IMPORT MOVIES ######
             import_movies = self.import_movies_generation()
-            self.processing_json['Movies'] = import_movies
+            self.processing_json['movies'] = import_movies
 
             # if self.movieAlignment.get() is not None:
             #     ###### MOVIE ALGINMENT ######
@@ -176,7 +176,7 @@ class ProtOSCEM(EMProtocol):
         if self.micrographs.get() is not None:
             ###### MICROGRAPHS ######
             micrographs = self.micrographs_generation()
-            self.processing_json['Micrographs'] = micrographs
+            self.processing_json['micrographs'] = micrographs
 
         if self.CTF.get() is not None:
             ###### CTF ######
@@ -186,17 +186,17 @@ class ProtOSCEM(EMProtocol):
         if self.particles.get() is not None:
             ###### PARTICLES ######
             particles = self.particles_generation()
-            self.processing_json['Coordinates'] = particles
+            self.processing_json['coordinates'] = particles
 
         if self.classes2D.get() is not None:
             ###### CLASSES 2D ######
             classes_2D = self.classes2D_generation()
-            self.processing_json['Classes2D'] = classes_2D
+            self.processing_json['classes2D'] = classes_2D
 
         if self.classes3D.get() is not None:
             ###### CLASSES 3D ######
             classes_3D = self.classes3D_generation()
-            self.processing_json['Classes_3D'] = classes_3D
+            self.processing_json['classes3D'] = classes_3D
 
         volumes = []
         if self.initVolume.get() is not None:
@@ -208,7 +208,7 @@ class ProtOSCEM(EMProtocol):
             init_volume = self.volume_generation(volume_type, folder_name, volume, th)
             volumes.append(init_volume)
             # self.processing_json['Initial_volume'] = volume
-            self.processing_json['Volumes'] = volumes
+            self.processing_json['volumes'] = volumes
 
         if self.finalVolume.get() is not None:
             ###### FINAL VOLUME ######
@@ -218,7 +218,7 @@ class ProtOSCEM(EMProtocol):
             th = int(self.threshold_finalVol.get())
             final_volume = self.volume_generation(volume_type, folder_name, volume, th)
             volumes.append(final_volume)
-            self.processing_json['Volumes'] = volumes
+            self.processing_json['volumes'] = volumes
 
         if self.enhancedVolume.get() is not None:
             ###### ENHANCED VOLUME ######
@@ -228,7 +228,7 @@ class ProtOSCEM(EMProtocol):
             th = int(self.threshold_enhancedVol.get())
             enhanced_volume = self.volume_generation(volume_type, folder_name, volume, th)
             volumes.append(enhanced_volume)
-            self.processing_json['Volumes'] = volumes
+            self.processing_json['volumes'] = volumes
 
         if self.polishedVolume.get() is not None:
             ###### POLISHED VOLUME ######
@@ -238,7 +238,7 @@ class ProtOSCEM(EMProtocol):
             th = int(self.threshold_polishedVol.get())
             polished_volume = self.volume_generation(volume_type, folder_name, volume, th)
             volumes.append(polished_volume)
-            self.processing_json['Volumes'] = volumes
+            self.processing_json['volumes'] = volumes
 
         print(json.dumps(self.processing_json, ensure_ascii=False, indent=4))
 
@@ -267,10 +267,10 @@ class ProtOSCEM(EMProtocol):
 
         # Mapping dictionary for key name changes
         key_mapping = {
-            _dosePerFrame: ('Dose_per_image', 'e/Å²'),
-            _doseInitial: ('Initial_dose', 'e/Å²'),
-            _gainFile: 'Gain_image',
-            _darkFile: 'Dark_image'
+            _dosePerFrame: ('dose_per_image', 'e/Å²'),
+            _doseInitial: ('initial_dose', 'e/Å²'),
+            _gainFile: 'gain_image',
+            _darkFile: 'dark_image'
         }
 
         # Filter the dictionary and rename the keys
@@ -327,7 +327,7 @@ class ProtOSCEM(EMProtocol):
             ###### MOVIE ALGINMENT DESCRIPTOR ######
 
             MovieAlignmentProt = self.movieAlignment.get()
-            movie_align = {'Descriptor_name': MovieAlignmentProt.getClassName()}
+            movie_align = {'descriptor_name': MovieAlignmentProt.getClassName()}
 
             ################################ INPUT #############################################
             input_alignment = MovieAlignmentProt.getObjDict()
@@ -336,10 +336,10 @@ class ProtOSCEM(EMProtocol):
 
             # Mapping dictionary for key name changes
             key_mapping = {
-                'binFactor': 'Binning_factor',
-                'maxResForCorrelation': 'Maximum_resolution_(Å)',
-                'gainRot': 'Rotate_gain_reference',
-                'gainFlip': 'Flip_gain_reference'
+                'binFactor': 'binning_factor',
+                'maxResForCorrelation': 'maximum_resolution_(Å)',
+                'gainRot': 'rotate_gain_reference',
+                'gainFlip': 'flip_gain_reference'
             }
 
             # Map values for the schema
@@ -347,7 +347,7 @@ class ProtOSCEM(EMProtocol):
             for key in keys_to_retrieve:
                 if key in input_alignment and input_alignment[key] is not None and input_alignment[key] != 0:
                     if key == 'maxResForCorrelation':
-                        input_movie_align['Maximum_resolution'] = {
+                        input_movie_align['maximum_resolution'] = {
                             'value': input_alignment[key],
                             'unit': 'Å'
                         }
@@ -358,8 +358,8 @@ class ProtOSCEM(EMProtocol):
 
             # Dictionary for crop offsets
             crop_offset_mapping = {
-                'cropOffsetX': 'Crop_offsetX',
-                'cropOffsetY': 'Crop_offsetY',
+                'cropOffsetX': 'crop_offsetX',
+                'cropOffsetY': 'crop_offsetY',
             }
 
             crop_offsets = {}
@@ -370,12 +370,12 @@ class ProtOSCEM(EMProtocol):
                         'unit': 'pixels'
                     }
             if crop_offsets:
-                movie_align['Crop_offsets'] = crop_offsets
+                movie_align['crop_offsets'] = crop_offsets
 
             # Dictionary for crop dimensions
             crop_dim_mapping = {
-                'cropDimX': 'Crop_dimsX',
-                'cropDimY': 'Crop_dimsY',
+                'cropDimX': 'crop_dimsX',
+                'cropDimY': 'crop_dimsY',
             }
             crop_dims = {}
             for key, mapped_key in crop_dim_mapping.items():
@@ -385,22 +385,22 @@ class ProtOSCEM(EMProtocol):
                         'unit': 'pixels'
                     }
             if crop_dims:
-                movie_align['Crop_dims'] = crop_dims
+                movie_align['crop_dims'] = crop_dims
 
             # Dictionary for frames aligned
             # if input_alignment['alignFrameN'] != 0:
             keys_to_retrieve = ['alignFrame0', 'alignFrameN']
             key_mapping = {
-                'alignFrame0': 'Frame0',
-                'alignFrameN': 'FrameN',
+                'alignFrame0': 'frame0',
+                'alignFrameN': 'frameN',
             }
             frames_aligned = {key_mapping[key]: input_alignment[key] for key in keys_to_retrieve if
                               key in input_alignment and input_alignment[key] is not None}
 
-            if frames_aligned['FrameN'] == 0:
-                frames_aligned['FrameN'] = self.number_movies
+            if frames_aligned['frameN'] == 0:
+                frames_aligned['frameN'] = self.number_movies
 
-            movie_align['Frames_aligned'] = frames_aligned
+            movie_align['frames_aligned'] = frames_aligned
 
             ############################### OUTPUT #############################################
             # average and max shift
@@ -424,11 +424,11 @@ class ProtOSCEM(EMProtocol):
                             max_shift = max(max_shift, max_norm)
 
                 # movie_align.update(output_movie_align)
-                movie_align['Output_avg_shift'] = {
+                movie_align['output_avg_shift'] = {
                     'value': round(avg_shift, 1),
                     'unit': 'Å'
                 }
-                movie_align['Output_max_shift'] = {
+                movie_align['output_max_shift'] = {
                     'value': round(max_shift, 1),
                     'unit': 'Å'
                 }
@@ -439,7 +439,7 @@ class ProtOSCEM(EMProtocol):
         if self.maxShift.get() is not None:
             ###### MAX SHIFT DESCRIPTOR######
             MaxShiftProt = self.maxShift.get()
-            movie_maxshift = {'Descriptor_name': MaxShiftProt.getClassName()}
+            movie_maxshift = {'descriptor_name': MaxShiftProt.getClassName()}
 
             ############################### INPUT #############################################
             input_shift = MaxShiftProt.getObjDict()
@@ -447,15 +447,15 @@ class ProtOSCEM(EMProtocol):
             keys_to_retrieve = ['outputMoviesDiscarded._size', 'maxFrameShift', 'maxMovieShift', 'rejType']
             # Mapping dictionary for key name changes
             key_mapping = {
-                'outputMoviesDiscarded._size': 'Discarded_movies',
-                'maxFrameShift': 'Max_frame_shift',
-                'maxMovieShift': 'Max_movie_shift',
-                'rejType': 'Rejection_type'
+                'outputMoviesDiscarded._size': 'discarded_movies',
+                'maxFrameShift': 'max_frame_shift',
+                'maxMovieShift': 'max_movie_shift',
+                'rejType': 'rejection_type'
             }
 
             # Filter dictionary and rename keys
             # movie_maxshift = {}
-            rejtype_list = ['By frame', 'By whole movie', 'By frame and movie', 'By frame or movie']
+            rejtype_list = ['by frame', 'by whole movie', 'by frame and movie', 'by frame or movie']
 
             for key in keys_to_retrieve:
                 if key == 'rejType':
@@ -512,15 +512,15 @@ class ProtOSCEM(EMProtocol):
             plt.savefig(shift_hist)
 
             output_movie_maxshift = {
-                'Output_avg_shift': {
+                'output_avg_shift': {
                     'value': round(avg_shift, 1),
                     'unit': 'Å'
                 },
-                'Output_max_shift': {
+                'output_max_shift': {
                     'value': round(max_shift, 1),
                     'unit': 'Å'
                 },
-                'Shift_histogram': shift_hist_name
+                'shift_histogram': shift_hist_name
             }
 
             movie_maxshift.update(output_movie_maxshift)
@@ -894,40 +894,40 @@ class ProtOSCEM(EMProtocol):
         plt.savefig(astigmatism_hist)
 
         CTF_estimation = {
-            'Amplitude_contrast': amplitude_contrast,
-            'Defocus': {
-                'Output_min_defocus': {
+            'amplitude_contrast': amplitude_contrast,
+            'defocus': {
+                'output_min_defocus': {
                     'value': round(min_defocus, 1),
                     'unit': 'Å'
                 },
-                'Output_max_defocus': {
+                'output_max_defocus': {
                     'value': round(max_defocus, 1),
                     'unit': 'Å'
                 },
-                'Output_avg_defocus': {
+                'output_avg_defocus': {
                     'value': round(avg_defocus, 1),
                     'unit': 'Å'
                 },
-                'Defocus_histogram': defocus_hist_name,
-                'Micrograph_examples': join(micro_folder_name, micro_name)
+                'defocus_histogram': defocus_hist_name,
+                'micrograph_examples': join(micro_folder_name, micro_name)
             },
-            'Resolution': {
-                'Output_min_resolution': {
+            'resolution': {
+                'output_min_resolution': {
                     'value': round(min_resolution, 1),
                     'unit': 'Å'
                 },
-                'Output_max_resolution': {
+                'output_max_resolution': {
                     'value': round(max_resolution, 1),
                     'unit': 'Å'
                 },
-                'Output_avg_resolution': {
+                'output_avg_resolution': {
                     'value': round(avg_resolution, 1),
                     'unit': 'Å'
                 },
-                'Resolution_histogram': resolution_hist_name
+                'resolution_histogram': resolution_hist_name
             },
-            'Astigmatism': {
-                'Astigmatism_histogram': astigmatism_hist_name
+            'astigmatism': {
+                'astigmatism_histogram': astigmatism_hist_name
             }
         }
 
@@ -1040,10 +1040,10 @@ class ProtOSCEM(EMProtocol):
         micro_path = join(micro_folder_path, micro_name)
         collage.save(micro_path)
 
-        particles = {"Number_particles": sum(particle_counts),
-                     "Particles_per_micrograph": round(mean_particles_values, 1),
-                     "Particles_histogram": hist_name,
-                     'Particles_mic_examples': join(micro_folder_name, micro_name)
+        particles = {"number_particles": sum(particle_counts),
+                     "particles_per_micrograph": round(mean_particles_values, 1),
+                     "particles_histogram": hist_name,
+                     "micrograph_examples": join(micro_folder_name, micro_name)
                      }
 
         return particles
@@ -1105,8 +1105,8 @@ class ProtOSCEM(EMProtocol):
             collage_filepath = join(output_folder, collage_filename)
             self.create_collage(images, collage_filepath)
 
-        classes_2D = {"Number_classes_2D": classes, "Particles_per_class": particles_list,
-                      "Images_classes_2D": collage_filename}
+        classes_2D = {"number_classes_2D": classes, "particles_per_class": particles_list,
+                      "images_classes_2D": collage_filename}
 
         return classes_2D
 
@@ -1157,30 +1157,30 @@ class ProtOSCEM(EMProtocol):
             size = len(particles)
 
             volume = {
-                'Volume_type': volume_type,
+                'volume_type': volume_type,
                 'number_particles': size,
-                'Orthogonal_slices': {
-                    'Orthogonal_slices_X': join(folder_name, orthogonal_slices_folder, "orthogonal_slices_X.jpg"),
-                    'Orthogonal_slices_Y': join(folder_name, orthogonal_slices_folder, "orthogonal_slices_Y.jpg"),
-                    'Orthogonal_slices_Z': join(folder_name, orthogonal_slices_folder, "orthogonal_slices_Z.jpg")
+                'orthogonal_slices': {
+                    'orthogonal_slices_X': join(folder_name, orthogonal_slices_folder, "orthogonal_slices_X.jpg"),
+                    'orthogonal_slices_Y': join(folder_name, orthogonal_slices_folder, "orthogonal_slices_Y.jpg"),
+                    'orthogonal_slices_Z': join(folder_name, orthogonal_slices_folder, "orthogonal_slices_Z.jpg")
                 },
-                'Isosurface_images': {
+                'isosurface_images': {
                     'Front_view': join(folder_name, isosurface_images_folder, front_view_img),
                     'Side_view': join(folder_name, isosurface_images_folder, side_view_img),
                     'Top_view': join(folder_name, isosurface_images_folder, top_view_img)
                 }}
         else:
             volume = {
-                'Volume_type': volume_type,
-                'Orthogonal_slices': {
-                'Orthogonal_slices_X': join(folder_name, orthogonal_slices_folder, "orthogonal_slices_X.jpg"),
-                'Orthogonal_slices_Y': join(folder_name, orthogonal_slices_folder, "orthogonal_slices_Y.jpg"),
-                'Orthogonal_slices_Z': join(folder_name, orthogonal_slices_folder, "orthogonal_slices_Z.jpg")
-            },
-                'Isosurface_images': {
-                    'Front_view': join(folder_name, isosurface_images_folder, front_view_img),
-                    'Side_view': join(folder_name, isosurface_images_folder, side_view_img),
-                    'Top_view': join(folder_name, isosurface_images_folder, top_view_img)
+                'volume_type': volume_type,
+                'orthogonal_slices': {
+                    'orthogonal_slices_X': join(folder_name, orthogonal_slices_folder, "orthogonal_slices_X.jpg"),
+                    'orthogonal_slices_Y': join(folder_name, orthogonal_slices_folder, "orthogonal_slices_Y.jpg"),
+                    'orthogonal_slices_Z': join(folder_name, orthogonal_slices_folder, "orthogonal_slices_Z.jpg")
+                },
+                'isosurface_images': {
+                    'front_view': join(folder_name, isosurface_images_folder, front_view_img),
+                    'side_view': join(folder_name, isosurface_images_folder, side_view_img),
+                    'top_view': join(folder_name, isosurface_images_folder, top_view_img)
                 }}
 
         return volume
@@ -1285,17 +1285,17 @@ class ProtOSCEM(EMProtocol):
 
                 # Dictionary fill in:
                 volume = {
-                    "Orthogonal_slices": {
-                        "Orthogonal_slices_X": join(classes_3D_folder_name, orthogonal_slices_folder,
+                    "orthogonal_slices": {
+                        "orthogonal_slices_X": join(classes_3D_folder_name, orthogonal_slices_folder,
                                                     "orthogonal_slices_X.jpg"),
-                        "Orthogonal_slices_Y": join(classes_3D_folder_name, orthogonal_slices_folder,
+                        "orthogonal_slices_Y": join(classes_3D_folder_name, orthogonal_slices_folder,
                                                     "orthogonal_slices_Y.jpg"),
-                        "Orthogonal_slices_Z": join(classes_3D_folder_name, orthogonal_slices_folder,
+                        "orthogonal_slices_Z": join(classes_3D_folder_name, orthogonal_slices_folder,
                                                     "orthogonal_slices_Z.jpg")},
-                    'Isosurface_images': {
-                        'Front_view': join(classes_3D_folder_name, isosurface_images_folder, front_view_img),
-                        'Side_view': join(classes_3D_folder_name, isosurface_images_folder, side_view_img),
-                        'Top_view': join(classes_3D_folder_name, isosurface_images_folder, top_view_img)
+                    'isosurface_images': {
+                        'front_view': join(classes_3D_folder_name, isosurface_images_folder, front_view_img),
+                        'dide_view': join(classes_3D_folder_name, isosurface_images_folder, side_view_img),
+                        'top_view': join(classes_3D_folder_name, isosurface_images_folder, top_view_img)
                     }}
                 # Add this volume to the volumes list
                 volumes_list.append(volume)
@@ -1306,9 +1306,9 @@ class ProtOSCEM(EMProtocol):
         collage_filepath = join(classes3D_folder_path, collage_filename)
         self.create_collage(images, collage_filepath)
 
-        classes_3D = {"Number_classes_3D": classes, "Particles_per_class": particles_list,
-                      "Images_classes_3D": join(classes_3D_folder_name, collage_filename),
-                      "Volumes": volumes_list}
+        classes_3D = {"number_classes_3D": classes, "particles_per_class": particles_list,
+                      "images_classes_3D": join(classes_3D_folder_name, collage_filename),
+                      "volumes": volumes_list}
         return classes_3D
 
     def preprocess_data(self, data):
