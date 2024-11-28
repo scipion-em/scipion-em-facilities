@@ -145,14 +145,14 @@ class ProtOSCEM(EMProtocol):
                       label="Polished volume threshold",
                       help='Threshold to obtain isosurface of volume')
 
-        form.addParam('enhancedVolume', params.PointerParam,
-                      label="Enhanced volume",
+        form.addParam('sharpenedVolume', params.PointerParam,
+                      label="Sharpened volume",
                       pointerClass='Volume',
-                      help="Enhanced volume",
+                      help="Sharpened volume",
                       allowsNull=True)
 
-        form.addParam('threshold_enhancedVol', params.IntParam, default=-1,
-                      label="Enhanced volume threshold",
+        form.addParam('threshold_sharpenedVol', params.IntParam, default=-1,
+                      label="Sharpened volume threshold",
                       help='Threshold to obtain isosurface of volume')
 
 
@@ -229,14 +229,14 @@ class ProtOSCEM(EMProtocol):
             volumes.append(final_volume)
             self.processing_json['volumes'] = volumes
 
-        if self.enhancedVolume.get() is not None:
-            ###### ENHANCED VOLUME ######
-            volume_type = 'enhanced volume'
-            folder_name = 'Enhanced_volume'
-            volume = self.enhancedVolume.get()
-            th = int(self.threshold_enhancedVol.get())
-            enhanced_volume = self.volume_generation(volume_type, folder_name, volume, th)
-            volumes.append(enhanced_volume)
+        if self.sharpenedVolume.get() is not None:
+            ###### SHARPENED VOLUME ######
+            volume_type = 'sharpened volume'
+            folder_name = 'Sharpened_volume'
+            volume = self.sharpenedVolume.get()
+            th = int(self.threshold_sharpenedVol.get())
+            sharpened_volume = self.volume_generation(volume_type, folder_name, volume, th)
+            volumes.append(sharpened_volume)
             self.processing_json['volumes'] = volumes
 
         if self.polishedVolume.get() is not None:
