@@ -949,7 +949,8 @@ class ProtOSCEM(EMProtocol):
         for index, item in enumerate(parts.iterItems()):
             micrograph_num = str(item._micId)
             sampling_rate_part = item._samplingRate.get()
-            sampling_rate_ctf = item._ctfModel._xmipp_ctfSamplingRate.get()
+            # sampling_rate_ctf = item._ctfModel._xmipp_ctfSamplingRate.get()
+            sampling_rate_ctf = item._ctfModel._micObj._samplingRate.get()
             scale = sampling_rate_part/sampling_rate_ctf
 
             # coordinates scaled
@@ -1633,4 +1634,4 @@ class ProtOSCEM(EMProtocol):
                 below_fsc = float(y[i])
                 break
         resolution = below_res - ((threshold - below_fsc) / (above_fsc - below_fsc) * (below_res - above_res))
-        return 1 / resolution
+        return round(1 / resolution, 2)
