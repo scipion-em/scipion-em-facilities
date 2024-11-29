@@ -6,4 +6,5 @@ paramiko
 influxdb
 joblib
 networkx
+pandas
 scipion-em-xmipp
