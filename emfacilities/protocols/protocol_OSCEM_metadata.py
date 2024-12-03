@@ -823,15 +823,15 @@ class ProtOSCEM(EMProtocol):
         font = ImageFont.load_default()
         # Draw text on images
         draw1 = ImageDraw.Draw(img1_resized)
-        text1 = f'{min_defocus} A'
+        text1 = f'{round(min_defocus, 1)} A'
         draw1.text((10, 10), text1, fill='#80FF00', font=font)
 
         draw2 = ImageDraw.Draw(img2_resized)
-        text2 = f'{medium_defocus_value} A'
+        text2 = f'{round(medium_defocus_value, 1)} A'
         draw2.text((10, 10), text2, fill='#80FF00', font=font)
 
         draw3 = ImageDraw.Draw(img3_resized)
-        text3 = f'{max_defocus} A'
+        text3 = f'{round(max_defocus, 1)} A'
         draw3.text((10, 10), text3, fill='#80FF00', font=font)
 
         # Define original sizes
@@ -1176,6 +1176,7 @@ class ProtOSCEM(EMProtocol):
                 if half_maps:
                     print(cyanStr('there are half maps'))
                     sampling_rate = volume.getSamplingRate()
+                    print(cyanStr(f'--------------------------------- {sampling_rate}'))
                     args = (f"--half1 {half_maps1}:mrc --half2 {half_maps2}:mrc --sampling {sampling_rate:.3f} "
                             f"-o {self._getTmpPath()}")
                     self.runJob(program_fso, args, env=xmipp3.Plugin.getEnviron())
@@ -1186,9 +1187,9 @@ class ProtOSCEM(EMProtocol):
                     metadata_fso = emlib.MetaData(path_to_fso)
 
 
-                    x = metadata_fso.getColumnValues(emlib.MDL_RESOLUTION_FRC)
-                    y = metadata_fso.getColumnValues(emlib.MDL_RESOLUTION_FREQREAL)
-                    resolution = self.calculateResolution(x,y)
+                    y = metadata_fso.getColumnValues(emlib.MDL_RESOLUTION_FRC)
+                    x = metadata_fso.getColumnValues(emlib.MDL_RESOLUTION_FREQREAL)
+                    resolution = round(sampling_rate / self.calculateResolution(x,y), 2)
                     print(resolution)
                 else:
                     logger.warning(cyanStr("Unable to get the resolution since no half maps were detected."))
@@ -1634,4 +1635,4 @@ class ProtOSCEM(EMProtocol):
                 below_fsc = float(y[i])
                 break
         resolution = below_res - ((threshold - below_fsc) / (above_fsc - below_fsc) * (below_res - above_res))
-        return round(1 / resolution, 2)
+        return 1 / resolution
