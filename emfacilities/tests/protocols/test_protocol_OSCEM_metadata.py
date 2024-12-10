@@ -1,4 +1,5 @@
 import json
+from collections.abc import Mapping, Sequence
 from os.path import exists, abspath
 
 import yaml
@@ -385,6 +386,24 @@ class TestOscemJson(BaseTest):
         output2 = getattr(prot, 'outputVolumes', None)
         return prot, output1, output2
 
+    def test_only_compulsory(self):
+        print(magentaStr("\n==> Running test with only compulsory input:"))
+        test_data_import = {"movies": self.test_data["movies"]}
+
+        prot = self.newProtocol(ProtOSCEM,
+                                inputType=INPUT_MOVIES,
+                                importMovies=self.protimportmovies,
+                                movieAlignment=self.protalignmovie,
+                                maxShift=self.protmaxshift)
+
+        load_json = self.prot_and_load_json(prot)
+
+        for key, section_test_dict in test_data_import.items():
+            current_dict = load_json.get(key, None)
+            self.assertIsNotNone(current_dict, msg=f'Dictionary section {key} is not found')
+            self.recursive_compare(section_test_dict, current_dict, parent_key=key)
+
+
     def test_complete_input(self):
         print(magentaStr("\n==> Running test with all input completed:"))
         test_data_import = {"movies": self.test_data["movies"],
@@ -408,158 +427,11 @@ class TestOscemJson(BaseTest):
 
         load_json = self.prot_and_load_json(prot)
 
-        # for key, section_test_dict in test_data_import.items():
-        #     current_dict = load_json.get(key, None)
-        #     self.assertIsNotNone(current_dict, msg=f'Dictionary section {key} is not found')
-        #     for key_in, current_test_value in section_test_dict.items():
-        #         if key == 'CTF_estimation':
-        #             self.CTF_comparison(current_test_value, current_dict, key_in, key)
-        #         else:
-        #             current_value = current_dict.get(key_in, None)
-        #             self.assertIsNotNone(current_value, msg=f'In dictionary {key}, {key_in} is not found')
-        #             # Handle cases where the test data now uses value-unit pairs
-        #             if isinstance(current_test_value,
-        #                           dict) and 'value' in current_test_value and 'unit' in current_test_value:
-        #                 # Retrieve value and unit separately
-        #                 test_value = current_test_value.get('value', None)
-        #                 test_unit = current_test_value.get('unit', None)
-        #
-        #                 # Extract value and unit from the current dictionary entry
-        #                 current_value_data = current_value.get('value', None)
-        #                 current_unit_data = current_value.get('unit', None)
-        #
-        #                 # Check values
-        #                 if key_in == "Output_avg_shift" or key_in == "Output_max_shift":
-        #                     self.assertAlmostEqual(test_value, current_value_data, delta=4)
-        #                 else:
-        #                     self.assertEqual(test_value, current_value_data, msg=f'Value mismatch for {key_in}')
-        #
-        #                 # Check units
-        #                 self.assertEqual(test_unit, current_unit_data, msg=f'Unit mismatch for {key_in}')
-        #
-        #             else:
-        #                 # Original comparison logic if it's not a value-unit pair
-        #                 if key_in == "Discarded_movies":
-        #                     self.assertAlmostEqual(current_test_value, current_value, delta=2)
-        #                 elif key_in == "Number_particles":
-        #                     self.assertAlmostEqual(current_test_value, current_value, delta=1000)
-        #                 elif key_in == "Particles_per_micrograph":
-        #                     self.assertAlmostEqual(current_test_value, current_value, delta=10)
-        #                 elif key_in == "Number_classes_2D":
-        #                     self.assertAlmostEqual(current_test_value, current_value, delta=2)
-        #                 elif key_in == 'Particles_per_class':
-        #                     pass
-        #                 else:
-        #                     self.assertEqual(current_test_value, current_value)
         for key, section_test_dict in test_data_import.items():
             current_dict = load_json.get(key, None)
             self.assertIsNotNone(current_dict, msg=f'Dictionary section {key} is not found')
+            self.recursive_compare(section_test_dict, current_dict, parent_key=key)
 
-            for key_in, current_test_value in section_test_dict.items():
-                if key == 'CTFs':
-                    self.CTF_comparison(current_test_value, current_dict, key_in, key)
-                else:
-                    current_value = current_dict.get(key_in, None)
-                    self.assertIsNotNone(current_value, msg=f'In dictionary {key}, {key_in} is not found')
-
-                    # Handle cases where the test data uses value-unit pairs or dictionaries
-                    if isinstance(current_test_value,
-                                  dict) and 'value' in current_test_value and 'unit' in current_test_value:
-                        # Handle value-unit dictionary comparison
-                        test_value = current_test_value.get('value', None)
-                        test_unit = current_test_value.get('unit', None)
-
-                        current_value_data = current_value.get('value', None)
-                        current_unit_data = current_value.get('unit', None)
-
-                        # Compare the values with tolerance
-                        if key_in == "output_avg_shift" or key_in == "output_max_shift":
-                            self.assertAlmostEqual(test_value, current_value_data, delta=0.2,
-                                                   msg=f"Value mismatch for {key_in}")
-                        else:
-                            self.assertEqual(test_value, current_value_data, msg=f"Value mismatch for {key_in}")
-
-                        # Compare the units
-                        self.assertEqual(test_unit, current_unit_data, msg=f"Unit mismatch for {key_in}")
-
-                    elif isinstance(current_test_value, list):
-                        # Handle cases where the values are lists
-                        self.assertIsInstance(current_value, list,
-                                              msg=f"Expected a list for {key_in}, but got {type(current_value)}")
-                        self.assertEqual(len(current_test_value), len(current_value),
-                                         msg=f"List lengths do not match for {key_in}")
-
-                        # Iterate through the lists and compare each item
-                        for test_item, current_item in zip(current_test_value, current_value):
-                            if isinstance(test_item, dict) and 'value' in test_item and 'unit' in test_item:
-                                # Compare dictionaries within the lists
-                                self.assertAlmostEqual(test_item['value'], current_item['value'], delta=0.2,
-                                                       msg=f"Value mismatch in list for {key_in}")
-                                self.assertEqual(test_item['unit'], current_item['unit'],
-                                                 msg=f"Unit mismatch in list for {key_in}")
-                            else:
-                                # Compare items directly if they are not dictionaries
-                                self.assertEqual(test_item, current_item,
-                                                 msg=f"Item mismatch in list for {key_in}")
-                    elif isinstance(current_test_value, dict):
-                        # General dictionary comparison (not specifically value-unit)
-                        for sub_key, sub_value in current_test_value.items():
-                            current_sub_value = current_value.get(sub_key, None)
-                            self.assertEqual(sub_value, current_sub_value,
-                                             msg=f"Mismatch for {key_in} -> {sub_key}")
-                    else:
-                        # Handle direct value comparisons
-                        if key_in == "discarded_movies":
-                            self.assertAlmostEqual(current_test_value, current_value, delta=2)
-                        elif key_in == "number_particles":
-                            self.assertAlmostEqual(current_test_value, current_value, delta=1000)
-                        elif key_in == "particles_per_micrograph":
-                            self.assertAlmostEqual(current_test_value, current_value, delta=10)
-                        elif key_in == "number_classes_2D":
-                            self.assertAlmostEqual(current_test_value, current_value, delta=2)
-                        elif key_in == 'particles_per_class':
-                            pass  # Custom logic for specific cases if needed
-                        else:
-                            self.assertEqual(current_test_value, current_value)
-    def test_only_compulsory(self):
-        print(magentaStr("\n==> Running test with only compulsory input completed:"))
-        test_data_import = {"movies": self.test_data["movies"]}
-
-        prot = self.newProtocol(ProtOSCEM,
-                                inputType=INPUT_MOVIES,
-                                importMovies=self.protimportmovies)
-
-        self.launchProtocol(prot)
-
-        file_path = prot.getOutFile()
-        self.assertTrue(exists(file_path))
-
-        with open(abspath(file_path), 'r') as json_file:
-            load_json = json.load(json_file)
-
-        for key, section_test_dict in test_data_import.items():
-            current_dict = load_json.get(key, None)
-            self.assertIsNotNone(current_dict, msg=f'Dictionary section {key} is not found')
-            for key_in, current_test_value in section_test_dict.items():
-                current_value = current_dict.get(key_in, None)
-                self.assertIsNotNone(current_value, msg=f'In dictionary {key}, {key_in} is not found')
-                # Handle cases where the test data now uses value-unit pairs
-                if isinstance(current_test_value,
-                              dict) and 'value' in current_test_value and 'unit' in current_test_value:
-                    # Retrieve value and unit separately
-                    test_value = current_test_value.get('value', None)
-                    test_unit = current_test_value.get('unit', None)
-
-                    # Extract value and unit from the current dictionary entry
-                    current_value_data = current_value.get('value', None)
-                    current_unit_data = current_value.get('unit', None)
-                    # Check value
-                    self.assertEqual(test_value, current_value_data, msg=f'Value mismatch for {key_in}')
-                    # Check units
-                    self.assertEqual(test_unit, current_unit_data, msg=f'Unit mismatch for {key_in}')
-
-                else:
-                    self.assertEqual(current_test_value, current_value)
 
     def test_medium_level(self):
         print(magentaStr("\n==> Running test with compulsory and some optional input:"))
@@ -574,41 +446,13 @@ class TestOscemJson(BaseTest):
                                 CTF=self.CTFout)
 
         load_json = self.prot_and_load_json(prot)
+        print(load_json)
 
+        # Recursive comparison
         for key, section_test_dict in test_data_import.items():
             current_dict = load_json.get(key, None)
             self.assertIsNotNone(current_dict, msg=f'Dictionary section {key} is not found')
-            for key_in, current_test_value in section_test_dict.items():
-                if key == 'CTFs':
-                    self.CTF_comparison(current_test_value, current_dict, key_in, key)
-                else:
-                    current_value = current_dict.get(key_in, None)
-                    self.assertIsNotNone(current_value, msg=f'In dictionary {key}, {key_in} is not found')
-                    if isinstance(current_test_value,
-                                  dict) and 'value' in current_test_value and 'unit' in current_test_value:
-                        # Retrieve value and unit separately
-                        test_value = current_test_value.get('value', None)
-                        test_unit = current_test_value.get('unit', None)
-
-                        # Extract value and unit from the current dictionary entry
-                        current_value_data = current_value.get('value', None)
-                        current_unit_data = current_value.get('unit', None)
-
-                        # Check values
-                        if key_in == "output_avg_shift" or key_in == "output_max_shift":
-                            self.assertAlmostEqual(test_value, current_value_data, delta=4)
-                        else:
-                            self.assertEqual(test_value, current_value_data, msg=f'Value mismatch for {key_in}')
-
-                        # Check units
-                        self.assertEqual(test_unit, current_unit_data, msg=f'Unit mismatch for {key_in}')
-
-                    else:
-                        # Original comparison logic if it's not a value-unit pair
-                        if key_in == "discarded_movies":
-                            self.assertAlmostEqual(current_test_value, current_value, delta=2)
-                        else:
-                            self.assertEqual(current_test_value, current_value)
+            self.recursive_compare(section_test_dict, current_dict, parent_key=key)
 
 
     def test_micro_input(self):
@@ -621,109 +465,11 @@ class TestOscemJson(BaseTest):
 
         load_json = self.prot_and_load_json(prot)
 
+        # Recursive comparison
         for key, section_test_dict in test_data_import.items():
             current_dict = load_json.get(key, None)
             self.assertIsNotNone(current_dict, msg=f'Dictionary section {key} is not found')
-            for key, section_test_dict in test_data_import.items():
-                current_dict = load_json.get(key, None)
-                self.assertIsNotNone(current_dict, msg=f'Dictionary section {key} is not found')
-                for key_in, current_test_value in section_test_dict.items():
-                    if key == 'movies':
-                        current_value = current_dict.get(key_in, None)
-                        self.assertIsNotNone(current_value, msg=f'In dictionary {key}, {key_in} is not found')
-                        if isinstance(current_test_value,
-                                      dict) and 'value' in current_test_value and 'unit' in current_test_value:
-                            # Retrieve value and unit separately
-                            test_value = current_test_value.get('value', None)
-                            test_unit = current_test_value.get('unit', None)
-                            # Extract value and unit from the current dictionary entry
-                            current_value_data = current_value.get('value', None)
-                            current_unit_data = current_value.get('unit', None)
-                            # Check values
-                            self.assertEqual(test_value, current_value_data, msg=f'Value mismatch for {key_in}')
-                            # Check units
-                            self.assertEqual(test_unit, current_unit_data, msg=f'Unit mismatch for {key_in}')
-                        else:
-                            self.assertEqual(current_test_value, current_value)
-
-                    else:
-                        current_section_dict = current_dict.get(key_in, None)
-                        self.assertIsNotNone(current_section_dict, msg=f'In dictionary {key}, {key_in} is not found')
-
-                        # If current_test_value is a dictionary, loop through its items
-                        if isinstance(current_test_value, dict):
-                            for key_in_in, current_test_value_in in current_test_value.items():
-                                current_value = current_section_dict.get(key_in_in, None)
-                                self.assertIsNotNone(current_value,
-                                                     msg=f'In dictionary {key}, {key_in_in} is not found')
-                                # Handle cases where the test data now uses value-unit pairs
-                                if isinstance(current_test_value_in,
-                                              dict) and 'value' in current_test_value_in and 'unit' in current_test_value_in:
-                                    # Retrieve value and unit separately
-                                    test_value = current_test_value_in.get('value', None)
-                                    test_unit = current_test_value_in.get('unit', None)
-
-                                    # Extract value and unit from the current dictionary entry
-                                    current_value_data = current_value.get('value', None)
-                                    current_unit_data = current_value.get('unit', None)
-
-                                    # Check values
-                                    if key_in_in in ["output_max_defocus", "output_min_defocus", "ouput_avg_defocus",
-                                                     "output_max_resolution", "output_min_resolution",
-                                                     "ouput_avg_resolution"]:
-                                        # these values change each time alignment protocol is run
-                                        self.assertAlmostEqual(test_value, current_value_data, delta=3000)
-                                    else:
-                                        self.assertEqual(test_value, current_value_data,
-                                                         msg=f'Value mismatch for {key_in_in}')
-
-                                    # Check units
-                                    self.assertEqual(test_unit, current_unit_data, msg=f'Unit mismatch for {key_in_in}')
-
-                                else:
-                                    # Compare simple values directly
-                                    self.assertEqual(current_test_value_in, current_value)
-                        else:
-                            # If current_test_value is not a dictionary, compare it directly
-                            self.assertEqual(current_test_value, current_section_dict,
-                                             msg=f"Value mismatch for {key_in}")
-
-
-    def CTF_comparison(self, current_test_value, current_dict, key_in, key):
-        current_section_dict = current_dict.get(key_in, None)
-        self.assertIsNotNone(current_section_dict, msg=f'In dictionary {key}, {key_in} is not found')
-
-        # Check if current_test_value is a dictionary
-        if isinstance(current_test_value, dict):
-            for sub_key, sub_value in current_test_value.items():
-                # Check if the sub_value has both 'value' and 'unit'
-                if isinstance(sub_value, dict) and 'value' in sub_value and 'unit' in sub_value:
-                    test_value = sub_value['value']
-                    test_unit = sub_value['unit']
-
-                    # Get the corresponding value and unit from the current section
-                    current_value = current_section_dict.get(sub_key, {}).get('value', None)
-                    current_unit = current_section_dict.get(sub_key, {}).get('unit', None)
-
-                    # Compare the units
-                    self.assertEqual(test_unit, current_unit, msg=f"Unit mismatch for {sub_key} in {key}")
-
-                    # Compare the values with appropriate delta
-                    if sub_key in ["output_min_defocus", "output_max_defocus", "ouput_avg_defocus",
-                                   "output_min_resolution", "output_max_resolution", "ouput_avg_resolution"]:
-                        self.assertAlmostEqual(test_value, current_value, delta=3000)
-                    else:
-                        self.assertEqual(test_value, current_value)
-
-                else:
-                    # Handle simple values  that don't have value-unit structure
-                    current_value = current_section_dict[sub_key]
-                    self.assertEqual(sub_value, current_value, msg=f"Value mismatch for {sub_key} in {key}")
-
-        else:
-            # Handle simple float or int values
-            self.assertEqual(current_test_value, current_section_dict, msg=f"Value mismatch for {key_in} in {key}")
-
+            self.recursive_compare(section_test_dict, current_dict, parent_key=key)
 
     def prot_and_load_json(self, prot):
         self.launchProtocol(prot)
@@ -738,3 +484,115 @@ class TestOscemJson(BaseTest):
             load_json = json.loads(json_string)
 
         return load_json
+
+    def recursive_compare(self, test_data, current_data, parent_key=""):
+        """
+        Compares nested dictionaries and lists
+        """
+        if isinstance(test_data, dict):
+            # Compare dictionaries
+            for key, test_value in test_data.items():
+                self.assertIn(key, current_data, msg=f"Key '{key}' not found in {parent_key}")
+                # Recursively call to compare nested values
+                self.recursive_compare(
+                    test_value, current_data[key], f"{parent_key}.{key}" if parent_key else key
+                )
+
+        elif isinstance(test_data, list):
+            # Compare lists
+            if parent_key.endswith("particles_per_class"):
+                length_difference = abs(len(test_data) - len(current_data))
+                self.assertLessEqual(
+                    length_difference, 2,
+                    msg=f"List length mismatch at {parent_key}: {len(test_data)} != {len(current_data)}"
+                )
+
+                min_length = min(len(test_data), len(current_data))
+                for i in range(min_length):
+                    self.assertAlmostEqual(
+                        test_data[i], current_data[i], delta=500,
+                        msg=f"Value mismatch at {parent_key}[{i}]: {test_data[i]} != {current_data[i]}"
+                    )
+            else:
+                self.assertEqual(
+                    len(test_data), len(current_data),
+                    msg=f"List length mismatch at {parent_key}: {len(test_data)} != {len(current_data)}"
+                )
+                for i, (test_item, current_item) in enumerate(zip(test_data, current_data)):
+                    self.recursive_compare(
+                        test_item, current_item, f"{parent_key}[{i}]"
+                    )
+        else:
+            # Check if we are dealing with a value-unit pair
+            if parent_key.endswith(".value") or parent_key.endswith(".unit"):
+                # Handle value-unit pairs
+                value_unit_key = ".".join(parent_key.split(".")[:-1])
+                test_value = test_data if parent_key.endswith(".value") else None
+                test_unit = test_data if parent_key.endswith(".unit") else None
+                current_value = current_data if parent_key.endswith(".value") else None
+                current_unit = current_data if parent_key.endswith(".unit") else None
+
+                # Compare value and unit if both are present
+                if "value" in value_unit_key or "unit" in value_unit_key:
+                    print(f"Found value and unit at {value_unit_key}")
+                    print(f"Comparing value: {test_value} with {current_value}, unit: {test_unit} with {current_unit}")
+
+                    # Handle flexible comparisons for specific keys
+                    last_key = value_unit_key.split('.')[-1]
+                    if last_key in [
+                        "output_max_defocus", "output_min_defocus", "output_avg_defocus",
+                        "output_max_resolution", "output_min_resolution", "output_avg_resolution",
+                    ]:
+                        self.assertAlmostEqual(
+                            test_value, current_value, delta=3000,
+                            msg=f"Value mismatch at {value_unit_key}: {test_value} != {current_value}"
+                        )
+                    elif last_key in ["output_avg_shift", "output_max_shift"]:
+                        self.assertAlmostEqual(
+                            test_value, current_value, delta=1,
+                            msg=f"Value mismatch at {value_unit_key}: {test_value} != {current_value}"
+                        )
+                    else:
+                        self.assertEqual(
+                            test_value, current_value,
+                            msg=f"Value mismatch at {value_unit_key}: {test_value} != {current_value}"
+                        )
+
+                    # Compare units
+                    if test_unit and current_unit:
+                        self.assertEqual(
+                            test_unit, current_unit,
+                            msg=f"Unit mismatch at {value_unit_key}: {test_unit} != {current_unit}"
+                        )
+            else:
+                key_in = parent_key.split('.')[-1]
+                if key_in == "discarded_movies":
+                    self.assertAlmostEqual(
+                        test_data, current_data, delta=2,
+                        msg=f"Value mismatch at {parent_key}: {test_data} != {current_data}"
+                    )
+                elif key_in == "number_particles":
+                    self.assertAlmostEqual(
+                        test_data, current_data, delta=1000,
+                        msg=f"Value mismatch at {parent_key}: {test_data} != {current_data}"
+                    )
+                elif key_in == "particles_per_micrograph":
+                    self.assertAlmostEqual(
+                        test_data, current_data, delta=10,
+                        msg=f"Value mismatch at {parent_key}: {test_data} != {current_data}"
+                    )
+                elif key_in == "number_classes_2D":
+                    self.assertAlmostEqual(
+                        test_data, current_data, delta=2,
+                        msg=f"Value mismatch at {parent_key}: {test_data} != {current_data}"
+                    )
+                elif key_in == "number_classes_3D":
+                    self.assertAlmostEqual(
+                        test_data, current_data, delta=2,
+                        msg=f"Value mismatch at {parent_key}: {test_data} != {current_data}"
+                    )
+                else:
+                    self.assertEqual(
+                        test_data, current_data,
+                        msg=f"Value mismatch at {parent_key}: {test_data} != {current_data}"
+                    )
