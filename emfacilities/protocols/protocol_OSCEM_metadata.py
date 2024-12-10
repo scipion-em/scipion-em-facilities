@@ -1189,7 +1189,7 @@ class ProtOSCEM(EMProtocol):
 
                     y = metadata_fso.getColumnValues(emlib.MDL_RESOLUTION_FRC)
                     x = metadata_fso.getColumnValues(emlib.MDL_RESOLUTION_FREQREAL)
-                    resolution = round(sampling_rate / self.calculateResolution(x,y), 2)
+                    resolution = round(sampling_rate / self.calculateResolution(x, y), 2)
                     print(resolution)
                 else:
                     logger.warning(cyanStr("Unable to get the resolution since no half maps were detected."))
