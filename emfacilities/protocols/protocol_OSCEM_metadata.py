@@ -31,7 +31,7 @@ INPUT_MICS = 1
 # OUTFILE = 'Processing_metadata.json'
 OUTFILE = 'Processing_metadata.yaml'
 
-# input movies attributes:
+# movies attributes:
 _dosePerFrame = 'outputMovies._acquisition._dosePerFrame'
 _doseInitial = 'outputMovies._acquisition._doseInitial'
 _gainFile = 'outputMovies._gainFile'
@@ -168,59 +168,40 @@ class ProtOSCEM(EMProtocol):
         self.processing_json = {}
 
         if self.inputType.get() == 0:  # movies as input
-            ###### IMPORT MOVIES ######
             import_movies = self.import_movies_generation()
             self.processing_json['movies'] = import_movies
 
-            # if self.movieAlignment.get() is not None:
-            #     ###### MOVIE ALGINMENT ######
-            #     movie_alignment = self.movie_alignment_generation()
-            #     self.processing_json['Movie_alignment'] = movie_alignment
-            #
-            # if self.maxShift.get() is not None:
-            #     ###### MAX SHIFT ######
-            #     max_shift = self.max_shift_generation()
-            #     self.processing_json['Movie_maxshift'] = max_shift
-
         if self.micrographs.get() is not None:
-            ###### MICROGRAPHS ######
             micrographs = self.micrographs_generation()
             self.processing_json['micrographs'] = micrographs
 
         if self.CTF.get() is not None:
-            ###### CTF ######
             CTF = self.CTF_generation()
             self.processing_json['CTFs'] = CTF
 
         if self.particles.get() is not None:
-            ###### PARTICLES ######
             particles = self.particles_generation()
             self.processing_json['coordinates'] = particles
 
         if self.classes2D.get() is not None:
-            ###### CLASSES 2D ######
             classes_2D = self.classes2D_generation()
             self.processing_json['classes2D'] = classes_2D
 
         if self.classes3D.get() is not None:
-            ###### CLASSES 3D ######
             classes_3D = self.classes3D_generation()
             self.processing_json['classes3D'] = classes_3D
 
         volumes = []
         if self.initVolume.get() is not None:
-            ###### INITIAL VOLUME ######
             volume_type = 'initial volume'
             folder_name = 'Initial_volume'
             volume = self.initVolume.get()
             th = int(self.threshold_initVol.get())
             init_volume = self.volume_generation(volume_type, folder_name, volume, th)
             volumes.append(init_volume)
-            # self.processing_json['Initial_volume'] = volume
             self.processing_json['volumes'] = volumes
 
         if self.finalVolume.get() is not None:
-            ###### FINAL VOLUME ######
             volume_type = 'final volume'
             folder_name = 'Final_volume'
             volume = self.finalVolume.get()
@@ -230,7 +211,6 @@ class ProtOSCEM(EMProtocol):
             self.processing_json['volumes'] = volumes
 
         if self.sharpenedVolume.get() is not None:
-            ###### SHARPENED VOLUME ######
             volume_type = 'sharpened volume'
             folder_name = 'Sharpened_volume'
             volume = self.sharpenedVolume.get()
@@ -240,7 +220,6 @@ class ProtOSCEM(EMProtocol):
             self.processing_json['volumes'] = volumes
 
         if self.polishedVolume.get() is not None:
-            ###### POLISHED VOLUME ######
             volume_type = 'polished volume'
             folder_name = 'Polished_volume'
             volume = self.polishedVolume.get()
@@ -298,14 +277,10 @@ class ProtOSCEM(EMProtocol):
                 normalized_data = normalized_data.astype(np.uint8)
 
                 # Apply Histogram Equalization
-                # Convert to PIL Image
                 image = Image.fromarray(normalized_data)
                 image = ImageOps.equalize(image)
 
-                # Save the image as PNG to the specified path
-                # Extract the base filename without extension
                 base_filename = os.path.splitext(os.path.basename(input_movies[key]))[0]
-
                 png_path = os.path.join(extra_folder, f'{base_filename}.jpg')
                 image.save(png_path)
 
@@ -333,8 +308,7 @@ class ProtOSCEM(EMProtocol):
         # Descriptors
         descriptors = []
         if self.movieAlignment.get() is not None:
-            ###### MOVIE ALGINMENT DESCRIPTOR ######
-
+            ###### MOVIE ALIGNMENT DESCRIPTOR ######
             MovieAlignmentProt = self.movieAlignment.get()
             movie_align = {'descriptor_name': MovieAlignmentProt.getClassName()}
 
@@ -432,7 +406,6 @@ class ProtOSCEM(EMProtocol):
                             avg_shift = np.mean([avgXY, avg_shift])
                             max_shift = max(max_shift, max_norm)
 
-                # movie_align.update(output_movie_align)
                 movie_align['output_avg_shift'] = {
                     'value': round(avg_shift, 1),
                     'unit': 'Å'
@@ -442,7 +415,6 @@ class ProtOSCEM(EMProtocol):
                     'unit': 'Å'
                 }
 
-            # Append movie_align to descriptors
             descriptors.append(movie_align)
 
         if self.maxShift.get() is not None:
@@ -463,7 +435,6 @@ class ProtOSCEM(EMProtocol):
             }
 
             # Filter dictionary and rename keys
-            # movie_maxshift = {}
             rejtype_list = ['by frame', 'by whole movie', 'by frame and movie', 'by frame or movie']
 
             for key in keys_to_retrieve:
@@ -490,8 +461,6 @@ class ProtOSCEM(EMProtocol):
                         shiftX = attributes_dict.get('_xmipp_ShiftX')
                         shiftY = attributes_dict.get('_xmipp_ShiftY')
                         norm = np.linalg.norm([shiftX, shiftY], axis=0)
-
-                        # Shift
                         shift_list.append(norm)
 
                         # Max and average shift
@@ -534,214 +503,10 @@ class ProtOSCEM(EMProtocol):
 
             movie_maxshift.update(output_movie_maxshift)
 
-            # Append movie_align to descriptors
             descriptors.append(movie_maxshift)
 
         import_movies['descriptors'] = descriptors
         return import_movies
-
-    # def movie_alignment_generation(self):
-    #     MovieAlignmentProt = self.movieAlignment.get()
-    #     movie_align = {'Method': MovieAlignmentProt.getClassName()}
-    #
-    #     ################################ INPUT #############################################
-    #     input_alignment = MovieAlignmentProt.getObjDict()
-    #     # List of keys to retrieve
-    #     keys_to_retrieve = ['binFactor', 'maxResForCorrelation', 'gainRot', 'gainFlip']
-    #
-    #     # Mapping dictionary for key name changes
-    #     key_mapping = {
-    #         'binFactor': 'Binning_factor',
-    #         'maxResForCorrelation': 'Maximum_resolution_(Å)',
-    #         'gainRot': 'Rotate_gain_reference',
-    #         'gainFlip': 'Flip_gain_reference'
-    #     }
-    #
-    #     # Map values for the schema
-    #     input_movie_align = {}
-    #     for key in keys_to_retrieve:
-    #         if key in input_alignment and input_alignment[key] is not None and input_alignment[key] != 0:
-    #             if key == 'maxResForCorrelation':
-    #                 input_movie_align['Maximum_resolution'] = {
-    #                     'value': input_alignment[key],
-    #                     'unit': 'Å'
-    #                 }
-    #             else:
-    #                 input_movie_align[key_mapping[key]] = input_alignment[key]
-    #
-    #     movie_align.update(input_movie_align)
-    #
-    #     # Dictionary for crop offsets
-    #     crop_offset_mapping = {
-    #         'cropOffsetX': 'Crop_offsetX',
-    #         'cropOffsetY': 'Crop_offsetY',
-    #     }
-    #
-    #     crop_offsets = {}
-    #     for key, mapped_key in crop_offset_mapping.items():
-    #         if key in input_alignment and input_alignment[key] is not None and input_alignment[key] != 0:
-    #             crop_offsets[mapped_key] = {
-    #                 'value': input_alignment[key],
-    #                 'unit': 'pixels'
-    #             }
-    #     if crop_offsets:
-    #         movie_align['Crop_offsets'] = crop_offsets
-    #
-    #
-    #     # Dictionary for crop dimensions
-    #     crop_dim_mapping = {
-    #         'cropDimX': 'Crop_dimsX',
-    #         'cropDimY': 'Crop_dimsY',
-    #     }
-    #     crop_dims = {}
-    #     for key, mapped_key in crop_dim_mapping.items():
-    #         if key in input_alignment and input_alignment[key] is not None and input_alignment[key] != 0:
-    #             crop_dims[mapped_key] = {
-    #                 'value': input_alignment[key],
-    #                 'unit': 'pixels'
-    #             }
-    #     if crop_dims:
-    #         movie_align['Crop_dims'] = crop_dims
-    #
-    #
-    #     # Dictionary for frames aligned
-    #     # if input_alignment['alignFrameN'] != 0:
-    #     keys_to_retrieve = ['alignFrame0', 'alignFrameN']
-    #     key_mapping = {
-    #         'alignFrame0': 'Frame0',
-    #         'alignFrameN': 'FrameN',
-    #     }
-    #     frames_aligned = {key_mapping[key]: input_alignment[key] for key in keys_to_retrieve if
-    #                       key in input_alignment and input_alignment[key] is not None}
-    #
-    #     if frames_aligned['FrameN'] == 0:
-    #         frames_aligned['FrameN'] = self.number_movies
-    #
-    #     movie_align['Frames_aligned'] = frames_aligned
-    #
-    #     ############################### OUTPUT #############################################
-    #     # average and max shift
-    #     for a, output in MovieAlignmentProt.iterOutputAttributes():
-    #         if a == 'outputMovies':
-    #             for index, item in enumerate(output.iterItems()):
-    #                 attributes = item.getAttributes()
-    #                 attributes_dict = dict(attributes)
-    #                 shiftX = attributes_dict.get('_xmipp_ShiftX')
-    #                 shiftY = attributes_dict.get('_xmipp_ShiftY')
-    #                 norm = np.linalg.norm([shiftX, shiftY], axis=0)
-    #
-    #                 # Max and Average shift
-    #                 max_norm = np.max(norm)
-    #                 avgXY = np.mean(norm)
-    #                 if index == 0:
-    #                     avg_shift = avgXY
-    #                     max_shift = max_norm
-    #                 else:
-    #                     avg_shift = np.mean([avgXY, avg_shift])
-    #                     max_shift = max(max_shift, max_norm)
-    #
-    #         # movie_align.update(output_movie_align)
-    #         movie_align['Output_avg_shift'] = {
-    #             'value': round(avg_shift, 1),
-    #             'unit': 'Å'
-    #         }
-    #         movie_align['Output_max_shift'] = {
-    #             'value': round(max_shift, 1),
-    #             'unit': 'Å'
-    #         }
-    #
-    #     return movie_align
-
-    # def max_shift_generation(self):
-    #     MaxShiftProt = self.maxShift.get()
-    #
-    #     ############################### INPUT #############################################
-    #     input_shift = MaxShiftProt.getObjDict()
-    #     # List of keys to retrieve
-    #     keys_to_retrieve = ['outputMoviesDiscarded._size', 'maxFrameShift', 'maxMovieShift', 'rejType']
-    #     # Mapping dictionary for key name changes
-    #     key_mapping = {
-    #         'outputMoviesDiscarded._size': 'Discarded_movies',
-    #         'maxFrameShift': 'Max_frame_shift',
-    #         'maxMovieShift': 'Max_movie_shift',
-    #         'rejType': 'Rejection_type'
-    #     }
-    #
-    #     # Filter dictionary and rename keys
-    #     movie_maxshift = {}
-    #     rejtype_list = ['By frame', 'By whole movie', 'By frame and movie', 'By frame or movie']
-    #
-    #     for key in keys_to_retrieve:
-    #         if key == 'rejType':
-    #             rej_type = rejtype_list[input_shift[key]]
-    #             movie_maxshift[key_mapping[key]] = rej_type
-    #         elif key in input_shift and input_shift[key] is not None and input_shift[key] != 0:
-    #             if key in ['maxFrameShift', 'maxMovieShift']:
-    #                 movie_maxshift[key_mapping[key]] = {
-    #                     'value': input_shift[key],
-    #                     'unit': 'Å'
-    #                 }
-    #             else:
-    #                 movie_maxshift[key_mapping[key]] = input_shift[key]
-    #
-    #
-    #     ############################### OUTPUT #############################################
-    #     # average and max shift
-    #     shift_list = []
-    #     for a, output in MaxShiftProt.iterOutputAttributes():
-    #         if a == 'outputMovies':
-    #             for index, item in enumerate(output.iterItems()):
-    #                 attributes = item.getAttributes()
-    #                 attributes_dict = dict(attributes)
-    #                 shiftX = attributes_dict.get('_xmipp_ShiftX')
-    #                 shiftY = attributes_dict.get('_xmipp_ShiftY')
-    #                 norm = np.linalg.norm([shiftX, shiftY], axis=0)
-    #
-    #                 # Shift
-    #                 shift_list.append(norm)
-    #
-    #                 # Max and average shift
-    #                 max_norm = np.max(norm)
-    #                 avgXY = np.mean(norm)
-    #                 if index == 0:
-    #                     avg_shift = avgXY
-    #                     max_shift = max_norm
-    #                 else:
-    #                     avg_shift = np.mean([avgXY, avg_shift])
-    #                     max_shift = max(max_shift, max_norm)
-    #
-    #     flattened_shift_list = np.hstack(shift_list)
-    #
-    #     # Histogram generation
-    #     # shift
-    #     plt.close('all')
-    #     plt.clf()
-    #     plt.cla()
-    #
-    #
-    #     plt.hist(flattened_shift_list, edgecolor='black')
-    #     plt.xlabel('# Shift (Å)')
-    #     plt.ylabel(hist_ylabel_frames)
-    #     plt.title('Shift histogram')
-    #     shift_hist_name = 'shift_hist.jpg'
-    #     shift_hist = self.hist_path(shift_hist_name)
-    #     plt.savefig(shift_hist)
-    #
-    #     output_movie_maxshift = {
-    #         'Output_avg_shift': {
-    #             'value': round(avg_shift, 1),
-    #             'unit': 'Å'
-    #         },
-    #         'Output_max_shift': {
-    #             'value': round(max_shift, 1),
-    #             'unit': 'Å'
-    #         },
-    #         'Shift_histogram': shift_hist_name
-    #     }
-    #
-    #     movie_maxshift.update(output_movie_maxshift)
-    #
-    #     return movie_maxshift
 
     def micrographs_generation(self):
         mics = self.micrographs.get()
@@ -750,22 +515,21 @@ class ProtOSCEM(EMProtocol):
         micrographs = {
             'number_micrographs': size
         }
-
         return micrographs
 
     def CTF_generation(self):
         CTFs = self.CTF.get()
-        ############################## OUTPUT #############################################
-        CTF_estimation = {}
+
         defocus_list = []
         resolution_list = []
         astigmatism_list = []
+
         # dictionary to show 3 micrographs (minimum defocus, medium defocus, max defocus)
         dict_defocus = {}
 
         for index, item in enumerate(CTFs.iterItems()):
             amplitude_contrast = float(item._micObj._acquisition._amplitudeContrast)
-            # Min, max  and average defocus and resolution
+            # Min, max and average defocus and resolution
             defocus = np.mean([float(item._defocusU), float(item._defocusV)])
             resolution = float(item._resolution)
             astigmatism = float(item._defocusRatio)
@@ -852,7 +616,6 @@ class ProtOSCEM(EMProtocol):
         collage.paste(img2_final, (img1_final.width, 0))
         collage.paste(img3_final, (img1_final.width + img2_final.width, 0))
 
-        # Save the result
         extra_folder = self._getExtraPath()
         micro_folder_name = 'Micro_examples'
         micro_folder_path = join(extra_folder, micro_folder_name)
@@ -939,7 +702,6 @@ class ProtOSCEM(EMProtocol):
                 'astigmatism_histogram': astigmatism_hist_name
             }
         }
-
         return CTF_estimation
 
     def particles_generation(self):
@@ -949,7 +711,6 @@ class ProtOSCEM(EMProtocol):
         for index, item in enumerate(parts.iterItems()):
             micrograph_num = str(item._micId)
             sampling_rate_part = item._samplingRate.get()
-            # sampling_rate_ctf = item._ctfModel._xmipp_ctfSamplingRate.get()
             sampling_rate_ctf = item._ctfModel._micObj._samplingRate.get()
             scale = sampling_rate_part/sampling_rate_ctf
 
@@ -958,12 +719,12 @@ class ProtOSCEM(EMProtocol):
 
             # Key of dictionary is the micrograph ID
             # If the key already exists in the dictionary, increment the count
+            # Otherwise, add the key with an initial count of 1
             if micrograph_num in mic_dict:
                 mic_dict[micrograph_num]['particles_num'] += 1
                 mic_dict[micrograph_num]['coordinates'].append(coordinates_scaled)
 
             else:
-                # Otherwise, add the key with an initial count of 1
                 mic_dict[micrograph_num] = {
                     'particles_num': 1,
                     'coordinates': [coordinates_scaled],
@@ -1023,14 +784,6 @@ class ProtOSCEM(EMProtocol):
                 y = coord[1]
                 draw.ellipse((x - r, y - r, x + r, y + r), fill=(0, 255, 0))
 
-                # Draw number of particles
-                # font = ImageFont.load_default()
-                # # Draw text on images
-                # draw = ImageDraw.Draw(image)
-                # text = str(values['particles_num'])
-                # draw.text((10, 10), text, fill='#80FF00', font=font)
-
-            # Append the image to the list
             images.append(image)
 
         # Create collage
@@ -1110,7 +863,7 @@ class ProtOSCEM(EMProtocol):
             # Creating collage in .jpg with all images ordered in descending order
             images = [Image.open(filename) for filename in img_filenames]
 
-            output_folder = self._getExtraPath()  # Extra path of current protocol
+            output_folder = self._getExtraPath()
             collage_filename = 'classes_2D.jpg'
             collage_filepath = join(output_folder, collage_filename)
             self.create_collage(images, collage_filepath)
@@ -1121,22 +874,16 @@ class ProtOSCEM(EMProtocol):
         return classes_2D
 
     def volume_generation(self, volume_type, folder_name, volume, th):
-        print(f"att: {dir(volume)}")
-        print(f" file name: {volume.getFileName()}")
-        print(f"half maps: {volume.getHalfMaps()}")
+
         if volume_type == 'final volume':
             half_maps = volume.getHalfMaps()
             half_maps1, half_maps2 = half_maps.split(',')
             print(cyanStr(f"halfmap1 : {half_maps1}"))
             print(cyanStr(f"halfmap2 : {half_maps2}"))
 
-
-
         extra_folder = self._getExtraPath()
-        # initial_vol_folder_name = 'Initial_volume'
         folder_path = join(extra_folder, folder_name)
         os.makedirs(folder_path, exist_ok=True)
-        # volume = self.initVolume.get()
         volume_file = volume.getFileName()
 
         # Access to particles.sqlite to obtain particles in volume:
@@ -1158,8 +905,6 @@ class ProtOSCEM(EMProtocol):
         isosurface_images_path = join(folder_path, isosurface_images_folder)
         os.makedirs(isosurface_images_path, exist_ok=True)
 
-        # th = int(self.threshold_initVol.get())
-
         volume_file_abspath = abspath(volume_file)
         front_view_img = 'front_view.jpg'
         side_view_img = 'side_view.jpg'
@@ -1176,7 +921,6 @@ class ProtOSCEM(EMProtocol):
                 if half_maps:
                     print(cyanStr('there are half maps'))
                     sampling_rate = volume.getSamplingRate()
-                    print(cyanStr(f'--------------------------------- {sampling_rate}'))
                     args = (f"--half1 {half_maps1}:mrc --half2 {half_maps2}:mrc --sampling {sampling_rate:.3f} "
                             f"-o {self._getTmpPath()}")
                     self.runJob(program_fso, args, env=xmipp3.Plugin.getEnviron())
@@ -1186,11 +930,9 @@ class ProtOSCEM(EMProtocol):
                     path_to_fso = os.path.join(self._getTmpPath(), 'GlobalFSC.xmd')
                     metadata_fso = emlib.MetaData(path_to_fso)
 
-
                     y = metadata_fso.getColumnValues(emlib.MDL_RESOLUTION_FRC)
                     x = metadata_fso.getColumnValues(emlib.MDL_RESOLUTION_FREQREAL)
                     resolution = round(sampling_rate / self.calculateResolution(x, y), 2)
-                    print(resolution)
                 else:
                     logger.warning(cyanStr("Unable to get the resolution since no half maps were detected."))
             except Exception as e:
@@ -1199,9 +941,7 @@ class ProtOSCEM(EMProtocol):
         else:
             logger.warning(cyanStr('Xmipp3 is not detected: unable to get the resolution'))
 
-
         if os.path.exists(sqlite_particles_file) and resolution:
-
             particles = self._createSetOfParticles()
             particles._mapperPath.set('%s, %s' % (sqlite_particles_file, ''))
             particles.load()
@@ -1272,7 +1012,7 @@ class ProtOSCEM(EMProtocol):
     def classes3D_generation(self):
         classes3D = self.classes3D.get()
 
-        extra_folder = self._getExtraPath()  # Extra path of current protocol
+        extra_folder = self._getExtraPath()
         classes_3D_folder_name = 'Classes_3D'
         classes3D_folder_path = join(extra_folder, classes_3D_folder_name)
         os.makedirs(classes3D_folder_path, exist_ok=True)
@@ -1314,7 +1054,7 @@ class ProtOSCEM(EMProtocol):
                 data = mrc.data
 
                 ############################
-                ########## CLASSES ##########
+                ########## CLASSES #########
                 ############################
 
                 particles = class_3D.getSize()
@@ -1335,7 +1075,6 @@ class ProtOSCEM(EMProtocol):
                 position = (10, 10)
                 draw.text(position, str(particles), fill='#80FF00', font=font)
 
-                # Saving images
                 new_img_filename = splitext(file_name)[0] + '.jpg'
                 image.save(new_img_filename)
                 img_filenames.append(new_img_filename)
@@ -1359,7 +1098,6 @@ class ProtOSCEM(EMProtocol):
                 os.makedirs(isosurface_images_path, exist_ok=True)
 
                 th = int(self.threshold_classes3D.get())
-
                 volume_file_abspath = abspath(file_name_without_suffix)
                 front_view_img = 'front_view.jpg'
                 side_view_img = 'side_view.jpg'
@@ -1381,7 +1119,7 @@ class ProtOSCEM(EMProtocol):
                         'side_view': join(classes_3D_folder_name, isosurface_images_folder, side_view_img),
                         'top_view': join(classes_3D_folder_name, isosurface_images_folder, top_view_img)
                     }}
-                # Add this volume to the volumes list
+
                 volumes_list.append(volume)
 
         # Creating collage in .jpg with all images ordered in descending order
@@ -1422,21 +1160,18 @@ class ProtOSCEM(EMProtocol):
             yaml.dump(preprocessed_data, yaml_file, allow_unicode=True, sort_keys=False, indent=4)
         print(f"YAML data successfully saved to {file_path}")
 
-
         ### JSON TO SEE
         # Now, convert the YAML to JSON and save it as well
         file_path_json = file_path.replace('.yaml', '.json')  # Change extension from .yaml to .json
 
         # Convert the data back to JSON
         with open(file_path, 'r', encoding='utf-8') as yaml_file:
-            yaml_data = yaml.safe_load(yaml_file)  # Load YAML into a Python object
+            yaml_data = yaml.safe_load(yaml_file)
 
         # Save the JSON data to a new file
         with open(file_path_json, 'w', encoding='utf-8') as json_file:
             json.dump(yaml_data, json_file, ensure_ascii=False, indent=4)
         print(f"JSON data successfully saved to {file_path_json}")
-
-
 
 
     def getOutFile(self):
