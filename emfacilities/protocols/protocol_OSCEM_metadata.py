@@ -1217,9 +1217,9 @@ class ProtOSCEM(EMProtocol):
                     'orthogonal_slices_Z': join(folder_name, orthogonal_slices_folder, "orthogonal_slices_Z.jpg")
                 },
                 'isosurface_images': {
-                    'Front_view': join(folder_name, isosurface_images_folder, front_view_img),
-                    'Side_view': join(folder_name, isosurface_images_folder, side_view_img),
-                    'Top_view': join(folder_name, isosurface_images_folder, top_view_img)
+                    'front_view': join(folder_name, isosurface_images_folder, front_view_img),
+                    'side_view': join(folder_name, isosurface_images_folder, side_view_img),
+                    'top_view': join(folder_name, isosurface_images_folder, top_view_img)
                 }}
         elif os.path.exists(sqlite_particles_file):
             particles = self._createSetOfParticles()
@@ -1235,9 +1235,9 @@ class ProtOSCEM(EMProtocol):
                     'orthogonal_slices_Z': join(folder_name, orthogonal_slices_folder, "orthogonal_slices_Z.jpg")
                 },
                 'isosurface_images': {
-                    'Front_view': join(folder_name, isosurface_images_folder, front_view_img),
-                    'Side_view': join(folder_name, isosurface_images_folder, side_view_img),
-                    'Top_view': join(folder_name, isosurface_images_folder, top_view_img)
+                    'front_view': join(folder_name, isosurface_images_folder, front_view_img),
+                    'side_view': join(folder_name, isosurface_images_folder, side_view_img),
+                    'top_view': join(folder_name, isosurface_images_folder, top_view_img)
                 }}
         elif resolution:
             volume = {
@@ -1249,9 +1249,9 @@ class ProtOSCEM(EMProtocol):
                     'orthogonal_slices_Z': join(folder_name, orthogonal_slices_folder, "orthogonal_slices_Z.jpg")
                 },
                 'isosurface_images': {
-                    'Front_view': join(folder_name, isosurface_images_folder, front_view_img),
-                    'Side_view': join(folder_name, isosurface_images_folder, side_view_img),
-                    'Top_view': join(folder_name, isosurface_images_folder, top_view_img)
+                    'front_view': join(folder_name, isosurface_images_folder, front_view_img),
+                    'side_view': join(folder_name, isosurface_images_folder, side_view_img),
+                    'top_view': join(folder_name, isosurface_images_folder, top_view_img)
                 }}
         else:
             volume = {
@@ -1378,7 +1378,7 @@ class ProtOSCEM(EMProtocol):
                                                     "orthogonal_slices_Z.jpg")},
                     'isosurface_images': {
                         'front_view': join(classes_3D_folder_name, isosurface_images_folder, front_view_img),
-                        'dide_view': join(classes_3D_folder_name, isosurface_images_folder, side_view_img),
+                        'side_view': join(classes_3D_folder_name, isosurface_images_folder, side_view_img),
                         'top_view': join(classes_3D_folder_name, isosurface_images_folder, top_view_img)
                     }}
                 # Add this volume to the volumes list
