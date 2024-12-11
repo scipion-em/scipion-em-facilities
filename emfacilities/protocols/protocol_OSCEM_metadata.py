@@ -922,11 +922,11 @@ class ProtOSCEM(EMProtocol):
             },
             'resolution': {
                 'output_min_resolution': {
-                    'value': round(min_resolution, 1),
+                    'value': round(max_resolution, 1), # min resolution defined as the highest
                     'unit': 'Å'
                 },
                 'output_max_resolution': {
-                    'value': round(max_resolution, 1),
+                    'value': round(min_resolution, 1), # max resolution defined as the lowest
                     'unit': 'Å'
                 },
                 'output_avg_resolution': {
