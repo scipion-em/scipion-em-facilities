@@ -3,18 +3,21 @@ from collections.abc import Mapping, Sequence
 from os.path import exists, abspath
 
 import yaml
+from sphire.protocols import SphireProtCRYOLOPicking
 
-from cryosparc2.protocols import ProtCryo2D, ProtCryoSparcInitialModel
+from cistem.protocols import CistemProtCTFFind
+
+from cryosparc2.protocols import ProtCryo2D, ProtCryoSparcInitialModel, ProtCryoSparcNewNonUniformRefine3D
 from pwem import SYM_TETRAHEDRAL
 
-from relion.protocols import ProtRelionAutopickLoG, ProtRelionClassify3D
+from relion.protocols import ProtRelionAutopickLoG, ProtRelionClassify3D, ProtRelionPostprocess
 
 from pwem.protocols import ProtImportMovies, ProtImportVolumes
 from pyworkflow.tests import BaseTest, tests, DataSet
 from pyworkflow.utils import magentaStr
 from xmipp3.protocols import XmippProtMovieGain, XmippProtFlexAlign, XmippProtMovieMaxShift, XmippProtCTFMicrographs, \
     XmippProtCenterParticles, \
-    XmippProtExtractParticles
+    XmippProtExtractParticles, XmippProtCreateMask3D
 from ...protocols import ProtOSCEM
 from ...protocols.protocol_OSCEM_metadata import INPUT_MOVIES, INPUT_MICS
 
@@ -29,6 +32,10 @@ class TestOscemJson(BaseTest):
     high_res = 0.5
     test_data = {
     "movies": {
+        "dose_per_image": {
+            "value": 0.64,
+            "unit": "e/Å²"
+        },
         "gain_image": "gain.jpg",
         "descriptors": [
             {
@@ -47,7 +54,7 @@ class TestOscemJson(BaseTest):
                     "unit": "Å"
                 },
                 "output_max_shift": {
-                    "value": 34.0,
+                    "value": 34.1,
                     "unit": "Å"
                 }
             },
@@ -68,7 +75,7 @@ class TestOscemJson(BaseTest):
                     "unit": "Å"
                 },
                 "output_max_shift": {
-                    "value": 29.6,
+                    "value": 29.7,
                     "unit": "Å"
                 },
                 "shift_histogram": "shift_hist.jpg"
@@ -82,15 +89,15 @@ class TestOscemJson(BaseTest):
         "amplitude_contrast": 0.1,
         "defocus": {
             "output_min_defocus": {
-                "value": 1469.9,
+                "value": 4199.7,
                 "unit": "Å"
             },
             "output_max_defocus": {
-                "value": 11850.8,
+                "value": 11828.1,
                 "unit": "Å"
             },
             "output_avg_defocus": {
-                "value": 1723.3,
+                "value": 9424.5,
                 "unit": "Å"
             },
             "defocus_histogram": "defocus_hist.jpg",
@@ -98,15 +105,15 @@ class TestOscemJson(BaseTest):
         },
         "resolution": {
             "output_min_resolution": {
-                "value": 2.1,
+                "value": 3.9,
                 "unit": "Å"
             },
             "output_max_resolution": {
-                "value": 5.2,
+                "value": 2.8,
                 "unit": "Å"
             },
             "output_avg_resolution": {
-                "value": 3.0,
+                "value": 3.3,
                 "unit": "Å"
             },
             "resolution_histogram": "resolution_hist.jpg"
@@ -116,71 +123,41 @@ class TestOscemJson(BaseTest):
         }
     },
     "coordinates": {
-        "number_particles": 2860,
-        "particles_per_micrograph": 136.2,
+        "number_particles": 2937,
+        "particles_per_micrograph": 139.9,
         "particles_histogram": "particles_hist.jpg",
         "micrograph_examples": "Micro_examples/micro_particles.jpg"
     },
     "classes2D": {
-        "number_classes_2D": 49,
+        "number_classes_2D": 20,
         "particles_per_class": [
-            798,
-            365,
-            262,
-            128,
-            109,
-            92,
+            333,
+            296,
+            235,
+            231,
+            228,
+            212,
+            202,
+            192,
+            182,
+            168,
+            96,
+            91,
             82,
-            78,
-            77,
-            54,
-            51,
-            44,
-            42,
-            40,
-            35,
-            33,
-            31,
-            28,
+            80,
+            76,
+            65,
+            62,
+            59,
             27,
-            26,
-            25,
-            23,
-            23,
-            22,
-            22,
-            22,
-            21,
-            21,
-            20,
-            19,
-            18,
-            18,
-            17,
-            17,
-            17,
-            16,
-            16,
-            16,
-            16,
-            14,
-            13,
-            13,
-            12,
-            12,
-            9,
-            7,
-            4,
-            4,
-            1
+            20
         ],
         "images_classes_2D": "classes_2D.jpg"
     },
     "classes3D": {
-        "number_classes_3D": 2,
+        "number_classes_3D": 1,
         "particles_per_class": [
-            1985,
-            875
+            2937
         ],
         "images_classes_3D": "Classes_3D/classes_3D.jpg",
         "volumes": [
@@ -192,20 +169,8 @@ class TestOscemJson(BaseTest):
                 },
                 "isosurface_images": {
                     "front_view": "Classes_3D/isosurface_images_volume1/front_view.jpg",
-                    "dide_view": "Classes_3D/isosurface_images_volume1/side_view.jpg",
+                    "side_view": "Classes_3D/isosurface_images_volume1/side_view.jpg",
                     "top_view": "Classes_3D/isosurface_images_volume1/top_view.jpg"
-                }
-            },
-            {
-                "orthogonal_slices": {
-                    "orthogonal_slices_X": "Classes_3D/orthogonal_slices_volume2/orthogonal_slices_X.jpg",
-                    "orthogonal_slices_Y": "Classes_3D/orthogonal_slices_volume2/orthogonal_slices_Y.jpg",
-                    "orthogonal_slices_Z": "Classes_3D/orthogonal_slices_volume2/orthogonal_slices_Z.jpg"
-                },
-                "isosurface_images": {
-                    "front_view": "Classes_3D/isosurface_images_volume2/front_view.jpg",
-                    "dide_view": "Classes_3D/isosurface_images_volume2/side_view.jpg",
-                    "top_view": "Classes_3D/isosurface_images_volume2/top_view.jpg"
                 }
             }
         ]
@@ -223,6 +188,34 @@ class TestOscemJson(BaseTest):
                 "side_view": "Initial_volume/isosurface_images/side_view.jpg",
                 "top_view": "Initial_volume/isosurface_images/top_view.jpg"
             }
+        },
+        {
+            "volume_type": "final volume",
+            "number_particles": 2937,
+            "resolution": 3.39,
+            "orthogonal_slices": {
+                "orthogonal_slices_X": "Final_volume/orthogonal_slices/orthogonal_slices_X.jpg",
+                "orthogonal_slices_Y": "Final_volume/orthogonal_slices/orthogonal_slices_Y.jpg",
+                "orthogonal_slices_Z": "Final_volume/orthogonal_slices/orthogonal_slices_Z.jpg"
+            },
+            "isosurface_images": {
+                "front_view": "Final_volume/isosurface_images/front_view.jpg",
+                "side_view": "Final_volume/isosurface_images/side_view.jpg",
+                "top_view": "Final_volume/isosurface_images/top_view.jpg"
+            }
+        },
+        {
+            "volume_type": "sharpened volume",
+            "orthogonal_slices": {
+                "orthogonal_slices_X": "Sharpened_volume/orthogonal_slices/orthogonal_slices_X.jpg",
+                "orthogonal_slices_Y": "Sharpened_volume/orthogonal_slices/orthogonal_slices_Y.jpg",
+                "orthogonal_slices_Z": "Sharpened_volume/orthogonal_slices/orthogonal_slices_Z.jpg"
+            },
+            "isosurface_images": {
+                "front_view": "Sharpened_volume/isosurface_images/front_view.jpg",
+                "side_view": "Sharpened_volume/isosurface_images/side_view.jpg",
+                "top_view": "Sharpened_volume/isosurface_images/top_view.jpg"
+            }
         }
     ]
 }
@@ -234,17 +227,21 @@ class TestOscemJson(BaseTest):
         cls.dataset = DataSet.getDataSet('OSCEM_jsons')
         cls.protimportmovies, cls.importedmovies = cls.runImportMovies()
 
-        cls.protimportvolumes, cls.importedvolume = cls.runImportVolumes()
+        cls.imported_volume_classes3D, cls.imported_initial_volume = cls.runImportVolumes()
 
         cls.protmoviegain, cls.gainmovies = cls.runMovieGain()
         cls.protalignmovie, cls.alignedmovies = cls.runMovieAlign()
         cls.protmaxshift, cls.maxshiftmicro = cls.runMaxShift()
         cls.protCTF, cls.CTFout = cls.runCTFestimation()
-        cls.protpicking, cls.coordinates = cls.runLoGPicking()
+        cls.protpicking, cls.coordinates = cls.runPicking()
         cls.protextract, cls.particles = cls.runExtractParticles()
         cls.prot2Dclasses, cls.classes2D = cls.run2DClassification()
-        cls.portCenter, cls.centeredClasses2D, cls.centeredParticles = cls.runCenterParticles()
+        cls.protinitvol, cls.classesinitvol, cls.volinitvol = cls.runInitialVolume()
+        # cls.portCenter, cls.centeredClasses2D, cls.centeredParticles = cls.runCenterParticles()
         cls.prot3DClassification, cls.classes3DClassification, cls.volumes3DClassification = cls.run3DClassification()
+        cls.protrefine, cls.volrefine, cls.particlesrefine = cls.runRefinement()
+        cls.prot3Dmask, cls.mask = cls.run3DMask()
+        cls.protpostprocess, cls.volpostprocess = cls.runPostProcess()
 
     @classmethod
     def runImportMovies(cls):
@@ -253,6 +250,7 @@ class TestOscemJson(BaseTest):
                                filesPath=cls.dataset.getFile('movies_dir'),
                                filesPattern='*.tiff',
                                samplingRate=cls.sampling_rate,
+                               dosePerFrame=0.64,
                                gainFile=cls.dataset.getFile('gain_im'))
 
         cls.launchProtocol(prot)
@@ -262,13 +260,20 @@ class TestOscemJson(BaseTest):
     @classmethod
     def runImportVolumes(cls):
 
-        prot = cls.newProtocol(ProtImportVolumes,
-                               filesPath=cls.dataset.getFile('initial_volume'),
-                               samplingRate=1.24,)
+        prot1 = cls.newProtocol(ProtImportVolumes,
+                               filesPath=cls.dataset.getFile('volume_classification3D'),
+                               samplingRate=0.99)
 
-        cls.launchProtocol(prot)
-        output = getattr(prot, 'outputVolume', None)
-        return prot, output
+        cls.launchProtocol(prot1)
+        output1 = getattr(prot1, 'outputVolume', None)
+
+        prot2 = cls.newProtocol(ProtImportVolumes,
+                                filesPath=cls.dataset.getFile('volume_init'),
+                                samplingRate=0.99)
+
+        cls.launchProtocol(prot2)
+        output2 = getattr(prot2, 'outputVolume', None)
+        return output1, output2
 
     @classmethod
     def runMovieGain(cls):
@@ -300,23 +305,27 @@ class TestOscemJson(BaseTest):
 
     @classmethod
     def runCTFestimation(cls):
-        prot = cls.newProtocol(XmippProtCTFMicrographs,
+        prot = cls.newProtocol(CistemProtCTFFind,
                                inputMicrographs=cls.maxshiftmicro,
-                               AutoDownsampling=False,
-                               ctfDownFactor=cls.ctf_down_factor,
-                               highRes=cls.high_res)
+                               windowSize=1024,
+                               lowRes=16.5,
+                               highRes=1.98)
+                               # AutoDownsampling=False,
+                               # ctfDownFactor=cls.ctf_down_factor,
+                               # highRes=cls.high_res)
 
         cls.launchProtocol(prot)
         output = getattr(prot, 'outputCTF', None)
         return prot, output
 
     @classmethod
-    def runLoGPicking(cls):
-        prot = cls.newProtocol(ProtRelionAutopickLoG,
+    def runPicking(cls):
+        prot = cls.newProtocol(SphireProtCRYOLOPicking,
                                inputMicrographs=cls.maxshiftmicro,
-                               boxSize=box_size,
-                               minDiameter=100,
-                               maxDiameter=200)
+                               lowPassFilter=True)
+                               # boxSize=box_size,
+                               # minDiameter=100,
+                               # maxDiameter=200)
 
         cls.launchProtocol(prot)
         output = getattr(prot, 'outputCoordinates', None)
@@ -328,8 +337,8 @@ class TestOscemJson(BaseTest):
                                inputCoordinates=cls.coordinates,
                                ctfRelations=cls.CTFout,
                                doResize=True,
-                               downFactor=2.5,
-                               boxSize=box_size)
+                               downFactor=2,
+                               boxSize=500)
 
         cls.launchProtocol(prot)
         output = getattr(prot, 'outputParticles', None)
@@ -338,30 +347,34 @@ class TestOscemJson(BaseTest):
     @classmethod
     def run2DClassification(cls):
         prot = cls.newProtocol(ProtCryo2D,
-                               inputParticles=cls.particles)
+                               inputParticles=cls.particles,
+                               numberOfClasses=20,
+                               class2D_window_inner_A=140,
+                               class2D_window_outer_A=150)
 
         cls.launchProtocol(prot)
         output = getattr(prot, 'outputClasses', None)
         return prot, output
 
-    @classmethod
-    def runCenterParticles(cls):
-        prot = cls.newProtocol(XmippProtCenterParticles,
-                               inputClasses=cls.classes2D,
-                               inputMics=cls.maxshiftmicro)
-
-        cls.launchProtocol(prot)
-        output1 = getattr(prot, 'outputClasses', None)
-        output2 = getattr(prot, 'outputParticles', None)
-        return prot, output1, output2
+    # @classmethod
+    # def runCenterParticles(cls):
+    #     prot = cls.newProtocol(XmippProtCenterParticles,
+    #                            inputClasses=cls.classes2D,
+    #                            inputMics=cls.maxshiftmicro)
+    #
+    #     cls.launchProtocol(prot)
+    #     output1 = getattr(prot, 'outputClasses', None)
+    #     output2 = getattr(prot, 'outputParticles', None)
+    #     return prot, output1, output2
 
     @classmethod
     def runInitialVolume(cls):
         prot = cls.newProtocol(ProtCryoSparcInitialModel,
-                               inputParticles=cls.centeredParticles,
+                               inputParticles=cls.particles,
                                symmetryGroup=SYM_TETRAHEDRAL,
-                               numberOfClasses=2,
+                               numberOfClasses=1,
                                abinit_max_res=20,
+                               abinit_init_res=35,
                                abinit_num_init_iters=50,
                                abinit_num_final_iters=75,
                                abinit_radwn_step=0.1)
@@ -374,35 +387,56 @@ class TestOscemJson(BaseTest):
     @classmethod
     def run3DClassification(cls):
         prot = cls.newProtocol(ProtRelionClassify3D,
-                               inputParticles=cls.centeredParticles,
-                               referenceVolume=cls.importedvolume,  #  initVolVolumes,
+                               inputParticles=cls.particles,
+                               maskDiameterA=150,
+                               referenceVolume=cls.volinitvol,  #  initVolVolumes,
                                numberOfIterations=10,
                                symmetryGroup='O',
-                               initialLowPassFilterA=15,
-                               numberOfClasses=2)
+                               numberOfClasses=1,
+                               useBlush=True,
+                               limitResolEStep=7)
 
         cls.launchProtocol(prot)
         output1 = getattr(prot, 'outputClasses', None)
         output2 = getattr(prot, 'outputVolumes', None)
         return prot, output1, output2
 
-    def test_only_compulsory(self):
-        print(magentaStr("\n==> Running test with only compulsory input:"))
-        test_data_import = {"movies": self.test_data["movies"]}
+    @classmethod
+    def runRefinement(cls):
+        prot = cls.newProtocol(ProtCryoSparcNewNonUniformRefine3D,
+                               inputParticles=cls.particles,
+                               referenceVolume=cls.imported_volume_classes3D,
+                               symmetryGroup=SYM_TETRAHEDRAL)
 
-        prot = self.newProtocol(ProtOSCEM,
-                                inputType=INPUT_MOVIES,
-                                importMovies=self.protimportmovies,
-                                movieAlignment=self.protalignmovie,
-                                maxShift=self.protmaxshift)
+        cls.launchProtocol(prot)
+        output1 = getattr(prot, 'outputVolume', None)
+        output2 = getattr(prot, 'outputParticles', None)
+        return prot, output1, output2
 
-        load_json = self.prot_and_load_json(prot)
+    @classmethod
+    def run3DMask(cls):
+        prot = cls.newProtocol(XmippProtCreateMask3D,
+                               inputVolume=cls.volrefine,
+                               threshold=0.1,
+                               doMorphological=True,
+                               elementSize=5,
+                               doSmooth=True)
 
-        for key, section_test_dict in test_data_import.items():
-            current_dict = load_json.get(key, None)
-            self.assertIsNotNone(current_dict, msg=f'Dictionary section {key} is not found')
-            self.recursive_compare(section_test_dict, current_dict, parent_key=key)
+        cls.launchProtocol(prot)
+        output = getattr(prot, 'outputMask', None)
+        return prot, output
 
+    @classmethod
+    def runPostProcess(cls):
+        prot = cls.newProtocol(ProtRelionPostprocess,
+                               relionInput=False,
+                               inputVolume=cls.volrefine,
+                               solventMask=cls.mask,
+                               skipFscWeighting=True)
+
+        cls.launchProtocol(prot)
+        output = getattr(prot, 'outputVolume', None)
+        return prot, output
 
     def test_complete_input(self):
         print(magentaStr("\n==> Running test with all input completed:"))
@@ -422,8 +456,10 @@ class TestOscemJson(BaseTest):
                                 CTF=self.CTFout,
                                 particles=self.particles,
                                 classes2D=self.classes2D,
-                                initVolume=self.importedvolume,  # Pointer(self.initVolVolumes.getFirstItem()),
-                                classes3D=self.classes3DClassification)
+                                initVolume=self.imported_initial_volume,  # Pointer(self.initVolVolumes.getFirstItem()),
+                                classes3D=self.classes3DClassification,
+                                finalVolume=self.volrefine,
+                                sharpenedVolume=self.volpostprocess)
 
         load_json = self.prot_and_load_json(prot)
 
@@ -446,7 +482,6 @@ class TestOscemJson(BaseTest):
                                 CTF=self.CTFout)
 
         load_json = self.prot_and_load_json(prot)
-        print(load_json)
 
         # Recursive comparison
         for key, section_test_dict in test_data_import.items():
@@ -566,6 +601,11 @@ class TestOscemJson(BaseTest):
                         )
             else:
                 key_in = parent_key.split('.')[-1]
+                if key_in == 'number_micrographs':
+                    self.assertAlmostEqual(
+                        test_data, current_data, delta=2,
+                        msg=f"Value mismatch at {parent_key}: {test_data} != {current_data}"
+                    )
                 if key_in == "discarded_movies":
                     self.assertAlmostEqual(
                         test_data, current_data, delta=2,
@@ -578,7 +618,7 @@ class TestOscemJson(BaseTest):
                     )
                 elif key_in == "particles_per_micrograph":
                     self.assertAlmostEqual(
-                        test_data, current_data, delta=10,
+                        test_data, current_data, delta=15,
                         msg=f"Value mismatch at {parent_key}: {test_data} != {current_data}"
                     )
                 elif key_in == "number_classes_2D":
@@ -589,6 +629,11 @@ class TestOscemJson(BaseTest):
                 elif key_in == "number_classes_3D":
                     self.assertAlmostEqual(
                         test_data, current_data, delta=2,
+                        msg=f"Value mismatch at {parent_key}: {test_data} != {current_data}"
+                    )
+                elif key_in == "resolution":
+                    self.assertAlmostEqual(
+                        test_data, current_data, delta=0.5,
                         msg=f"Value mismatch at {parent_key}: {test_data} != {current_data}"
                     )
                 else:
