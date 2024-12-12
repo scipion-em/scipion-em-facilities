@@ -135,16 +135,6 @@ class ProtOSCEM(EMProtocol):
                       label="Final volume threshold",
                       help='Threshold to obtain isosurface of volume')
 
-        form.addParam('polishedVolume', params.PointerParam,
-                      label="Polished volume",
-                      pointerClass='Volume',
-                      help="Polished volume",
-                      allowsNull=True)
-
-        form.addParam('threshold_polishedVol', params.IntParam, default=-1,
-                      label="Polished volume threshold",
-                      help='Threshold to obtain isosurface of volume')
-
         form.addParam('sharpenedVolume', params.PointerParam,
                       label="Sharpened volume",
                       pointerClass='Volume',
@@ -155,7 +145,15 @@ class ProtOSCEM(EMProtocol):
                       label="Sharpened volume threshold",
                       help='Threshold to obtain isosurface of volume')
 
+        form.addParam('polishedVolume', params.PointerParam,
+                      label="Polished volume",
+                      pointerClass='Volume',
+                      help="Polished volume",
+                      allowsNull=True)
 
+        form.addParam('threshold_polishedVol', params.IntParam, default=-1,
+                      label="Polished volume threshold",
+                      help='Threshold to obtain isosurface of volume')
 
     # -------------------------- INSERT steps functions -----------------------
     def _insertAllSteps(self):
