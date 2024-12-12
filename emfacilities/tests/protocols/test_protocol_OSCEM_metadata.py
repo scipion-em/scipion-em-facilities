@@ -226,9 +226,7 @@ class TestOscemJson(BaseTest):
         tests.setupTestProject(cls)
         cls.dataset = DataSet.getDataSet('OSCEM_jsons')
         cls.protimportmovies, cls.importedmovies = cls.runImportMovies()
-
         cls.imported_volume_classes3D, cls.imported_initial_volume = cls.runImportVolumes()
-
         cls.protmoviegain, cls.gainmovies = cls.runMovieGain()
         cls.protalignmovie, cls.alignedmovies = cls.runMovieAlign()
         cls.protmaxshift, cls.maxshiftmicro = cls.runMaxShift()
@@ -237,7 +235,6 @@ class TestOscemJson(BaseTest):
         cls.protextract, cls.particles = cls.runExtractParticles()
         cls.prot2Dclasses, cls.classes2D = cls.run2DClassification()
         cls.protinitvol, cls.classesinitvol, cls.volinitvol = cls.runInitialVolume()
-        # cls.portCenter, cls.centeredClasses2D, cls.centeredParticles = cls.runCenterParticles()
         cls.prot3DClassification, cls.classes3DClassification, cls.volumes3DClassification = cls.run3DClassification()
         cls.protrefine, cls.volrefine, cls.particlesrefine = cls.runRefinement()
         cls.prot3Dmask, cls.mask = cls.run3DMask()
@@ -310,9 +307,6 @@ class TestOscemJson(BaseTest):
                                windowSize=1024,
                                lowRes=16.5,
                                highRes=1.98)
-                               # AutoDownsampling=False,
-                               # ctfDownFactor=cls.ctf_down_factor,
-                               # highRes=cls.high_res)
 
         cls.launchProtocol(prot)
         output = getattr(prot, 'outputCTF', None)
@@ -323,9 +317,6 @@ class TestOscemJson(BaseTest):
         prot = cls.newProtocol(SphireProtCRYOLOPicking,
                                inputMicrographs=cls.maxshiftmicro,
                                lowPassFilter=True)
-                               # boxSize=box_size,
-                               # minDiameter=100,
-                               # maxDiameter=200)
 
         cls.launchProtocol(prot)
         output = getattr(prot, 'outputCoordinates', None)
@@ -355,17 +346,6 @@ class TestOscemJson(BaseTest):
         cls.launchProtocol(prot)
         output = getattr(prot, 'outputClasses', None)
         return prot, output
-
-    # @classmethod
-    # def runCenterParticles(cls):
-    #     prot = cls.newProtocol(XmippProtCenterParticles,
-    #                            inputClasses=cls.classes2D,
-    #                            inputMics=cls.maxshiftmicro)
-    #
-    #     cls.launchProtocol(prot)
-    #     output1 = getattr(prot, 'outputClasses', None)
-    #     output2 = getattr(prot, 'outputParticles', None)
-    #     return prot, output1, output2
 
     @classmethod
     def runInitialVolume(cls):
