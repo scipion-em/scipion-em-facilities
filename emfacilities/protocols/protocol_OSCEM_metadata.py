@@ -233,7 +233,11 @@ class ProtOSCEM(EMProtocol):
         return []  # no errors
 
     def _summary(self):
-        return []
+        summary = []
+        metadata_file = self.getOutFile()
+        if os.path.exists(metadata_file):
+            summary.append(f'OSCEM metadata file successfully saved at: {metadata_file}')
+        return summary
 
     def _methods(self):
         return []
