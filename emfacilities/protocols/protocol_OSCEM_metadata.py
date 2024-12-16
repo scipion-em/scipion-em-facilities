@@ -157,11 +157,11 @@ class ProtOSCEM(EMProtocol):
 
     # -------------------------- INSERT steps functions -----------------------
     def _insertAllSteps(self):
-        self._insertFunctionStep(self.generateJson)
-        self._insertFunctionStep(self.saveJson)
+        self._insertFunctionStep(self.generateMetadata)
+        self._insertFunctionStep(self.saveMetadataFile)
 
     # -------------------------- STEPS functions ------------------------------
-    def generateJson(self):
+    def generateMetadata(self):
 
         self.processing_json = {}
 
@@ -1150,7 +1150,7 @@ class ProtOSCEM(EMProtocol):
         else:
             return data
 
-    def saveJson(self):
+    def saveMetadataFile(self):
         file_path = self.getOutFile()
         # with open(file_path, 'w', encoding='utf-8') as json_file:
         #     json.dump(self.processing_json, json_file, ensure_ascii=False, indent=4)
