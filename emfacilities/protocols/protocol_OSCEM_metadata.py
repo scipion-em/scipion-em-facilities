@@ -876,7 +876,7 @@ class ProtOSCEM(EMProtocol):
         return classes_2D
 
     def volume_generation(self, volume_type, folder_name, volume, th):
-
+        vol_size = str(volume.getDim())
         if volume_type == 'final volume':
             half_maps = volume.getHalfMaps()
             half_maps1, half_maps2 = half_maps.split(',')
@@ -952,7 +952,11 @@ class ProtOSCEM(EMProtocol):
             volume = {
                 'volume_type': volume_type,
                 'number_particles': size,
-                'resolution': resolution,
+                'resolution': {
+                    'value': resolution,
+                    'unit': 'Å',
+                    },
+                'size': vol_size,
                 'orthogonal_slices': {
                     'orthogonal_slices_X': join(folder_name, orthogonal_slices_folder, "orthogonal_slices_X.jpg"),
                     'orthogonal_slices_Y': join(folder_name, orthogonal_slices_folder, "orthogonal_slices_Y.jpg"),
@@ -971,6 +975,7 @@ class ProtOSCEM(EMProtocol):
             volume = {
                 'volume_type': volume_type,
                 'number_particles': size,
+                'size': vol_size,
                 'orthogonal_slices': {
                     'orthogonal_slices_X': join(folder_name, orthogonal_slices_folder, "orthogonal_slices_X.jpg"),
                     'orthogonal_slices_Y': join(folder_name, orthogonal_slices_folder, "orthogonal_slices_Y.jpg"),
@@ -984,7 +989,11 @@ class ProtOSCEM(EMProtocol):
         elif resolution:
             volume = {
                 'volume_type': volume_type,
-                'resolution': resolution,
+                'resolution': {
+                    'value': resolution,
+                    'unit': 'Å',
+                    },
+                'size': vol_size,
                 'orthogonal_slices': {
                     'orthogonal_slices_X': join(folder_name, orthogonal_slices_folder, "orthogonal_slices_X.jpg"),
                     'orthogonal_slices_Y': join(folder_name, orthogonal_slices_folder, "orthogonal_slices_Y.jpg"),
@@ -998,6 +1007,7 @@ class ProtOSCEM(EMProtocol):
         else:
             volume = {
                 'volume_type': volume_type,
+                'size': vol_size,
                 'orthogonal_slices': {
                     'orthogonal_slices_X': join(folder_name, orthogonal_slices_folder, "orthogonal_slices_X.jpg"),
                     'orthogonal_slices_Y': join(folder_name, orthogonal_slices_folder, "orthogonal_slices_Y.jpg"),
