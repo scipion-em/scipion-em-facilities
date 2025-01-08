@@ -69,11 +69,6 @@ class ProtDataSampler(EMProtocol):
                       label='Sampling proportion',
                       help='What proportion of images need to be output from '
                            'the random sampling (1 means all images and 0 means none).')
-        form.addSection(label='Stream of data timer')
-        form.addParam('delay', params.IntParam, default=10, label="Delay (sec)",
-                      validators=[params.GT(2, "must be larger than 3sec.")],
-                      help="Delay in seconds before checking new output")
-
 
 # --------------------------- INSERT steps functions -------------------------
     def _insertAllSteps(self):
@@ -233,16 +228,8 @@ class ProtDataSampler(EMProtocol):
         self.processedIds.extend(newIds)
         self.sampleIds.extend(sampledIds)
 
-        self.info('From %d new images, %d were random sampled with a proportion of %2f.'
+        self.info('From %d new images, %d were random sampled with a proportion of %.2f'
                   %(len(newIds), len(sampledIds), proportion))
-
-        if not self.isStreamClosed:
-            self.delayRegister()
-
-    def delayRegister(self):
-        delay = self.delay.get()
-        self.info('Sleeping for delay time: %d' %delay)
-        time.sleep(delay)
 
     # ------------------------- UTILS functions --------------------------------
     def _getAllDoneIds(self):
