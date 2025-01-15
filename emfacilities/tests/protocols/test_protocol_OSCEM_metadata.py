@@ -230,7 +230,7 @@ class TestOscemJson(BaseTest):
     def setUpClass(cls):
 
         tests.setupTestProject(cls)
-        cls.dataset = DataSet.getDataSet('OSCEM_jsons')
+        cls.dataset = DataSet.getDataSet('OSCEM_metadata')
         cls.protimportmovies, cls.importedmovies = cls.runImportMovies()
         cls.imported_volume_classes3D, cls.imported_initial_volume = cls.runImportVolumes()
         cls.protmoviegain, cls.gainmovies = cls.runMovieGain()

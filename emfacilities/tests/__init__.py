@@ -1,6 +1,6 @@
 from pyworkflow.tests import DataSet
 
-DataSet(name='OSCEM_jsons', folder='OSCEM_jsons',
+DataSet(name='OSCEM_metadata', folder='OSCEM_metadata',
         files={
             'processing_json': 'processing.json',
             'movies_dir': 'movies',
