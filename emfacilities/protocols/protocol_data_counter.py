@@ -72,9 +72,6 @@ class ProtDataCounter(EMProtocol):
                            'create output set.')
 
         form.addSection(label='Stream of data timer')
-        form.addParam('delay', params.IntParam, default=10, label="Delay (sec)",
-                      validators=[params.GT(2, "must be larger than 3sec.")],
-                      help="Delay in seconds before checking new output")
         form.addParam('boolTimer', params.BooleanParam, default=False,
                       label='Use timer?',
                       help='Select YES if you want to use a timer to close the stream of data once the timer is consumed.\n'
@@ -114,6 +111,7 @@ class ProtDataCounter(EMProtocol):
         self.timerOut = False
         self.timeoutSecs = self.getTimeOutInSeconds(self.timeout.get())
         self.lastTimeCheckTimer = datetime.now() # Timer
+        self.lastRound = False
 
     def _getFirstJoinStepName(self):
         # This function will be used for streaming, to check which is
@@ -134,6 +132,9 @@ class ProtDataCounter(EMProtocol):
 
     def _checkNewInput(self):
         # Check if there are new images to process from the input set
+        if self.finished:
+            return
+
         self.lastCheck = getattr(self, 'lastCheck', datetime.now())
         mTime = datetime.fromtimestamp(os.path.getmtime(self.inputFn))
         self.debug('Last check: %s, modification: %s'
@@ -141,7 +142,7 @@ class ProtDataCounter(EMProtocol):
                         pwutils.prettyTime(mTime)))
         # If the input.sqlite have not changed since our last check,
         # it does not make sense to check for new input data
-        if self.lastCheck > mTime and self.insertedIds:  # If this is empty it is due to a static "continue" action or it is the first round
+        if (self.lastCheck > mTime and self.insertedIds) or self.lastRound:  # If this is empty it is due to a static "continue" action or it is the first round
             return None
 
         inputSet = self._loadInputSet(self.inputFn)
@@ -150,6 +151,8 @@ class ProtDataCounter(EMProtocol):
 
         self.lastCheck = datetime.now()
         self.isStreamClosed = inputSet.isStreamClosed()
+        self.lastRound = self.isStreamClosed
+
         inputSet.close()
 
         outputStep = self._getFirstJoinStep()
@@ -168,6 +171,9 @@ class ProtDataCounter(EMProtocol):
             self.updateSteps()
 
     def _checkNewOutput(self):
+        if self.finished:
+            return
+
         doneListIds, currentOutputSize = self._getAllDoneIds()
         processedIds = copy.deepcopy(self.processedIds)
         newDone = [imageId for imageId in processedIds if imageId not in doneListIds]
@@ -250,15 +256,9 @@ class ProtDataCounter(EMProtocol):
             self.processedIds.append(imageId)
 
         if not self.isStreamClosed:
-            self.delayRegister()
             if self.boolTimer.get():
                 self.info('Using timer:')
                 self.timerStep()
-
-    def delayRegister(self):
-        delay = self.delay.get()
-        self.info('Sleeping for delay time: %d' %delay)
-        time.sleep(delay)
 
     def timerStep(self):
         endTime = self.lastTimeCheckTimer + timedelta(seconds=self.timeoutSecs)
