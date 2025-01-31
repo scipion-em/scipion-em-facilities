@@ -42,6 +42,9 @@ _size = 'outputMovies._size'
 hist_ylabel_mic = 'Frequency of Micrographs'
 hist_ylabel_frames = 'Frequency of frames'
 
+# Help sentence for defining threshold for obtaining isosurface volume
+threshold_help = 'Threshold to obtain isosurface of volume'
+
 class ProtOSCEM(EMProtocol):
     """ This is the class for generating the OSCEM metadata json file from Scipion workflow
     """
@@ -113,7 +116,7 @@ class ProtOSCEM(EMProtocol):
 
         form.addParam('threshold_initVol', params.IntParam, default=-1,
                       label="Initial volume threshold",
-                      help='Threshold to obtain isosurface of volume')
+                      help=threshold_help)
 
         form.addParam('classes3D', params.PointerParam,
                       label="Classes 3D",
@@ -123,7 +126,7 @@ class ProtOSCEM(EMProtocol):
 
         form.addParam('threshold_classes3D', params.IntParam, default=-1,
                       label="3D Classes threshold",
-                      help='Threshold to obtain isosurface of classes 3D')
+                      help=threshold_help)
 
         form.addParam('finalVolume', params.PointerParam,
                       label="Final volume",
@@ -133,7 +136,7 @@ class ProtOSCEM(EMProtocol):
 
         form.addParam('threshold_finalVol', params.IntParam, default=-1,
                       label="Final volume threshold",
-                      help='Threshold to obtain isosurface of volume')
+                      help=threshold_help)
 
         form.addParam('sharpenedVolume', params.PointerParam,
                       label="Sharpened volume",
@@ -143,7 +146,7 @@ class ProtOSCEM(EMProtocol):
 
         form.addParam('threshold_sharpenedVol', params.IntParam, default=-1,
                       label="Sharpened volume threshold",
-                      help='Threshold to obtain isosurface of volume')
+                      help=threshold_help)
 
         form.addParam('polishedVolume', params.PointerParam,
                       label="Polished volume",
@@ -153,7 +156,7 @@ class ProtOSCEM(EMProtocol):
 
         form.addParam('threshold_polishedVol', params.IntParam, default=-1,
                       label="Polished volume threshold",
-                      help='Threshold to obtain isosurface of volume')
+                      help=threshold_help)
 
     # -------------------------- INSERT steps functions -----------------------
     def _insertAllSteps(self):
@@ -1174,16 +1177,16 @@ class ProtOSCEM(EMProtocol):
 
         ### JSON TO SEE
         # Now, convert the YAML to JSON and save it as well
-        file_path_json = file_path.replace('.yaml', '.json')  # Change extension from .yaml to .json
+        # file_path_json = file_path.replace('.yaml', '.json')  # Change extension from .yaml to .json
 
-        # Convert the data back to JSON
-        with open(file_path, 'r', encoding='utf-8') as yaml_file:
-            yaml_data = yaml.safe_load(yaml_file)
+        # # Convert the data back to JSON
+        # with open(file_path, 'r', encoding='utf-8') as yaml_file:
+        #     yaml_data = yaml.safe_load(yaml_file)
 
         # Save the JSON data to a new file
-        with open(file_path_json, 'w', encoding='utf-8') as json_file:
-            json.dump(yaml_data, json_file, ensure_ascii=False, indent=4)
-        print(f"JSON data successfully saved to {file_path_json}")
+        # with open(file_path_json, 'w', encoding='utf-8') as json_file:
+        #     json.dump(yaml_data, json_file, ensure_ascii=False, indent=4)
+        # print(f"JSON data successfully saved to {file_path_json}")
 
 
     def getOutFile(self):
