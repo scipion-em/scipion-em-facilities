@@ -45,6 +45,11 @@ hist_ylabel_frames = 'Frequency of frames'
 # Help sentence for defining threshold for obtaining isosurface volume
 threshold_help = 'Threshold to obtain isosurface of volume'
 
+# orthogonal slices file names
+slices_x = "orthogonal_slices_X.jpg"
+slices_y = "orthogonal_slices_Y.jpg"
+slices_z = "orthogonal_slices_Z.jpg"
+
 class ProtOSCEM(EMProtocol):
     """ This is the class for generating the OSCEM metadata json file from Scipion workflow
     """
@@ -961,9 +966,9 @@ class ProtOSCEM(EMProtocol):
                     },
                 'size': vol_size,
                 'orthogonal_slices': {
-                    'orthogonal_slices_X': join(folder_name, orthogonal_slices_folder, "orthogonal_slices_X.jpg"),
-                    'orthogonal_slices_Y': join(folder_name, orthogonal_slices_folder, "orthogonal_slices_Y.jpg"),
-                    'orthogonal_slices_Z': join(folder_name, orthogonal_slices_folder, "orthogonal_slices_Z.jpg")
+                    'orthogonal_slices_X': join(folder_name, orthogonal_slices_folder, slices_x),
+                    'orthogonal_slices_Y': join(folder_name, orthogonal_slices_folder, slices_y),
+                    'orthogonal_slices_Z': join(folder_name, orthogonal_slices_folder, slices_z)
                 },
                 'isosurface_images': {
                     'front_view': join(folder_name, isosurface_images_folder, front_view_img),
@@ -980,9 +985,9 @@ class ProtOSCEM(EMProtocol):
                 'number_particles': size,
                 'size': vol_size,
                 'orthogonal_slices': {
-                    'orthogonal_slices_X': join(folder_name, orthogonal_slices_folder, "orthogonal_slices_X.jpg"),
-                    'orthogonal_slices_Y': join(folder_name, orthogonal_slices_folder, "orthogonal_slices_Y.jpg"),
-                    'orthogonal_slices_Z': join(folder_name, orthogonal_slices_folder, "orthogonal_slices_Z.jpg")
+                    'orthogonal_slices_X': join(folder_name, orthogonal_slices_folder, slices_x),
+                    'orthogonal_slices_Y': join(folder_name, orthogonal_slices_folder, slices_y),
+                    'orthogonal_slices_Z': join(folder_name, orthogonal_slices_folder, slices_z)
                 },
                 'isosurface_images': {
                     'front_view': join(folder_name, isosurface_images_folder, front_view_img),
@@ -998,9 +1003,9 @@ class ProtOSCEM(EMProtocol):
                     },
                 'size': vol_size,
                 'orthogonal_slices': {
-                    'orthogonal_slices_X': join(folder_name, orthogonal_slices_folder, "orthogonal_slices_X.jpg"),
-                    'orthogonal_slices_Y': join(folder_name, orthogonal_slices_folder, "orthogonal_slices_Y.jpg"),
-                    'orthogonal_slices_Z': join(folder_name, orthogonal_slices_folder, "orthogonal_slices_Z.jpg")
+                    'orthogonal_slices_X': join(folder_name, orthogonal_slices_folder, slices_x),
+                    'orthogonal_slices_Y': join(folder_name, orthogonal_slices_folder, slices_y),
+                    'orthogonal_slices_Z': join(folder_name, orthogonal_slices_folder, slices_z)
                 },
                 'isosurface_images': {
                     'front_view': join(folder_name, isosurface_images_folder, front_view_img),
@@ -1012,9 +1017,9 @@ class ProtOSCEM(EMProtocol):
                 'volume_type': volume_type,
                 'size': vol_size,
                 'orthogonal_slices': {
-                    'orthogonal_slices_X': join(folder_name, orthogonal_slices_folder, "orthogonal_slices_X.jpg"),
-                    'orthogonal_slices_Y': join(folder_name, orthogonal_slices_folder, "orthogonal_slices_Y.jpg"),
-                    'orthogonal_slices_Z': join(folder_name, orthogonal_slices_folder, "orthogonal_slices_Z.jpg")
+                    'orthogonal_slices_X': join(folder_name, orthogonal_slices_folder, slices_x),
+                    'orthogonal_slices_Y': join(folder_name, orthogonal_slices_folder, slices_y),
+                    'orthogonal_slices_Z': join(folder_name, orthogonal_slices_folder, slices_z)
                 },
                 'isosurface_images': {
                     'front_view': join(folder_name, isosurface_images_folder, front_view_img),
@@ -1124,11 +1129,11 @@ class ProtOSCEM(EMProtocol):
                 volume = {
                     "orthogonal_slices": {
                         "orthogonal_slices_X": join(classes_3D_folder_name, orthogonal_slices_folder,
-                                                    "orthogonal_slices_X.jpg"),
+                                                    slices_x),
                         "orthogonal_slices_Y": join(classes_3D_folder_name, orthogonal_slices_folder,
-                                                    "orthogonal_slices_Y.jpg"),
+                                                    slices_y),
                         "orthogonal_slices_Z": join(classes_3D_folder_name, orthogonal_slices_folder,
-                                                    "orthogonal_slices_Z.jpg")},
+                                                    slices_z)},
                     'isosurface_images': {
                         'front_view': join(classes_3D_folder_name, isosurface_images_folder, front_view_img),
                         'side_view': join(classes_3D_folder_name, isosurface_images_folder, side_view_img),
@@ -1221,9 +1226,9 @@ class ProtOSCEM(EMProtocol):
         images_Y = self.slices_to_images(slices_Y)
         images_Z = self.slices_to_images(slices_Z)
 
-        collage_X_path = join(fnRoot, 'orthogonal_slices_X.jpg')
-        collage_Y_path = join(fnRoot, 'orthogonal_slices_Y.jpg')
-        collage_Z_path = join(fnRoot, 'orthogonal_slices_Z.jpg')
+        collage_X_path = join(fnRoot, slices_x)
+        collage_Y_path = join(fnRoot, slices_y)
+        collage_Z_path = join(fnRoot, slices_z)
 
         self.create_collage(images_X, collage_X_path)
         self.create_collage(images_Y, collage_Y_path)
