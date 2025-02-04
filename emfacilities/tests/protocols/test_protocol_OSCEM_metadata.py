@@ -587,12 +587,12 @@ class TestOscemJson(BaseTest):
                         )
             else:
                 key_in = parent_key.split('.')[-1]
-                if key_in == 'number_micrographs':
-                    self.assertAlmostEqual(
-                        test_data, current_data, delta=2,
-                        msg=f"Value mismatch at {parent_key}: {test_data} != {current_data}"
-                    )
-                elif key_in == "discarded_movies":
+                if (
+                    key_in == "number_micrographs"
+                    or key_in == "discarded_movies"
+                    or key_in == "number_classes_2D"
+                    or key_in == "number_classes_3D"
+                ):
                     self.assertAlmostEqual(
                         test_data, current_data, delta=2,
                         msg=f"Value mismatch at {parent_key}: {test_data} != {current_data}"
@@ -605,16 +605,6 @@ class TestOscemJson(BaseTest):
                 elif key_in == "particles_per_micrograph":
                     self.assertAlmostEqual(
                         test_data, current_data, delta=15,
-                        msg=f"Value mismatch at {parent_key}: {test_data} != {current_data}"
-                    )
-                elif key_in == "number_classes_2D":
-                    self.assertAlmostEqual(
-                        test_data, current_data, delta=2,
-                        msg=f"Value mismatch at {parent_key}: {test_data} != {current_data}"
-                    )
-                elif key_in == "number_classes_3D":
-                    self.assertAlmostEqual(
-                        test_data, current_data, delta=2,
                         msg=f"Value mismatch at {parent_key}: {test_data} != {current_data}"
                     )
                 elif key_in == "resolution":
