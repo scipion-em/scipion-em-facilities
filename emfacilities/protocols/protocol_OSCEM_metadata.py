@@ -1262,70 +1262,34 @@ class ProtOSCEM(EMProtocol):
     def readMap(self, fnMap):
         return xmipp3.Image(fnMap)
 
-    def generateChimeraView(self, fnWorkingDir, fnMap, fnView, isMap=True, threshold=0, angX=0, angY=0, angZ=0,
-                            bfactor=False, \
-                            occupancy=False, otherAttribute=[], rainbow=True, legendMin=None, legendMax=None):
+    def generateChimeraView(self, fnWorkingDir, fnMap, fnView, isMap=True, threshold=0, angX=0, angY=0, angZ=0):
+
         maxMemToUse = 60000
         maxVoxelsToOpen = 1500
 
-        chimeraScript = \
-            """
+        chimeraScript = f"""
             windowsize 1300 700
             set bgColor white
+            volume dataCacheSize {maxMemToUse}
+            volume voxelLimitForOpen {maxVoxelsToOpen}
+            volume showPlane false
+            open {fnMap}
             """
 
-        if isMap:
+        if threshold == -1:
             chimeraScript += \
+                """show #1 models
+                volume #1 color #4e9a06
+                lighting soft
                 """
-                volume dataCacheSize %d
-                volume voxelLimitForOpen %d
-                volume showPlane false
-                """ % (maxMemToUse, maxVoxelsToOpen)
-            chimeraScript += \
-                """
-                open %s
-                """ % fnMap
-
-            if threshold == -1:
-                chimeraScript += \
-                    """show #1 models
-                    volume #1 color #4e9a06
-                    lighting soft
-                    """
-            else:
-                chimeraScript += \
-                    """show #1 models
-                    volume #1 level %f
-                    volume #1 color #4e9a06
-                    lighting soft
-                    """ % threshold
-            #  # volume #1 level %f
-            # % threshold
         else:
             chimeraScript += \
-                """hide atoms
-                show cartoons
-                """
-            if bfactor:
-                chimeraScript += "color bfactor\n"
-            if occupancy:
-                chimeraScript += "color byattribute occupancy"
-                if rainbow:
-                    chimeraScript += " palette rainbow\n"
-                if legendMin and legendMax:
-                    chimeraScript += " palette bluered range %s,%s\n" % (legendMin, legendMax)
-                else:
-                    chimeraScript += "\n"
-            if len(otherAttribute) > 0:
-                chimeraScript += "open %s\n" % otherAttribute[0]
-                chimeraScript += "color byattribute %s" % otherAttribute[1]
-                if legendMin and legendMax:
-                    chimeraScript += " palette bluered range %s,%s\n" % (legendMin, legendMax)
-                else:
-                    chimeraScript += "\n"
-            if legendMin and legendMax:
-                chimeraScript += "key blue:%s white: red:%s fontSize 15 size 0.025,0.4 pos 0.01,0.3\n" % (
-                    legendMin, legendMax)
+                """show #1 models
+                volume #1 level %f
+                volume #1 color #4e9a06
+                lighting soft
+                """ % threshold
+
         chimeraScript += \
             """turn x %f
             turn y %f
@@ -1334,6 +1298,7 @@ class ProtOSCEM(EMProtocol):
             save %s
             exit
             """ % (angX, angY, angZ, fnView)
+
         fnTmp = join(fnWorkingDir, "chimeraScript.cxc")
         fh = open(fnTmp, "w")
         fh.write(chimeraScript)
