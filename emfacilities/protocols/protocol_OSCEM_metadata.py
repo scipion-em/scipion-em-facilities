@@ -257,10 +257,10 @@ class ProtOSCEM(EMProtocol):
         # List of keys to retrieve
         # if dosePerFrame has a value, then dose initial is also retrieved
         # Otherwise, none of them are retrieved.
+        keys_to_retrieve = [_dosePerFrame, _doseInitial, _gainFile, _darkFile]
         if input_movies[_dosePerFrame] is None:
             keys_to_retrieve = [_gainFile, _darkFile]
-        else:
-            keys_to_retrieve = [_dosePerFrame, _doseInitial, _gainFile, _darkFile]
+
 
         # Mapping dictionary for key name changes
         key_mapping = {
@@ -270,31 +270,31 @@ class ProtOSCEM(EMProtocol):
             _darkFile: 'dark_image'
         }
 
-        # Filter the dictionary and rename the keys
+        # Saving gain and dark file images
         extra_folder = self._getExtraPath()
         file_keys = [_gainFile, _darkFile]
-        for key in file_keys:
-            if input_movies[key] is not None:
-                with mrcfile.open(input_movies[key], 'r') as mrc:
-                    # Read the data from the MRC file
-                    data = mrc.data
+        valid_file_keys = [key for key in file_keys if input_movies[key] is not None]
+        for key in valid_file_keys:
+            with mrcfile.open(input_movies[key], 'r') as mrc:
+                # Read the data from the MRC file
+                data = mrc.data
 
-                # Normalize the data to 8-bit (0-255) range
-                min_val = np.min(data)
-                max_val = np.max(data)
-                normalized_data = 255 * (data - min_val) / (max_val - min_val)
-                normalized_data = normalized_data.astype(np.uint8)
+            # Normalize the data to 8-bit (0-255) range
+            min_val = np.min(data)
+            max_val = np.max(data)
+            normalized_data = 255 * (data - min_val) / (max_val - min_val)
+            normalized_data = normalized_data.astype(np.uint8)
 
-                # Apply Histogram Equalization
-                image = Image.fromarray(normalized_data)
-                image = ImageOps.equalize(image)
+            # Apply Histogram Equalization
+            image = Image.fromarray(normalized_data)
+            image = ImageOps.equalize(image)
 
-                base_filename = os.path.splitext(os.path.basename(input_movies[key]))[0]
-                png_path = os.path.join(extra_folder, f'{base_filename}.jpg')
-                image.save(png_path)
+            base_filename = os.path.splitext(os.path.basename(input_movies[key]))[0]
+            png_path = os.path.join(extra_folder, f'{base_filename}.jpg')
+            image.save(png_path)
 
-                image_path = os.path.basename(png_path)
-                input_movies[key] = os.path.basename(image_path)
+            image_path = os.path.basename(png_path)
+            input_movies[key] = os.path.basename(image_path)
 
         # Creating the dictionary
         import_movies = {}
