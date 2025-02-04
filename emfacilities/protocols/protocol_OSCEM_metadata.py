@@ -784,7 +784,7 @@ class ProtOSCEM(EMProtocol):
             mrc_normalized = mrc_normalized.astype(np.uint8)
             image = Image.fromarray(mrc_normalized).convert('RGB')
 
-            W_jpg, H_jpg = image.size
+            W_jpg, _ = image.size
             draw = ImageDraw.Draw(image)
             r = W_jpg / 256
 
