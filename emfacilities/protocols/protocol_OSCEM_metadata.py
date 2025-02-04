@@ -28,7 +28,6 @@ with weakImport("xmipp3"):
 
 INPUT_MOVIES = 0
 INPUT_MICS = 1
-# OUTFILE = 'Processing_metadata.json'
 OUTFILE = 'Processing_metadata.yaml'
 
 # movies attributes:
