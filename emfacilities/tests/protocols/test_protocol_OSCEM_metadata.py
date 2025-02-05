@@ -31,199 +31,200 @@ class TestOscemJson(BaseTest):
     ctf_down_factor = 2.0
     high_res = 0.5
     test_data = {
-    "movies": {
-        "dose_per_image": {
-            "value": 0.64,
-            "unit": "e/Å²"
+        "processing":
+            {"movies": {
+            "dose_per_image": {
+                "value": 0.64,
+                "unit": "e/Å²"
+            },
+            "gain_image": "gain.jpg",
+            "descriptors": [
+                {
+                    "descriptor_name": "XmippProtFlexAlign",
+                    "binning_factor": 1.0,
+                    "maximum_resolution": {
+                        "value": 30.0,
+                        "unit": "Å"
+                    },
+                    "frames_aligned": {
+                        "frame0": 1,
+                        "frameN": 30
+                    },
+                    "output_avg_shift": {
+                        "value": 11.8,
+                        "unit": "Å"
+                    },
+                    "output_max_shift": {
+                        "value": 34.1,
+                        "unit": "Å"
+                    }
+                },
+                {
+                    "descriptor_name": "XmippProtMovieMaxShift",
+                    "discarded_movies": 9,
+                    "max_frame_shift": {
+                        "value": 5.0,
+                        "unit": "Å"
+                    },
+                    "max_movie_shift": {
+                        "value": 20.0,
+                        "unit": "Å"
+                    },
+                    "rejection_type": "by frame or movie",
+                    "output_avg_shift": {
+                        "value": 11.8,
+                        "unit": "Å"
+                    },
+                    "output_max_shift": {
+                        "value": 29.7,
+                        "unit": "Å"
+                    },
+                    "shift_histogram": "shift_hist.jpg"
+                }
+            ]
         },
-        "gain_image": "gain.jpg",
-        "descriptors": [
-            {
-                "descriptor_name": "XmippProtFlexAlign",
-                "binning_factor": 1.0,
-                "maximum_resolution": {
-                    "value": 30.0,
-                    "unit": "Å"
+            "micrographs": {
+                "number_micrographs": 21
+            },
+            "CTFs": {
+                "amplitude_contrast": 0.1,
+                "defocus": {
+                    "output_min_defocus": {
+                        "value": 4199.7,
+                        "unit": "Å"
+                    },
+                    "output_max_defocus": {
+                        "value": 11828.1,
+                        "unit": "Å"
+                    },
+                    "output_avg_defocus": {
+                        "value": 9424.5,
+                        "unit": "Å"
+                    },
+                    "defocus_histogram": "defocus_hist.jpg",
+                    "micrograph_examples": "Micro_examples/micro_defocus.jpg"
                 },
-                "frames_aligned": {
-                    "frame0": 1,
-                    "frameN": 30
+                "resolution": {
+                    "output_min_resolution": {
+                        "value": 3.9,
+                        "unit": "Å"
+                    },
+                    "output_max_resolution": {
+                        "value": 2.8,
+                        "unit": "Å"
+                    },
+                    "output_avg_resolution": {
+                        "value": 3.3,
+                        "unit": "Å"
+                    },
+                    "resolution_histogram": "resolution_hist.jpg"
                 },
-                "output_avg_shift": {
-                    "value": 11.8,
-                    "unit": "Å"
-                },
-                "output_max_shift": {
-                    "value": 34.1,
-                    "unit": "Å"
+                "astigmatism": {
+                    "astigmatism_histogram": "astigmatism_hist.jpg"
                 }
             },
-            {
-                "descriptor_name": "XmippProtMovieMaxShift",
-                "discarded_movies": 9,
-                "max_frame_shift": {
-                    "value": 5.0,
-                    "unit": "Å"
+            "coordinates": {
+                "number_particles": 2937,
+                "particles_per_micrograph": 139.9,
+                "particles_histogram": "particles_hist.jpg",
+                "micrograph_examples": "Micro_examples/micro_particles.jpg"
+            },
+            "classes2D": {
+                "number_classes_2D": 20,
+                "particles_per_class": [
+                    333,
+                    296,
+                    235,
+                    231,
+                    228,
+                    212,
+                    202,
+                    192,
+                    182,
+                    168,
+                    96,
+                    91,
+                    82,
+                    80,
+                    76,
+                    65,
+                    62,
+                    59,
+                    27,
+                    20
+                ],
+                "images_classes_2D": "classes_2D.jpg"
+            },
+            "classes3D": {
+                "number_classes_3D": 1,
+                "particles_per_class": [
+                    2937
+                ],
+                "images_classes_3D": "Classes_3D/classes_3D.jpg",
+                "volumes": [
+                    {
+                        "orthogonal_slices": {
+                            "orthogonal_slices_X": "Classes_3D/orthogonal_slices_volume1/orthogonal_slices_X.jpg",
+                            "orthogonal_slices_Y": "Classes_3D/orthogonal_slices_volume1/orthogonal_slices_Y.jpg",
+                            "orthogonal_slices_Z": "Classes_3D/orthogonal_slices_volume1/orthogonal_slices_Z.jpg"
+                        },
+                        "isosurface_images": {
+                            "front_view": "Classes_3D/isosurface_images_volume1/front_view.jpg",
+                            "side_view": "Classes_3D/isosurface_images_volume1/side_view.jpg",
+                            "top_view": "Classes_3D/isosurface_images_volume1/top_view.jpg"
+                        }
+                    }
+                ]
+            },
+            "volumes": [
+                {
+                    "volume_type": "initial volume",
+                    "size": "(250, 250, 250)",
+                    "orthogonal_slices": {
+                        "orthogonal_slices_X": "Initial_volume/orthogonal_slices/orthogonal_slices_X.jpg",
+                        "orthogonal_slices_Y": "Initial_volume/orthogonal_slices/orthogonal_slices_Y.jpg",
+                        "orthogonal_slices_Z": "Initial_volume/orthogonal_slices/orthogonal_slices_Z.jpg"
+                    },
+                    "isosurface_images": {
+                        "front_view": "Initial_volume/isosurface_images/front_view.jpg",
+                        "side_view": "Initial_volume/isosurface_images/side_view.jpg",
+                        "top_view": "Initial_volume/isosurface_images/top_view.jpg"
+                    }
                 },
-                "max_movie_shift": {
-                    "value": 20.0,
-                    "unit": "Å"
+                {
+                    "volume_type": "final volume",
+                    "number_particles": 2937,
+                    "resolution": {
+                        "value": 3.39,
+                        "unit": "Å"
+                    },
+                    "size": "(250, 250, 250)",
+                    "orthogonal_slices": {
+                        "orthogonal_slices_X": "Final_volume/orthogonal_slices/orthogonal_slices_X.jpg",
+                        "orthogonal_slices_Y": "Final_volume/orthogonal_slices/orthogonal_slices_Y.jpg",
+                        "orthogonal_slices_Z": "Final_volume/orthogonal_slices/orthogonal_slices_Z.jpg"
+                    },
+                    "isosurface_images": {
+                        "front_view": "Final_volume/isosurface_images/front_view.jpg",
+                        "side_view": "Final_volume/isosurface_images/side_view.jpg",
+                        "top_view": "Final_volume/isosurface_images/top_view.jpg"
+                    }
                 },
-                "rejection_type": "by frame or movie",
-                "output_avg_shift": {
-                    "value": 11.8,
-                    "unit": "Å"
-                },
-                "output_max_shift": {
-                    "value": 29.7,
-                    "unit": "Å"
-                },
-                "shift_histogram": "shift_hist.jpg"
-            }
-        ]
-    },
-    "micrographs": {
-        "number_micrographs": 21
-    },
-    "CTFs": {
-        "amplitude_contrast": 0.1,
-        "defocus": {
-            "output_min_defocus": {
-                "value": 4199.7,
-                "unit": "Å"
-            },
-            "output_max_defocus": {
-                "value": 11828.1,
-                "unit": "Å"
-            },
-            "output_avg_defocus": {
-                "value": 9424.5,
-                "unit": "Å"
-            },
-            "defocus_histogram": "defocus_hist.jpg",
-            "micrograph_examples": "Micro_examples/micro_defocus.jpg"
-        },
-        "resolution": {
-            "output_min_resolution": {
-                "value": 3.9,
-                "unit": "Å"
-            },
-            "output_max_resolution": {
-                "value": 2.8,
-                "unit": "Å"
-            },
-            "output_avg_resolution": {
-                "value": 3.3,
-                "unit": "Å"
-            },
-            "resolution_histogram": "resolution_hist.jpg"
-        },
-        "astigmatism": {
-            "astigmatism_histogram": "astigmatism_hist.jpg"
-        }
-    },
-    "coordinates": {
-        "number_particles": 2937,
-        "particles_per_micrograph": 139.9,
-        "particles_histogram": "particles_hist.jpg",
-        "micrograph_examples": "Micro_examples/micro_particles.jpg"
-    },
-    "classes2D": {
-        "number_classes_2D": 20,
-        "particles_per_class": [
-            333,
-            296,
-            235,
-            231,
-            228,
-            212,
-            202,
-            192,
-            182,
-            168,
-            96,
-            91,
-            82,
-            80,
-            76,
-            65,
-            62,
-            59,
-            27,
-            20
-        ],
-        "images_classes_2D": "classes_2D.jpg"
-    },
-    "classes3D": {
-        "number_classes_3D": 1,
-        "particles_per_class": [
-            2937
-        ],
-        "images_classes_3D": "Classes_3D/classes_3D.jpg",
-        "volumes": [
-            {
-                "orthogonal_slices": {
-                    "orthogonal_slices_X": "Classes_3D/orthogonal_slices_volume1/orthogonal_slices_X.jpg",
-                    "orthogonal_slices_Y": "Classes_3D/orthogonal_slices_volume1/orthogonal_slices_Y.jpg",
-                    "orthogonal_slices_Z": "Classes_3D/orthogonal_slices_volume1/orthogonal_slices_Z.jpg"
-                },
-                "isosurface_images": {
-                    "front_view": "Classes_3D/isosurface_images_volume1/front_view.jpg",
-                    "side_view": "Classes_3D/isosurface_images_volume1/side_view.jpg",
-                    "top_view": "Classes_3D/isosurface_images_volume1/top_view.jpg"
+                {
+                    "volume_type": "sharpened volume",
+                    "size": "(250, 250, 250)",
+                    "orthogonal_slices": {
+                        "orthogonal_slices_X": "Sharpened_volume/orthogonal_slices/orthogonal_slices_X.jpg",
+                        "orthogonal_slices_Y": "Sharpened_volume/orthogonal_slices/orthogonal_slices_Y.jpg",
+                        "orthogonal_slices_Z": "Sharpened_volume/orthogonal_slices/orthogonal_slices_Z.jpg"
+                    },
+                    "isosurface_images": {
+                        "front_view": "Sharpened_volume/isosurface_images/front_view.jpg",
+                        "side_view": "Sharpened_volume/isosurface_images/side_view.jpg",
+                        "top_view": "Sharpened_volume/isosurface_images/top_view.jpg"
+                    }
                 }
-            }
-        ]
-    },
-    "volumes": [
-        {
-            "volume_type": "initial volume",
-            "size": "(250, 250, 250)",
-            "orthogonal_slices": {
-                "orthogonal_slices_X": "Initial_volume/orthogonal_slices/orthogonal_slices_X.jpg",
-                "orthogonal_slices_Y": "Initial_volume/orthogonal_slices/orthogonal_slices_Y.jpg",
-                "orthogonal_slices_Z": "Initial_volume/orthogonal_slices/orthogonal_slices_Z.jpg"
-            },
-            "isosurface_images": {
-                "front_view": "Initial_volume/isosurface_images/front_view.jpg",
-                "side_view": "Initial_volume/isosurface_images/side_view.jpg",
-                "top_view": "Initial_volume/isosurface_images/top_view.jpg"
-            }
-        },
-        {
-            "volume_type": "final volume",
-            "number_particles": 2937,
-            "resolution": {
-                "value": 3.39,
-                "unit": "Å"
-            },
-            "size": "(250, 250, 250)",
-            "orthogonal_slices": {
-                "orthogonal_slices_X": "Final_volume/orthogonal_slices/orthogonal_slices_X.jpg",
-                "orthogonal_slices_Y": "Final_volume/orthogonal_slices/orthogonal_slices_Y.jpg",
-                "orthogonal_slices_Z": "Final_volume/orthogonal_slices/orthogonal_slices_Z.jpg"
-            },
-            "isosurface_images": {
-                "front_view": "Final_volume/isosurface_images/front_view.jpg",
-                "side_view": "Final_volume/isosurface_images/side_view.jpg",
-                "top_view": "Final_volume/isosurface_images/top_view.jpg"
-            }
-        },
-        {
-            "volume_type": "sharpened volume",
-            "size": "(250, 250, 250)",
-            "orthogonal_slices": {
-                "orthogonal_slices_X": "Sharpened_volume/orthogonal_slices/orthogonal_slices_X.jpg",
-                "orthogonal_slices_Y": "Sharpened_volume/orthogonal_slices/orthogonal_slices_Y.jpg",
-                "orthogonal_slices_Z": "Sharpened_volume/orthogonal_slices/orthogonal_slices_Z.jpg"
-            },
-            "isosurface_images": {
-                "front_view": "Sharpened_volume/isosurface_images/front_view.jpg",
-                "side_view": "Sharpened_volume/isosurface_images/side_view.jpg",
-                "top_view": "Sharpened_volume/isosurface_images/top_view.jpg"
-            }
-        }
-    ]
+            ]}
 }
 
     @classmethod
@@ -426,12 +427,14 @@ class TestOscemJson(BaseTest):
 
     def test_complete_input(self):
         print(magentaStr("\n==> Running test with all input completed:"))
-        test_data_import = {"movies": self.test_data["movies"],
-                            "micrographs": self.test_data["micrographs"],
-                            "CTFs": self.test_data["CTFs"],
-                            "coordinates": self.test_data["coordinates"],
-                            "classes2D": self.test_data["classes2D"],
-                            "volumes": self.test_data["volumes"]}
+        test_data_import = {"processing": {
+                "movies": self.test_data["processing"]["movies"],
+                "micrographs": self.test_data["processing"]["micrographs"],
+                "CTFs": self.test_data["processing"]["CTFs"],
+                "coordinates": self.test_data["processing"]["coordinates"],
+                "classes2D": self.test_data["processing"]["classes2D"],
+                "volumes": self.test_data["processing"]["volumes"]}
+                }
 
         prot = self.newProtocol(ProtOSCEM,
                                 inputType=INPUT_MOVIES,
@@ -457,8 +460,10 @@ class TestOscemJson(BaseTest):
 
     def test_medium_level(self):
         print(magentaStr("\n==> Running test with compulsory and some optional input:"))
-        test_data_import = {"movies": self.test_data["movies"],
-                            "CTFs": self.test_data["CTFs"]}
+        test_data_import = {"processing": {
+                            "movies": self.test_data["processing"]["movies"],
+                            "CTFs": self.test_data["processing"]["CTFs"]}
+                            }
 
         prot = self.newProtocol(ProtOSCEM,
                                 inputType=INPUT_MOVIES,
@@ -478,7 +483,9 @@ class TestOscemJson(BaseTest):
 
     def test_micro_input(self):
         print(magentaStr("\n==> Running test with micrographs as input:"))
-        test_data_import = {"CTFs": self.test_data["CTFs"]}
+        test_data_import = {"processing": {
+                            "CTFs": self.test_data["processing"]["CTFs"]}
+                            }
 
         prot = self.newProtocol(ProtOSCEM,
                                 inputType=INPUT_MICS,

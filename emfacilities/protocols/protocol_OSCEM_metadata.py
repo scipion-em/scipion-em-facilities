@@ -170,31 +170,32 @@ class ProtOSCEM(EMProtocol):
     # -------------------------- STEPS functions ------------------------------
     def generateMetadata(self):
 
-        self.processing_json = {}
+        self.processing_schema = {}
+        self.processing_metadata = {}
 
         if self.inputType.get() == 0:  # movies as input
             import_movies = self.import_movies_generation()
-            self.processing_json['movies'] = import_movies
+            self.processing_metadata['movies'] = import_movies
 
         if self.micrographs.get() is not None:
             micrographs = self.micrographs_generation()
-            self.processing_json['micrographs'] = micrographs
+            self.processing_metadata['micrographs'] = micrographs
 
         if self.CTF.get() is not None:
             CTF = self.CTF_generation()
-            self.processing_json['CTFs'] = CTF
+            self.processing_metadata['CTFs'] = CTF
 
         if self.particles.get() is not None:
             particles = self.particles_generation()
-            self.processing_json['coordinates'] = particles
+            self.processing_metadata['coordinates'] = particles
 
         if self.classes2D.get() is not None:
             classes_2D = self.classes2D_generation()
-            self.processing_json['classes2D'] = classes_2D
+            self.processing_metadata['classes2D'] = classes_2D
 
         if self.classes3D.get() is not None:
             classes_3D = self.classes3D_generation()
-            self.processing_json['classes3D'] = classes_3D
+            self.processing_metadata['classes3D'] = classes_3D
 
         volumes = []
         if self.initVolume.get() is not None:
@@ -204,7 +205,7 @@ class ProtOSCEM(EMProtocol):
             th = int(self.threshold_initVol.get())
             init_volume = self.volume_generation(volume_type, folder_name, volume, th)
             volumes.append(init_volume)
-            self.processing_json['volumes'] = volumes
+            self.processing_metadata['volumes'] = volumes
 
         if self.finalVolume.get() is not None:
             volume_type = 'final volume'
@@ -213,7 +214,7 @@ class ProtOSCEM(EMProtocol):
             th = int(self.threshold_finalVol.get())
             final_volume = self.volume_generation(volume_type, folder_name, volume, th)
             volumes.append(final_volume)
-            self.processing_json['volumes'] = volumes
+            self.processing_metadata['volumes'] = volumes
 
         if self.sharpenedVolume.get() is not None:
             volume_type = 'sharpened volume'
@@ -222,7 +223,7 @@ class ProtOSCEM(EMProtocol):
             th = int(self.threshold_sharpenedVol.get())
             sharpened_volume = self.volume_generation(volume_type, folder_name, volume, th)
             volumes.append(sharpened_volume)
-            self.processing_json['volumes'] = volumes
+            self.processing_metadata['volumes'] = volumes
 
         if self.polishedVolume.get() is not None:
             volume_type = 'polished volume'
@@ -231,9 +232,10 @@ class ProtOSCEM(EMProtocol):
             th = int(self.threshold_polishedVol.get())
             polished_volume = self.volume_generation(volume_type, folder_name, volume, th)
             volumes.append(polished_volume)
-            self.processing_json['volumes'] = volumes
+            self.processing_metadata['volumes'] = volumes
 
-        print(json.dumps(self.processing_json, ensure_ascii=False, indent=4))
+        self.processing_schema['processing'] = self.processing_metadata
+        print(json.dumps(self.processing_schema, ensure_ascii=False, indent=4))
 
     # -------------------------- INFO functions -------------------------------
     def _validate(self):
@@ -1180,7 +1182,7 @@ class ProtOSCEM(EMProtocol):
         #     json.dump(self.processing_json, json_file, ensure_ascii=False, indent=4)
         # print(f"JSON data successfully saved to {file_path}")
         # Save the data in YAML format
-        preprocessed_data = self.preprocess_data(self.processing_json)
+        preprocessed_data = self.preprocess_data(self.processing_schema)
 
         with open(file_path, 'w', encoding='utf-8') as yaml_file:
             yaml.dump(preprocessed_data, yaml_file, allow_unicode=True, sort_keys=False, indent=4)
