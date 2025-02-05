@@ -142,7 +142,7 @@ class ProtDataCounter(EMProtocol):
                         pwutils.prettyTime(mTime)))
         # If the input.sqlite have not changed since our last check,
         # it does not make sense to check for new input data
-        if (self.lastCheck > mTime and self.insertedIds) or self.lastRound:  # If this is empty it is due to a static "continue" action or it is the first round
+        if (self.lastCheck > mTime and self.insertedIds) and not self.lastRound:  # If this is empty it is due to a static "continue" action or it is the first round
             return None
 
         inputSet = self._loadInputSet(self.inputFn)
