@@ -996,7 +996,14 @@ class ProtOSCEM(EMProtocol):
                     }
                 else:
                     input_movie_align[key_mapping[key]] = input_alignment[key]
-
+        print(f"Example 1: {input_movie_align}")
+        input_movie_align2 = {
+            key_mapping[key] if key != 'maxResForCorrelation' else 'maximum_resolution':
+                {'value': input_alignment[key], 'unit': 'Å'} if key == 'maxResForCorrelation' else input_alignment[key]
+            for key in keys_to_retrieve
+            if input_alignment.get(key) not in (None, 0)
+        }
+        print(f"Example 2: {input_movie_align2}")
         movie_align.update(input_movie_align)
 
         # Dictionary for crop offsets
@@ -1160,7 +1167,6 @@ class ProtOSCEM(EMProtocol):
             },
             'shift_histogram': shift_hist_name
         }
-        print(movie_maxshift)
         movie_maxshift.update(output_movie_maxshift)
 
         return movie_maxshift
