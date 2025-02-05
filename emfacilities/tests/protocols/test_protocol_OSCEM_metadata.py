@@ -511,109 +511,135 @@ class TestOscemJson(BaseTest):
         Compares nested dictionaries and lists
         """
         if isinstance(test_data, dict):
-            # Compare dictionaries
-            for key, test_value in test_data.items():
-                self.assertIn(key, current_data, msg=f"Key '{key}' not found in {parent_key}")
-                # Recursively call to compare nested values
-                self.recursive_compare(
-                    test_value, current_data[key], f"{parent_key}.{key}" if parent_key else key
-                )
+            self.compare_dicts(test_data, current_data, parent_key)
 
         elif isinstance(test_data, list):
-            # Compare lists
-            if parent_key.endswith("particles_per_class"):
-                length_difference = abs(len(test_data) - len(current_data))
-                self.assertLessEqual(
-                    length_difference, 2,
-                    msg=f"List length mismatch at {parent_key}: {len(test_data)} != {len(current_data)}"
-                )
+            self.compare_lists(test_data, current_data, parent_key)
 
-                min_length = min(len(test_data), len(current_data))
-                for i in range(min_length):
-                    self.assertAlmostEqual(
-                        test_data[i], current_data[i], delta=500,
-                        msg=f"Value mismatch at {parent_key}[{i}]: {test_data[i]} != {current_data[i]}"
-                    )
-            else:
-                self.assertEqual(
-                    len(test_data), len(current_data),
-                    msg=f"List length mismatch at {parent_key}: {len(test_data)} != {len(current_data)}"
-                )
-                for i, (test_item, current_item) in enumerate(zip(test_data, current_data)):
-                    self.recursive_compare(
-                        test_item, current_item, f"{parent_key}[{i}]"
-                    )
         else:
             # Check if we are dealing with a value-unit pair
             if parent_key.endswith(".value") or parent_key.endswith(".unit"):
-                # Handle value-unit pairs
-                value_unit_key = ".".join(parent_key.split(".")[:-1])
-                test_value = test_data if parent_key.endswith(".value") else None
-                test_unit = test_data if parent_key.endswith(".unit") else None
-                current_value = current_data if parent_key.endswith(".value") else None
-                current_unit = current_data if parent_key.endswith(".unit") else None
+                self.compare_value_unit(test_data, current_data, parent_key)
 
-                # Compare value and unit if both are present
-                if "value" in value_unit_key or "unit" in value_unit_key:
-                    print(f"Found value and unit at {value_unit_key}")
-                    print(f"Comparing value: {test_value} with {current_value}, unit: {test_unit} with {current_unit}")
-
-                    # Handle flexible comparisons for specific keys
-                    last_key = value_unit_key.split('.')[-1]
-                    if last_key in [
-                        "output_max_defocus", "output_min_defocus", "output_avg_defocus",
-                        "output_max_resolution", "output_min_resolution", "output_avg_resolution",
-                    ]:
-                        self.assertAlmostEqual(
-                            test_value, current_value, delta=3000,
-                            msg=f"Value mismatch at {value_unit_key}: {test_value} != {current_value}"
-                        )
-                    elif last_key in ["output_avg_shift", "output_max_shift"]:
-                        self.assertAlmostEqual(
-                            test_value, current_value, delta=1,
-                            msg=f"Value mismatch at {value_unit_key}: {test_value} != {current_value}"
-                        )
-                    else:
-                        self.assertEqual(
-                            test_value, current_value,
-                            msg=f"Value mismatch at {value_unit_key}: {test_value} != {current_value}"
-                        )
-
-                    # Compare units
-                    if test_unit and current_unit:
-                        self.assertEqual(
-                            test_unit, current_unit,
-                            msg=f"Unit mismatch at {value_unit_key}: {test_unit} != {current_unit}"
-                        )
             else:
-                key_in = parent_key.split('.')[-1]
-                if (
-                    key_in == "number_micrographs"
-                    or key_in == "discarded_movies"
-                    or key_in == "number_classes_2D"
-                    or key_in == "number_classes_3D"
-                ):
-                    self.assertAlmostEqual(
-                        test_data, current_data, delta=2,
-                        msg=f"Value mismatch at {parent_key}: {test_data} != {current_data}"
-                    )
-                elif key_in == "number_particles":
-                    self.assertAlmostEqual(
-                        test_data, current_data, delta=1000,
-                        msg=f"Value mismatch at {parent_key}: {test_data} != {current_data}"
-                    )
-                elif key_in == "particles_per_micrograph":
-                    self.assertAlmostEqual(
-                        test_data, current_data, delta=15,
-                        msg=f"Value mismatch at {parent_key}: {test_data} != {current_data}"
-                    )
-                elif key_in == "resolution":
-                    self.assertAlmostEqual(
-                        test_data, current_data, delta=0.5,
-                        msg=f"Value mismatch at {parent_key}: {test_data} != {current_data}"
-                    )
-                else:
-                    self.assertEqual(
-                        test_data, current_data,
-                        msg=f"Value mismatch at {parent_key}: {test_data} != {current_data}"
-                    )
+                self.compare_rest(test_data, current_data, parent_key)
+
+    def compare_dicts(self, test_data, current_data, parent_key):
+        """
+            Compares two lists dictionaries and raises assertion errors if a key is not found in it,
+            then it performs recursive comparison.
+            """
+        for key, test_value in test_data.items():
+            self.assertIn(key, current_data, msg=f"Key '{key}' not found in {parent_key}")
+            # Recursively call to compare nested values
+            self.recursive_compare(
+                test_value, current_data[key], f"{parent_key}.{key}" if parent_key else key
+            )
+
+    def compare_lists(self, test_data, current_data, parent_key):
+        """
+            Compares two lists (test_data and current_data) and raises assertion errors if there are mismatches.
+            If the list ends with 'particles_per_class', it checks that the length difference is <= 2
+            and values match within a delta of 500. Otherwise, it recursively compares the lists element by element.
+            """
+        if parent_key.endswith("particles_per_class"):
+            length_difference = abs(len(test_data) - len(current_data))
+            self.assertLessEqual(
+                length_difference, 2,
+                msg=f"List length mismatch at {parent_key}: {len(test_data)} != {len(current_data)}"
+            )
+
+            min_length = min(len(test_data), len(current_data))
+            for i in range(min_length):
+                self.assertAlmostEqual(
+                    test_data[i], current_data[i], delta=500,
+                    msg=f"Value mismatch at {parent_key}[{i}]: {test_data[i]} != {current_data[i]}"
+                )
+        else:
+            self.assertEqual(
+                len(test_data), len(current_data),
+                msg=f"List length mismatch at {parent_key}: {len(test_data)} != {len(current_data)}"
+            )
+            for i, (test_item, current_item) in enumerate(zip(test_data, current_data)):
+                self.recursive_compare(
+                    test_item, current_item, f"{parent_key}[{i}]"
+                )
+
+    def compare_value_unit(self, test_data, current_data, parent_key):
+        """
+            Compares value-unit pairs (test_data and current_data) and raises assertion errors if there are mismatches.
+            """
+        value_unit_key = ".".join(parent_key.split(".")[:-1])
+        test_value = test_data if parent_key.endswith(".value") else None
+        test_unit = test_data if parent_key.endswith(".unit") else None
+        current_value = current_data if parent_key.endswith(".value") else None
+        current_unit = current_data if parent_key.endswith(".unit") else None
+
+        # Compare value and unit if both are present
+        if "value" in value_unit_key or "unit" in value_unit_key:
+            print(f"Found value and unit at {value_unit_key}")
+            print(f"Comparing value: {test_value} with {current_value}, unit: {test_unit} with {current_unit}")
+
+            # Handle flexible comparisons for specific keys
+            last_key = value_unit_key.split('.')[-1]
+            if last_key in [
+                "output_max_defocus", "output_min_defocus", "output_avg_defocus",
+                "output_max_resolution", "output_min_resolution", "output_avg_resolution",
+            ]:
+                self.assertAlmostEqual(
+                    test_value, current_value, delta=3000,
+                    msg=f"Value mismatch at {value_unit_key}: {test_value} != {current_value}"
+                )
+            elif last_key in ["output_avg_shift", "output_max_shift"]:
+                self.assertAlmostEqual(
+                    test_value, current_value, delta=1,
+                    msg=f"Value mismatch at {value_unit_key}: {test_value} != {current_value}"
+                )
+            else:
+                self.assertEqual(
+                    test_value, current_value,
+                    msg=f"Value mismatch at {value_unit_key}: {test_value} != {current_value}"
+                )
+
+            # Compare units
+            if test_unit and current_unit:
+                self.assertEqual(
+                    test_unit, current_unit,
+                    msg=f"Unit mismatch at {value_unit_key}: {test_unit} != {current_unit}"
+                )
+
+    def compare_rest(self, test_data, current_data, parent_key):
+        """
+            Compares rest of key-values (test_data and current_data) and raises assertion errors if there are mismatches.
+            """
+        key_in = parent_key.split('.')[-1]
+        if (
+                key_in == "number_micrographs"
+                or key_in == "discarded_movies"
+                or key_in == "number_classes_2D"
+                or key_in == "number_classes_3D"
+        ):
+            self.assertAlmostEqual(
+                test_data, current_data, delta=2,
+                msg=f"Value mismatch at {parent_key}: {test_data} != {current_data}"
+            )
+        elif key_in == "number_particles":
+            self.assertAlmostEqual(
+                test_data, current_data, delta=1000,
+                msg=f"Value mismatch at {parent_key}: {test_data} != {current_data}"
+            )
+        elif key_in == "particles_per_micrograph":
+            self.assertAlmostEqual(
+                test_data, current_data, delta=15,
+                msg=f"Value mismatch at {parent_key}: {test_data} != {current_data}"
+            )
+        elif key_in == "resolution":
+            self.assertAlmostEqual(
+                test_data, current_data, delta=0.5,
+                msg=f"Value mismatch at {parent_key}: {test_data} != {current_data}"
+            )
+        else:
+            self.assertEqual(
+                test_data, current_data,
+                msg=f"Value mismatch at {parent_key}: {test_data} != {current_data}"
+            )
