@@ -17,6 +17,7 @@ import json
 import yaml
 import os
 
+from pyworkflow import NEW
 from pyworkflow.utils import weakImport, cyanStr
 
 logger = logging.getLogger(__name__)
@@ -53,6 +54,7 @@ class ProtOSCEM(EMProtocol):
     """ This is the class for generating the OSCEM metadata json file from Scipion workflow
     """
     _label = 'OSCEM Metadata'
+    _devStatus = NEW
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
