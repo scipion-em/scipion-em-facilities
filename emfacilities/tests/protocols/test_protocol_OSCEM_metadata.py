@@ -23,7 +23,7 @@ from ...protocols.protocol_OSCEM_metadata import INPUT_MOVIES, INPUT_MICS
 
 
 box_size = 300
-class TestOscemJson(BaseTest):
+class TestOscemMetadata(BaseTest):
     """
     """
     sampling_rate = 0.495
@@ -450,10 +450,10 @@ class TestOscemJson(BaseTest):
                                 finalVolume=self.volrefine,
                                 sharpenedVolume=self.volpostprocess)
 
-        load_json = self.prot_and_load_json(prot)
+        load_metadata = self.prot_and_load_metadata(prot)
 
         for key, section_test_dict in test_data_import.items():
-            current_dict = load_json.get(key, None)
+            current_dict = load_metadata.get(key, None)
             self.assertIsNotNone(current_dict, msg=f'Dictionary section {key} is not found')
             self.recursive_compare(section_test_dict, current_dict, parent_key=key)
 
@@ -472,11 +472,11 @@ class TestOscemJson(BaseTest):
                                 maxShift=self.protmaxshift,
                                 CTF=self.CTFout)
 
-        load_json = self.prot_and_load_json(prot)
+        load_metadata = self.prot_and_load_metadata(prot)
 
         # Recursive comparison
         for key, section_test_dict in test_data_import.items():
-            current_dict = load_json.get(key, None)
+            current_dict = load_metadata.get(key, None)
             self.assertIsNotNone(current_dict, msg=f'Dictionary section {key} is not found')
             self.recursive_compare(section_test_dict, current_dict, parent_key=key)
 
@@ -491,15 +491,15 @@ class TestOscemJson(BaseTest):
                                 inputType=INPUT_MICS,
                                 CTF=self.CTFout)
 
-        load_json = self.prot_and_load_json(prot)
+        load_metadata = self.prot_and_load_metadata(prot)
 
         # Recursive comparison
         for key, section_test_dict in test_data_import.items():
-            current_dict = load_json.get(key, None)
+            current_dict = load_metadata.get(key, None)
             self.assertIsNotNone(current_dict, msg=f'Dictionary section {key} is not found')
             self.recursive_compare(section_test_dict, current_dict, parent_key=key)
 
-    def prot_and_load_json(self, prot):
+    def prot_and_load_metadata(self, prot):
         self.launchProtocol(prot)
         file_path = prot.getOutFile()
         self.assertTrue(exists(file_path))
@@ -508,10 +508,10 @@ class TestOscemJson(BaseTest):
         # Open the YAML file
         with open(abspath(file_path), 'r', encoding='utf-8') as yaml_file:
             yaml_data = yaml.safe_load(yaml_file)
-            json_string = json.dumps(yaml_data, ensure_ascii=False)
-            load_json = json.loads(json_string)
+            metadata_string = json.dumps(yaml_data, ensure_ascii=False)
+            load_metadata = json.loads(metadata_string)
 
-        return load_json
+        return load_metadata
 
     def recursive_compare(self, test_data, current_data, parent_key=""):
         """
