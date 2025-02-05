@@ -1049,22 +1049,19 @@ class ProtOSCEM(EMProtocol):
         # average and max shift
         for a, output in MovieAlignmentProt.iterOutputAttributes():
             if a == 'outputMovies':
+                avg_shifts = []
+                max_shifts = []
                 for index, item in enumerate(output.iterItems()):
-                    attributes = item.getAttributes()
-                    attributes_dict = dict(attributes)
+                    attributes_dict = dict(item.getAttributes())
                     shiftX = attributes_dict.get('_xmipp_ShiftX')
                     shiftY = attributes_dict.get('_xmipp_ShiftY')
-                    norm = np.linalg.norm([shiftX, shiftY], axis=0)
 
-                    # Max and Average shift
-                    max_norm = np.max(norm)
-                    avgXY = np.mean(norm)
-                    if index == 0:
-                        avg_shift = avgXY
-                        max_shift = max_norm
-                    else:
-                        avg_shift = np.mean([avgXY, avg_shift])
-                        max_shift = max(max_shift, max_norm)
+                    norm = np.linalg.norm([shiftX, shiftY], axis=0)
+                    avg_shifts.append(np.mean(norm))
+                    max_shifts.append(np.max(norm))
+
+                avg_shift = np.mean(avg_shifts)
+                max_shift = max(max_shifts)
 
             movie_align['output_avg_shift'] = {
                 'value': round(avg_shift, 1),
