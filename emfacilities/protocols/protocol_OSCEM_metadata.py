@@ -316,13 +316,17 @@ class ProtOSCEM(EMProtocol):
 
         # Descriptors
         descriptors = []
-        movie_align = self.get_movie_alignment_descriptor()
-        descriptors.append(movie_align)
+        if self.movieAlignment.get() is not None:
+            movie_align = self.get_movie_alignment_descriptor()
+            descriptors.append(movie_align)
 
-        max_shift = self.get_max_shift_descriptor()
-        descriptors.append(max_shift)
+        if self.maxShift.get() is not None:
+            max_shift = self.get_max_shift_descriptor()
+            descriptors.append(max_shift)
 
-        import_movies['descriptors'] = descriptors
+        if descriptors:
+            import_movies['descriptors'] = descriptors
+
         return import_movies
 
     def micrographs_generation(self):
@@ -961,209 +965,207 @@ class ProtOSCEM(EMProtocol):
         return classes_3D
 
     def get_movie_alignment_descriptor(self):
-        '''
+        """
         Function to create the movie alignment descriptor
-        '''
-        if self.movieAlignment.get() is not None:
-            ###### MOVIE ALIGNMENT DESCRIPTOR ######
-            MovieAlignmentProt = self.movieAlignment.get()
-            movie_align = {'descriptor_name': MovieAlignmentProt.getClassName()}
+        """
+        ###### MOVIE ALIGNMENT DESCRIPTOR ######
+        MovieAlignmentProt = self.movieAlignment.get()
+        movie_align = {'descriptor_name': MovieAlignmentProt.getClassName()}
 
-            ################################ INPUT #############################################
-            input_alignment = MovieAlignmentProt.getObjDict()
-            # List of keys to retrieve
-            keys_to_retrieve = ['binFactor', 'maxResForCorrelation', 'gainRot', 'gainFlip']
+        ################################ INPUT #############################################
+        input_alignment = MovieAlignmentProt.getObjDict()
+        # List of keys to retrieve
+        keys_to_retrieve = ['binFactor', 'maxResForCorrelation', 'gainRot', 'gainFlip']
 
-            # Mapping dictionary for key name changes
-            key_mapping = {
-                'binFactor': 'binning_factor',
-                'maxResForCorrelation': 'maximum_resolution_(Å)',
-                'gainRot': 'rotate_gain_reference',
-                'gainFlip': 'flip_gain_reference'
-            }
+        # Mapping dictionary for key name changes
+        key_mapping = {
+            'binFactor': 'binning_factor',
+            'maxResForCorrelation': 'maximum_resolution_(Å)',
+            'gainRot': 'rotate_gain_reference',
+            'gainFlip': 'flip_gain_reference'
+        }
 
-            # Map values for the schema
-            input_movie_align = {}
-            for key in keys_to_retrieve:
-                if key in input_alignment and input_alignment[key] is not None and input_alignment[key] != 0:
-                    if key == 'maxResForCorrelation':
-                        input_movie_align['maximum_resolution'] = {
-                            'value': input_alignment[key],
-                            'unit': 'Å'
-                        }
+        # Map values for the schema
+        input_movie_align = {}
+        for key in keys_to_retrieve:
+            if key in input_alignment and input_alignment[key] is not None and input_alignment[key] != 0:
+                if key == 'maxResForCorrelation':
+                    input_movie_align['maximum_resolution'] = {
+                        'value': input_alignment[key],
+                        'unit': 'Å'
+                    }
+                else:
+                    input_movie_align[key_mapping[key]] = input_alignment[key]
+
+        movie_align.update(input_movie_align)
+
+        # Dictionary for crop offsets
+        crop_offset_mapping = {
+            'cropOffsetX': 'crop_offsetX',
+            'cropOffsetY': 'crop_offsetY',
+        }
+
+        crop_offsets = {}
+        for key, mapped_key in crop_offset_mapping.items():
+            if key in input_alignment and input_alignment[key] is not None and input_alignment[key] != 0:
+                crop_offsets[mapped_key] = {
+                    'value': input_alignment[key],
+                    'unit': 'pixels'
+                }
+        if crop_offsets:
+            movie_align['crop_offsets'] = crop_offsets
+
+        # Dictionary for crop dimensions
+        crop_dim_mapping = {
+            'cropDimX': 'crop_dimsX',
+            'cropDimY': 'crop_dimsY',
+        }
+        crop_dims = {}
+        for key, mapped_key in crop_dim_mapping.items():
+            if key in input_alignment and input_alignment[key] is not None and input_alignment[key] != 0:
+                crop_dims[mapped_key] = {
+                    'value': input_alignment[key],
+                    'unit': 'pixels'
+                }
+        if crop_dims:
+            movie_align['crop_dims'] = crop_dims
+
+        # Dictionary for frames aligned
+        # if input_alignment['alignFrameN'] != 0:
+        keys_to_retrieve = ['alignFrame0', 'alignFrameN']
+        key_mapping = {
+            'alignFrame0': 'frame0',
+            'alignFrameN': 'frameN',
+        }
+        frames_aligned = {key_mapping[key]: input_alignment[key] for key in keys_to_retrieve if
+                          key in input_alignment and input_alignment[key] is not None}
+
+        if frames_aligned['frameN'] == 0:
+            frames_aligned['frameN'] = self.number_movies
+
+        movie_align['frames_aligned'] = frames_aligned
+
+        ############################### OUTPUT #############################################
+        # average and max shift
+        for a, output in MovieAlignmentProt.iterOutputAttributes():
+            if a == 'outputMovies':
+                for index, item in enumerate(output.iterItems()):
+                    attributes = item.getAttributes()
+                    attributes_dict = dict(attributes)
+                    shiftX = attributes_dict.get('_xmipp_ShiftX')
+                    shiftY = attributes_dict.get('_xmipp_ShiftY')
+                    norm = np.linalg.norm([shiftX, shiftY], axis=0)
+
+                    # Max and Average shift
+                    max_norm = np.max(norm)
+                    avgXY = np.mean(norm)
+                    if index == 0:
+                        avg_shift = avgXY
+                        max_shift = max_norm
                     else:
-                        input_movie_align[key_mapping[key]] = input_alignment[key]
+                        avg_shift = np.mean([avgXY, avg_shift])
+                        max_shift = max(max_shift, max_norm)
 
-            movie_align.update(input_movie_align)
-
-            # Dictionary for crop offsets
-            crop_offset_mapping = {
-                'cropOffsetX': 'crop_offsetX',
-                'cropOffsetY': 'crop_offsetY',
+            movie_align['output_avg_shift'] = {
+                'value': round(avg_shift, 1),
+                'unit': 'Å'
             }
-
-            crop_offsets = {}
-            for key, mapped_key in crop_offset_mapping.items():
-                if key in input_alignment and input_alignment[key] is not None and input_alignment[key] != 0:
-                    crop_offsets[mapped_key] = {
-                        'value': input_alignment[key],
-                        'unit': 'pixels'
-                    }
-            if crop_offsets:
-                movie_align['crop_offsets'] = crop_offsets
-
-            # Dictionary for crop dimensions
-            crop_dim_mapping = {
-                'cropDimX': 'crop_dimsX',
-                'cropDimY': 'crop_dimsY',
+            movie_align['output_max_shift'] = {
+                'value': round(max_shift, 1),
+                'unit': 'Å'
             }
-            crop_dims = {}
-            for key, mapped_key in crop_dim_mapping.items():
-                if key in input_alignment and input_alignment[key] is not None and input_alignment[key] != 0:
-                    crop_dims[mapped_key] = {
-                        'value': input_alignment[key],
-                        'unit': 'pixels'
-                    }
-            if crop_dims:
-                movie_align['crop_dims'] = crop_dims
-
-            # Dictionary for frames aligned
-            # if input_alignment['alignFrameN'] != 0:
-            keys_to_retrieve = ['alignFrame0', 'alignFrameN']
-            key_mapping = {
-                'alignFrame0': 'frame0',
-                'alignFrameN': 'frameN',
-            }
-            frames_aligned = {key_mapping[key]: input_alignment[key] for key in keys_to_retrieve if
-                              key in input_alignment and input_alignment[key] is not None}
-
-            if frames_aligned['frameN'] == 0:
-                frames_aligned['frameN'] = self.number_movies
-
-            movie_align['frames_aligned'] = frames_aligned
-
-            ############################### OUTPUT #############################################
-            # average and max shift
-            for a, output in MovieAlignmentProt.iterOutputAttributes():
-                if a == 'outputMovies':
-                    for index, item in enumerate(output.iterItems()):
-                        attributes = item.getAttributes()
-                        attributes_dict = dict(attributes)
-                        shiftX = attributes_dict.get('_xmipp_ShiftX')
-                        shiftY = attributes_dict.get('_xmipp_ShiftY')
-                        norm = np.linalg.norm([shiftX, shiftY], axis=0)
-
-                        # Max and Average shift
-                        max_norm = np.max(norm)
-                        avgXY = np.mean(norm)
-                        if index == 0:
-                            avg_shift = avgXY
-                            max_shift = max_norm
-                        else:
-                            avg_shift = np.mean([avgXY, avg_shift])
-                            max_shift = max(max_shift, max_norm)
-
-                movie_align['output_avg_shift'] = {
-                    'value': round(avg_shift, 1),
-                    'unit': 'Å'
-                }
-                movie_align['output_max_shift'] = {
-                    'value': round(max_shift, 1),
-                    'unit': 'Å'
-                }
-            return movie_align
+        return movie_align
 
     def get_max_shift_descriptor(self):
-        '''
+        """
         Function to create the max shift descriptor
-        '''
-        if self.maxShift.get() is not None:
-            ###### MAX SHIFT DESCRIPTOR######
-            MaxShiftProt = self.maxShift.get()
-            movie_maxshift = {'descriptor_name': MaxShiftProt.getClassName()}
+        """
+        ###### MAX SHIFT DESCRIPTOR######
+        MaxShiftProt = self.maxShift.get()
+        movie_maxshift = {'descriptor_name': MaxShiftProt.getClassName()}
 
-            ############################### INPUT #############################################
-            input_shift = MaxShiftProt.getObjDict()
-            # List of keys to retrieve
-            keys_to_retrieve = ['outputMoviesDiscarded._size', 'maxFrameShift', 'maxMovieShift', 'rejType']
-            # Mapping dictionary for key name changes
-            key_mapping = {
-                'outputMoviesDiscarded._size': 'discarded_movies',
-                'maxFrameShift': 'max_frame_shift',
-                'maxMovieShift': 'max_movie_shift',
-                'rejType': 'rejection_type'
-            }
+        ############################### INPUT #############################################
+        input_shift = MaxShiftProt.getObjDict()
+        # List of keys to retrieve
+        keys_to_retrieve = ['outputMoviesDiscarded._size', 'maxFrameShift', 'maxMovieShift', 'rejType']
+        # Mapping dictionary for key name changes
+        key_mapping = {
+            'outputMoviesDiscarded._size': 'discarded_movies',
+            'maxFrameShift': 'max_frame_shift',
+            'maxMovieShift': 'max_movie_shift',
+            'rejType': 'rejection_type'
+        }
 
-            # Filter dictionary and rename keys
-            rejtype_list = ['by frame', 'by whole movie', 'by frame and movie', 'by frame or movie']
+        # Filter dictionary and rename keys
+        rejtype_list = ['by frame', 'by whole movie', 'by frame and movie', 'by frame or movie']
 
-            for key in keys_to_retrieve:
-                if key == 'rejType':
-                    rej_type = rejtype_list[input_shift[key]]
-                    movie_maxshift[key_mapping[key]] = rej_type
-                elif key in input_shift and input_shift[key] is not None and input_shift[key] != 0:
-                    if key in ['maxFrameShift', 'maxMovieShift']:
-                        movie_maxshift[key_mapping[key]] = {
-                            'value': input_shift[key],
-                            'unit': 'Å'
-                        }
+        for key in keys_to_retrieve:
+            if key == 'rejType':
+                rej_type = rejtype_list[input_shift[key]]
+                movie_maxshift[key_mapping[key]] = rej_type
+            elif key in input_shift and input_shift[key] is not None and input_shift[key] != 0:
+                if key in ['maxFrameShift', 'maxMovieShift']:
+                    movie_maxshift[key_mapping[key]] = {
+                        'value': input_shift[key],
+                        'unit': 'Å'
+                    }
+                else:
+                    movie_maxshift[key_mapping[key]] = input_shift[key]
+
+        ############################### OUTPUT #############################################
+        # average and max shift
+        shift_list = []
+        for a, output in MaxShiftProt.iterOutputAttributes():
+            if a == 'outputMovies':
+                for index, item in enumerate(output.iterItems()):
+                    attributes = item.getAttributes()
+                    attributes_dict = dict(attributes)
+                    shiftX = attributes_dict.get('_xmipp_ShiftX')
+                    shiftY = attributes_dict.get('_xmipp_ShiftY')
+                    norm = np.linalg.norm([shiftX, shiftY], axis=0)
+                    shift_list.append(norm)
+
+                    # Max and average shift
+                    max_norm = np.max(norm)
+                    avgXY = np.mean(norm)
+                    if index == 0:
+                        avg_shift = avgXY
+                        max_shift = max_norm
                     else:
-                        movie_maxshift[key_mapping[key]] = input_shift[key]
+                        avg_shift = np.mean([avgXY, avg_shift])
+                        max_shift = max(max_shift, max_norm)
 
-            ############################### OUTPUT #############################################
-            # average and max shift
-            shift_list = []
-            for a, output in MaxShiftProt.iterOutputAttributes():
-                if a == 'outputMovies':
-                    for index, item in enumerate(output.iterItems()):
-                        attributes = item.getAttributes()
-                        attributes_dict = dict(attributes)
-                        shiftX = attributes_dict.get('_xmipp_ShiftX')
-                        shiftY = attributes_dict.get('_xmipp_ShiftY')
-                        norm = np.linalg.norm([shiftX, shiftY], axis=0)
-                        shift_list.append(norm)
+        flattened_shift_list = np.hstack(shift_list)
 
-                        # Max and average shift
-                        max_norm = np.max(norm)
-                        avgXY = np.mean(norm)
-                        if index == 0:
-                            avg_shift = avgXY
-                            max_shift = max_norm
-                        else:
-                            avg_shift = np.mean([avgXY, avg_shift])
-                            max_shift = max(max_shift, max_norm)
+        # Histogram generation
+        # shift
+        plt.close('all')
+        plt.clf()
+        plt.cla()
 
-            flattened_shift_list = np.hstack(shift_list)
+        plt.hist(flattened_shift_list, edgecolor='black')
+        plt.xlabel('# Shift (Å)')
+        plt.ylabel(hist_ylabel_frames)
+        plt.title('Shift histogram')
+        shift_hist_name = 'shift_hist.jpg'
+        shift_hist = self.hist_path(shift_hist_name)
+        plt.savefig(shift_hist)
 
-            # Histogram generation
-            # shift
-            plt.close('all')
-            plt.clf()
-            plt.cla()
+        output_movie_maxshift = {
+            'output_avg_shift': {
+                'value': round(avg_shift, 1),
+                'unit': 'Å'
+            },
+            'output_max_shift': {
+                'value': round(max_shift, 1),
+                'unit': 'Å'
+            },
+            'shift_histogram': shift_hist_name
+        }
+        print(movie_maxshift)
+        movie_maxshift.update(output_movie_maxshift)
 
-            plt.hist(flattened_shift_list, edgecolor='black')
-            plt.xlabel('# Shift (Å)')
-            plt.ylabel(hist_ylabel_frames)
-            plt.title('Shift histogram')
-            shift_hist_name = 'shift_hist.jpg'
-            shift_hist = self.hist_path(shift_hist_name)
-            plt.savefig(shift_hist)
-
-            output_movie_maxshift = {
-                'output_avg_shift': {
-                    'value': round(avg_shift, 1),
-                    'unit': 'Å'
-                },
-                'output_max_shift': {
-                    'value': round(max_shift, 1),
-                    'unit': 'Å'
-                },
-                'shift_histogram': shift_hist_name
-            }
-
-            movie_maxshift.update(output_movie_maxshift)
-
-            return output_movie_maxshift
+        return movie_maxshift
 
     def preprocess_data(self, data):
         """Recursively convert complex objects into YAML-compatible types."""
