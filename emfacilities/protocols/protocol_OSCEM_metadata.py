@@ -506,7 +506,7 @@ class ProtOSCEM(EMProtocol):
                     'unit': 'Å'
                 },
                 'defocus_histogram': defocus_hist_name,
-                'micrograph_examples': join(micro_folder_name, micro_name)
+                'defocus_micrograph_examples': join(micro_folder_name, micro_name)
             },
             'resolution': {
                 'output_min_resolution': {

@@ -102,7 +102,7 @@ class TestOscemMetadata(BaseTest):
                         "unit": "Å"
                     },
                     "defocus_histogram": "defocus_hist.jpg",
-                    "micrograph_examples": "Micro_examples/micro_defocus.jpg"
+                    "defocus_micrograph_examples": "Micro_examples/micro_defocus.jpg"
                 },
                 "resolution": {
                     "output_min_resolution": {
