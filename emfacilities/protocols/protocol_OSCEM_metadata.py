@@ -812,7 +812,7 @@ class ProtOSCEM(EMProtocol):
         elif resolution:
             volume = {
                 'volume_type': volume_type,
-                'resolution': {
+                'vol_resolution': {
                     'value': resolution,
                     'unit': 'Å',
                     },

@@ -194,7 +194,7 @@ class TestOscemMetadata(BaseTest):
                 {
                     "volume_type": "final volume",
                     "number_particles": 2937,
-                    "resolution": {
+                    "vol_resolution": {
                         "value": 3.39,
                         "unit": "Å"
                     },
