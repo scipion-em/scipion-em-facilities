@@ -775,7 +775,7 @@ class ProtOSCEM(EMProtocol):
             volume = {
                 'volume_type': volume_type,
                 'number_particles': size,
-                'resolution': {
+                'vol_resolution': {
                     'value': resolution,
                     'unit': 'Å',
                     },
