@@ -774,7 +774,7 @@ class ProtOSCEM(EMProtocol):
 
             volume = {
                 'volume_type': volume_type,
-                'number_particles': size,
+                'vol_number_particles': size,
                 'vol_resolution': {
                     'value': resolution,
                     'unit': 'Å',
@@ -797,7 +797,7 @@ class ProtOSCEM(EMProtocol):
             size = len(particles)
             volume = {
                 'volume_type': volume_type,
-                'number_particles': size,
+                'vol_number_particles': size,
                 'size': vol_size,
                 'orthogonal_slices': {
                     'orthogonal_slices_X': join(folder_name, orthogonal_slices_folder, slices_x),

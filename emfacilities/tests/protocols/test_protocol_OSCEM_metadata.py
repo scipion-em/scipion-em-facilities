@@ -193,7 +193,7 @@ class TestOscemMetadata(BaseTest):
                 },
                 {
                     "volume_type": "final volume",
-                    "number_particles": 2937,
+                    "vol_number_particles": 2937,
                     "vol_resolution": {
                         "value": 3.39,
                         "unit": "Å"
@@ -630,7 +630,7 @@ class TestOscemMetadata(BaseTest):
                 test_data, current_data, delta=2,
                 msg=f"Value mismatch at {parent_key}: {test_data} != {current_data}"
             )
-        elif key_in == "number_particles":
+        elif key_in == "number_particles" or key_in == "vol_number_particles":
             self.assertAlmostEqual(
                 test_data, current_data, delta=1000,
                 msg=f"Value mismatch at {parent_key}: {test_data} != {current_data}"
