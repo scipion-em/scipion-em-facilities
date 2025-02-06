@@ -131,7 +131,7 @@ class TestOscemMetadata(BaseTest):
             },
             "classes2D": {
                 "number_classes_2D": 20,
-                "particles_per_class": [
+                "particles_per_2Dclass": [
                     333,
                     296,
                     235,
@@ -157,7 +157,7 @@ class TestOscemMetadata(BaseTest):
             },
             "classes3D": {
                 "number_classes_3D": 1,
-                "particles_per_class": [
+                "particles_per_3Dclass": [
                     2937
                 ],
                 "images_classes_3D": "Classes_3D/classes_3D.jpg",
@@ -549,7 +549,7 @@ class TestOscemMetadata(BaseTest):
             If the list ends with 'particles_per_class', it checks that the length difference is <= 2
             and values match within a delta of 500. Otherwise, it recursively compares the lists element by element.
             """
-        if parent_key.endswith("particles_per_class"):
+        if parent_key.endswith("particles_per_2Dclass") or parent_key.endswith("particles_per_3Dclass"):
             length_difference = abs(len(test_data) - len(current_data))
             self.assertLessEqual(
                 length_difference, 2,
