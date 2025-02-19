@@ -975,7 +975,7 @@ class ProtOSCEM(EMProtocol):
         ###### MOVIE ALIGNMENT DESCRIPTOR ######
         MovieAlignmentProt = self.movieAlignment.get()
         movie_align = {'descriptor_name': MovieAlignmentProt.getClassName()}
-
+        descriptor_thing_dict = {}
         ################################ INPUT #############################################
         input_alignment = MovieAlignmentProt.getObjDict()
         # List of keys to retrieve
@@ -996,7 +996,7 @@ class ProtOSCEM(EMProtocol):
             for key in keys_to_retrieve
             if input_alignment.get(key) not in (None, 0)
         }
-        movie_align.update(input_movie_align)
+        descriptor_thing_dict.update(input_movie_align)
 
         # Dictionary for crop offsets
         crop_offset_mapping = {
@@ -1012,7 +1012,7 @@ class ProtOSCEM(EMProtocol):
                     'unit': 'pixels'
                 }
         if crop_offsets:
-            movie_align['crop_offsets'] = crop_offsets
+            descriptor_thing_dict['crop_offsets'] = crop_offsets
 
         # Dictionary for crop dimensions
         crop_dim_mapping = {
@@ -1027,7 +1027,7 @@ class ProtOSCEM(EMProtocol):
                     'unit': 'pixels'
                 }
         if crop_dims:
-            movie_align['crop_dims'] = crop_dims
+            descriptor_thing_dict['crop_dims'] = crop_dims
 
         # Dictionary for frames aligned
         # if input_alignment['alignFrameN'] != 0:
@@ -1042,7 +1042,7 @@ class ProtOSCEM(EMProtocol):
         if frames_aligned['frameN'] == 0:
             frames_aligned['frameN'] = self.number_movies
 
-        movie_align['frames_aligned'] = frames_aligned
+        descriptor_thing_dict['frames_aligned'] = frames_aligned
 
         ############################### OUTPUT #############################################
         # average and max shift
@@ -1063,14 +1063,15 @@ class ProtOSCEM(EMProtocol):
             avg_shift = np.mean(avg_shifts)
             max_shift = max(max_shifts)
 
-            movie_align['output_avg_shift'] = {
+            descriptor_thing_dict['output_avg_shift'] = {
                 'value': round(avg_shift, 1),
                 'unit': 'Å'
             }
-            movie_align['output_max_shift'] = {
+            descriptor_thing_dict['output_max_shift'] = {
                 'value': round(max_shift, 1),
                 'unit': 'Å'
             }
+        movie_align['descriptor_thing'] = descriptor_thing_dict
         return movie_align
 
     def get_max_shift_descriptor(self):
@@ -1080,7 +1081,7 @@ class ProtOSCEM(EMProtocol):
         ###### MAX SHIFT DESCRIPTOR######
         MaxShiftProt = self.maxShift.get()
         movie_maxshift = {'descriptor_name': MaxShiftProt.getClassName()}
-
+        descriptor_thing_dict = {}
         ############################### INPUT #############################################
         input_shift = MaxShiftProt.getObjDict()
         # List of keys to retrieve
@@ -1099,15 +1100,15 @@ class ProtOSCEM(EMProtocol):
         for key in keys_to_retrieve:
             if key == 'rejType':
                 rej_type = rejtype_list[input_shift[key]]
-                movie_maxshift[key_mapping[key]] = rej_type
+                descriptor_thing_dict[key_mapping[key]] = rej_type
             elif key in input_shift and input_shift[key] is not None and input_shift[key] != 0:
                 if key in ['maxFrameShift', 'maxMovieShift']:
-                    movie_maxshift[key_mapping[key]] = {
+                    descriptor_thing_dict[key_mapping[key]] = {
                         'value': input_shift[key],
                         'unit': 'Å'
                     }
                 else:
-                    movie_maxshift[key_mapping[key]] = input_shift[key]
+                    descriptor_thing_dict[key_mapping[key]] = input_shift[key]
 
         ############################### OUTPUT #############################################
         # average and max shift
@@ -1148,7 +1149,7 @@ class ProtOSCEM(EMProtocol):
         shift_hist = self.hist_path(shift_hist_name)
         plt.savefig(shift_hist)
 
-        output_movie_maxshift = {
+        descriptor_thing_dict.update({
             'output_avg_shift': {
                 'value': round(avg_shift, 1),
                 'unit': 'Å'
@@ -1158,8 +1159,9 @@ class ProtOSCEM(EMProtocol):
                 'unit': 'Å'
             },
             'shift_histogram': shift_hist_name
-        }
-        movie_maxshift.update(output_movie_maxshift)
+        })
+
+        movie_maxshift['descriptor_thing'] = descriptor_thing_dict
 
         return movie_maxshift
 
