@@ -4,18 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "scipion-em-facilities"
-dynamic = ["version"]
-dependencies = ["scipion-pyworkflow>=3.0.31",
-                "scipion-em",
-                "nvidia-ml-py3",
-                "pytz",
-                "paramiko",
-                "influxdb",
-                "joblib",
-                "networkx",
-                "scipion-em-xmipp",
-                "pyyaml"]
-
+dynamic = ["version", "dependencies"]
+dependencies = {file = ["requirements.txt"]}
 
 description = "Plugin to use Scipion in facilities"
 readme = "README.rst"
