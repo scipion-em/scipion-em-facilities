@@ -29,11 +29,8 @@ Issues = "https://github.com/scipion-em/scipion-em-facilities/issues"
 [tool.setuptools.dynamic]
 version = {attr = "emfacilities.__version__"}
 
-[tool.setuptools]
-include-package-data = true
-
 [project.entry-points."pyworkflow.plugin"]
 emfacilities = "emfacilities"
 
 [tool.setuptools.package-data]
-emfacilities = ["protocols.conf", "emfacilities/facilityLogo.png"]
+emfacilities = ["protocols.conf", "facilityLogo.png"]
