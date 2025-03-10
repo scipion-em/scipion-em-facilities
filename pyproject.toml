@@ -31,3 +31,6 @@ version = {attr = "emfacilities.__version__"}
 
 [project.entry-points."pyworkflow.plugin"]
 emfacilities = "emfacilities"
+
+[tool.setuptools.package-data]
+xmipp3 = ["emfacilities.facilityLogo.png"]
