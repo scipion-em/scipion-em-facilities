@@ -69,7 +69,7 @@ class ProtMonitor2dStreamer(ProtMonitor):
                            'many 2D classification runs based on the 2D '
                            'protocol template selected. ')
 
-        form.addParam('batchSize', params.IntParam,
+        form.addParam('batchSize', params.IntParam,  default=25000,
                       label="Batch size",
                       help="How many particles (approximately) you want to "
                            "group to make the new batch and launch a new 2d"

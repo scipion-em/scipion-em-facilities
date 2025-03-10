@@ -49,7 +49,7 @@ class ProtGoodClassesExtractor(EMProtocol, ProtStreamingBase):
 
     _label = "good classes extractor"
     outputsToDefine = {}
-    _devStatus = NEW
+    _devStatus = UPDATED
 
     _possibleOutputs = {OUTPUT_PARTICLES: SetOfParticles,
                         OUTPUT_DISCARDED_PARTICLES: SetOfParticles}
@@ -112,6 +112,7 @@ class ProtGoodClassesExtractor(EMProtocol, ProtStreamingBase):
                                                        prerequisites=selectStep)
 
                 self.newDeps.append(extractStep)
+                classSet.close()
 
             if self.isStreamClosed == Set.STREAM_CLOSED:
                 self.info('Stream closed')

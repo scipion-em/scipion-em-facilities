@@ -1,4 +1,8 @@
-V3.1.0 
+V3.2.0
+- Add OSCEM metadata protocol
+- Add streaming protocols: Data counter and Data sampler 
+
+V3.1.0
 - Monitor summary: validation for publish command
 - Monitor summary: verbose error if publish command fails
 - Updated workflow template

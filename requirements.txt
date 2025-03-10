@@ -7,3 +7,4 @@ influxdb
 joblib
 networkx
 scipion-em-xmipp
+pyyaml
