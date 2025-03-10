@@ -1,14 +1,14 @@
 # Workflow to send master to pypi and tag  the branch:
 # You need to edit FOLDER_WITH_VERSION with the folder that has the __version__ value. 
 
-name: master to pypi with comments and tag
+name: master to pypi with comments and tag 
 
 
 # Controls when the action will run. Triggers the workflow on push or pull request
 # events but only for the master branch
 on:
   push:
-    branches: [ master ]
+    branches: [ master ] 
 
 env:
   FOLDER_WITH_VERSION: emfacilities
