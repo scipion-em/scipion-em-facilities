@@ -52,7 +52,7 @@ class ProtMonitorSummary(ProtMonitor):
     """
     _label = 'monitor summary'
     _lastUpdateVersion = VERSION_1_1
-    _devStatus = UPDATED
+    _devStatus = PROD
 
     def __init__(self, **kwargs):
         ProtMonitor.__init__(self, **kwargs)
