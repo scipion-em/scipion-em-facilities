@@ -36,4 +36,4 @@ include-package-data = true
 emfacilities = "emfacilities"
 
 [tool.setuptools.package-data]
-xmipp3 = ["emfacilities/facilityLogo.png"]
+emfacilities = ["protocols.conf", "emfacilities/facilityLogo.png"]
