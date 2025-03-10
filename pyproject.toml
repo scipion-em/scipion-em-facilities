@@ -33,4 +33,4 @@ version = {attr = "emfacilities.__version__"}
 emfacilities = "emfacilities"
 
 [tool.setuptools.package-data]
-xmipp3 = ["facilityLogo.png"]
+xmipp3 = ["emfacilities/facilityLogo.png"]
