@@ -700,6 +700,7 @@ class ProtOSCEM(EMProtocol):
 
     def volume_generation(self, volume_type, folder_name, volume, th):
         vol_size = str(volume.getDim())
+        vol_size_list = [int(x) for x in vol_size.strip('()').split(',')]
         if volume_type == 'final volume':
             half_maps = volume.getHalfMaps()
             half_maps1, half_maps2 = half_maps.split(',')
@@ -779,7 +780,7 @@ class ProtOSCEM(EMProtocol):
                     'value': resolution,
                     'unit': 'Å',
                     },
-                'size': vol_size,
+                'size': vol_size_list,
                 'orthogonal_slices': {
                     'orthogonal_slices_X': join(folder_name, orthogonal_slices_folder, slices_x),
                     'orthogonal_slices_Y': join(folder_name, orthogonal_slices_folder, slices_y),
@@ -798,7 +799,7 @@ class ProtOSCEM(EMProtocol):
             volume = {
                 'volume_type': volume_type,
                 'vol_number_particles': size,
-                'size': vol_size,
+                'size': vol_size_list,
                 'orthogonal_slices': {
                     'orthogonal_slices_X': join(folder_name, orthogonal_slices_folder, slices_x),
                     'orthogonal_slices_Y': join(folder_name, orthogonal_slices_folder, slices_y),
@@ -816,7 +817,7 @@ class ProtOSCEM(EMProtocol):
                     'value': resolution,
                     'unit': 'Å',
                     },
-                'size': vol_size,
+                'size': vol_size_list,
                 'orthogonal_slices': {
                     'orthogonal_slices_X': join(folder_name, orthogonal_slices_folder, slices_x),
                     'orthogonal_slices_Y': join(folder_name, orthogonal_slices_folder, slices_y),
@@ -830,7 +831,7 @@ class ProtOSCEM(EMProtocol):
         else:
             volume = {
                 'volume_type': volume_type,
-                'size': vol_size,
+                'size': vol_size_list,
                 'orthogonal_slices': {
                     'orthogonal_slices_X': join(folder_name, orthogonal_slices_folder, slices_x),
                     'orthogonal_slices_Y': join(folder_name, orthogonal_slices_folder, slices_y),

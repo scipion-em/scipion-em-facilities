@@ -179,7 +179,7 @@ class TestOscemMetadata(BaseTest):
             "volumes": [
                 {
                     "volume_type": "initial volume",
-                    "size": "(250, 250, 250)",
+                    "size": [250, 250, 250],
                     "orthogonal_slices": {
                         "orthogonal_slices_X": "Initial_volume/orthogonal_slices/orthogonal_slices_X.jpg",
                         "orthogonal_slices_Y": "Initial_volume/orthogonal_slices/orthogonal_slices_Y.jpg",
@@ -198,7 +198,7 @@ class TestOscemMetadata(BaseTest):
                         "value": 3.39,
                         "unit": "Å"
                     },
-                    "size": "(250, 250, 250)",
+                    "size": [250, 250, 250],
                     "orthogonal_slices": {
                         "orthogonal_slices_X": "Final_volume/orthogonal_slices/orthogonal_slices_X.jpg",
                         "orthogonal_slices_Y": "Final_volume/orthogonal_slices/orthogonal_slices_Y.jpg",
@@ -212,7 +212,7 @@ class TestOscemMetadata(BaseTest):
                 },
                 {
                     "volume_type": "sharpened volume",
-                    "size": "(250, 250, 250)",
+                    "size": [250, 250, 250],
                     "orthogonal_slices": {
                         "orthogonal_slices_X": "Sharpened_volume/orthogonal_slices/orthogonal_slices_X.jpg",
                         "orthogonal_slices_Y": "Sharpened_volume/orthogonal_slices/orthogonal_slices_Y.jpg",
