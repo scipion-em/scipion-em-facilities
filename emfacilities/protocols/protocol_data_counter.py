@@ -144,7 +144,11 @@ class ProtDataCounter(EMProtocol):
         # it does not make sense to check for new input data
         if (self.lastCheck > mTime and self.insertedIds) and not self.lastRound:  # If this is empty it is due to a static "continue" action or it is the first round
             return None
-
+        
+        if self.lastRound:
+            self.info("Last round sleeping for 10 seconds to allow all the input to be loaded")
+            time.sleep(10) # Needs to make sure that eventhough the stream is closed all the data in the inputset is loaded
+        
         inputSet = self._loadInputSet(self.inputFn)
         inputSetIds = inputSet.getIdSet()
         newIds = [idImage for idImage in inputSetIds if idImage not in self.insertedIds]
