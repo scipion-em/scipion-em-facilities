@@ -132,7 +132,6 @@ class TestOscemMetadata(BaseTest):
                 "micrograph_examples": "Micro_examples/micro_particles.jpg"
             },
             "classes2D": {
-                "number_classes_2D": 20,
                 "particles_per_2Dclass": [
                     333,
                     296,
@@ -158,7 +157,6 @@ class TestOscemMetadata(BaseTest):
                 "images_classes_2D": "classes_2D.jpg"
             },
             "classes3D": {
-                "number_classes_3D": 1,
                 "particles_per_3Dclass": [
                     2937
                 ],
@@ -622,12 +620,7 @@ class TestOscemMetadata(BaseTest):
             Compares rest of key-values (test_data and current_data) and raises assertion errors if there are mismatches.
             """
         key_in = parent_key.split('.')[-1]
-        if (
-                key_in == "number_micrographs"
-                or key_in == "discarded_movies"
-                or key_in == "number_classes_2D"
-                or key_in == "number_classes_3D"
-        ):
+        if key_in == "number_micrographs" or key_in == "discarded_movies":
             self.assertAlmostEqual(
                 test_data, current_data, delta=2,
                 msg=f"Value mismatch at {parent_key}: {test_data} != {current_data}"

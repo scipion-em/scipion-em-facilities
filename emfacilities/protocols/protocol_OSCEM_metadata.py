@@ -693,7 +693,7 @@ class ProtOSCEM(EMProtocol):
             collage_filepath = join(output_folder, collage_filename)
             self.create_collage(images, collage_filepath)
 
-        classes_2D = {"number_classes_2D": classes, "particles_per_2Dclass": particles_list,
+        classes_2D = {"particles_per_2Dclass": particles_list,
                       "images_classes_2D": collage_filename}
 
         return classes_2D
@@ -963,7 +963,7 @@ class ProtOSCEM(EMProtocol):
         collage_filepath = join(classes3D_folder_path, collage_filename)
         self.create_collage(images, collage_filepath)
 
-        classes_3D = {"number_classes_3D": classes, "particles_per_3Dclass": particles_list,
+        classes_3D = {"particles_per_3Dclass": particles_list,
                       "images_classes_3D": join(classes_3D_folder_name, collage_filename),
                       "volumes": volumes_list}
         return classes_3D
