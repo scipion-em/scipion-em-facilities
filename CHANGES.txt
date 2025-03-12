@@ -1,3 +1,7 @@
+
+V3.2.1
+- Data counter fix 
+
 V3.2.0
 - Add OSCEM metadata protocol
 - Add streaming protocols: Data counter and Data sampler 
