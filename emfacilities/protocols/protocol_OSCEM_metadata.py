@@ -693,13 +693,14 @@ class ProtOSCEM(EMProtocol):
             collage_filepath = join(output_folder, collage_filename)
             self.create_collage(images, collage_filepath)
 
-        classes_2D = {"number_classes_2D": classes, "particles_per_2Dclass": particles_list,
+        classes_2D = {"particles_per_2Dclass": particles_list,
                       "images_classes_2D": collage_filename}
 
         return classes_2D
 
     def volume_generation(self, volume_type, folder_name, volume, th):
         vol_size = str(volume.getDim())
+        vol_size_list = [int(x) for x in vol_size.strip('()').split(',')]
         if volume_type == 'final volume':
             half_maps = volume.getHalfMaps()
             half_maps1, half_maps2 = half_maps.split(',')
@@ -779,7 +780,7 @@ class ProtOSCEM(EMProtocol):
                     'value': resolution,
                     'unit': 'Å',
                     },
-                'size': vol_size,
+                'size': vol_size_list,
                 'orthogonal_slices': {
                     'orthogonal_slices_X': join(folder_name, orthogonal_slices_folder, slices_x),
                     'orthogonal_slices_Y': join(folder_name, orthogonal_slices_folder, slices_y),
@@ -798,7 +799,7 @@ class ProtOSCEM(EMProtocol):
             volume = {
                 'volume_type': volume_type,
                 'vol_number_particles': size,
-                'size': vol_size,
+                'size': vol_size_list,
                 'orthogonal_slices': {
                     'orthogonal_slices_X': join(folder_name, orthogonal_slices_folder, slices_x),
                     'orthogonal_slices_Y': join(folder_name, orthogonal_slices_folder, slices_y),
@@ -816,7 +817,7 @@ class ProtOSCEM(EMProtocol):
                     'value': resolution,
                     'unit': 'Å',
                     },
-                'size': vol_size,
+                'size': vol_size_list,
                 'orthogonal_slices': {
                     'orthogonal_slices_X': join(folder_name, orthogonal_slices_folder, slices_x),
                     'orthogonal_slices_Y': join(folder_name, orthogonal_slices_folder, slices_y),
@@ -830,7 +831,7 @@ class ProtOSCEM(EMProtocol):
         else:
             volume = {
                 'volume_type': volume_type,
-                'size': vol_size,
+                'size': vol_size_list,
                 'orthogonal_slices': {
                     'orthogonal_slices_X': join(folder_name, orthogonal_slices_folder, slices_x),
                     'orthogonal_slices_Y': join(folder_name, orthogonal_slices_folder, slices_y),
@@ -963,7 +964,7 @@ class ProtOSCEM(EMProtocol):
         collage_filepath = join(classes3D_folder_path, collage_filename)
         self.create_collage(images, collage_filepath)
 
-        classes_3D = {"number_classes_3D": classes, "particles_per_3Dclass": particles_list,
+        classes_3D = {"particles_per_3Dclass": particles_list,
                       "images_classes_3D": join(classes_3D_folder_name, collage_filename),
                       "volumes": volumes_list}
         return classes_3D
