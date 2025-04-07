@@ -82,9 +82,9 @@ class ProtDataSampler(EMProtocol):
     def initializeParams(self):
         self.finished = False
         # Important to have both:
-        self.insertedIds = []   # Contains images that have been inserted in a Step (checkNewInput).
-        self.processedIds = [] # Ids to be register to output
-        self.sampleIds = [] # Ids to be output
+        self.insertedIds = set()   # Contains images that have been inserted in a Step (checkNewInput).
+        self.processedIds = set() # Ids to be register to output
+        self.sampleIds = set() # Ids to be output
         self.isStreamClosed = self.inputImages.get().isStreamClosed()
         # Contains images that have been processed in a Step (checkNewOutput).
         self.inputFn = self.inputImages.get().getFileName()
@@ -133,10 +133,12 @@ class ProtDataSampler(EMProtocol):
 
         if self.isContinued() and not self.insertedIds:  # For "Continue" action and the first round
             doneIds, _ = self._getAllDoneIds()
-            skipIds = list(set(newIds).intersection(set(doneIds)))
-            newIds = list(set(newIds).difference(set(doneIds)))
+            doneIdsSet = set(doneIds)
+            newIdsSet = set(newIds)
+            skipIds = list(newIdsSet & doneIdsSet)
+            newIds = list(newIdsSet - doneIdsSet)
             self.info("Skipping Images with ID: %s, seems to be done" % skipIds)
-            self.insertedIds = doneIds  # During the first round of "Continue" action it has to be filled
+            self.insertedIds = set(doneIds)  # During the first round of "Continue" action it has to be filled
 
         # Now handle the steps depending on the streaming batch size
         batchSize = self.batchSize.get()
@@ -151,8 +153,8 @@ class ProtDataSampler(EMProtocol):
 
     def _checkNewOutput(self):
         doneListIds, currentOutputSize = self._getAllDoneIds()
-        sampleIds = copy.deepcopy(self.sampleIds)
-        newDone = [imageId for imageId in sampleIds if imageId not in doneListIds]
+        doneIdSet = set(doneListIds)
+        newDone = list(self.sampleIds - doneIdSet)
         allDone = len(doneListIds) + len(newDone)
         maxSize = int(self._loadInputSet(self.inputFn).getSize() * self.samplingProportion.get())
 
@@ -217,7 +219,7 @@ class ProtDataSampler(EMProtocol):
             if len(batchIds) == batchSize or self.isStreamClosed:
                 stepId = self._insertFunctionStep(self.samplingStep, batchIds, needsGPU=False,
                                               prerequisites=[])
-                self.insertedIds.extend(batchIds)
+                self.insertedIds.update(batchIds)
                 deps.append(stepId)
 
         return deps
@@ -225,8 +227,8 @@ class ProtDataSampler(EMProtocol):
     def samplingStep(self, newIds):
         proportion = self.samplingProportion.get()
         sampledIds = sample_proportion(newIds, proportion)
-        self.processedIds.extend(newIds)
-        self.sampleIds.extend(sampledIds)
+        self.processedIds.update(newIds)
+        self.sampleIds.update(sampledIds)
 
         self.info('From %d new images, %d were random sampled with a proportion of %.2f'
                   %(len(newIds), len(sampledIds), proportion))
