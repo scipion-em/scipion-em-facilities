@@ -4,18 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "scipion-em-facilities"
-dynamic = ["version"]
-dependencies = ["scipion-pyworkflow>=3.0.31",
-                "scipion-em",
-                "nvidia-ml-py3",
-                "pytz",
-                "paramiko",
-                "influxdb",
-                "joblib",
-                "networkx",
-                "scipion-em-xmipp",
-                "pyyaml"]
-                
+dynamic = ["version", "dependencies"]                
 description = "Plugin to use Scipion in facilities"
 readme = "README.rst"
 requires-python = ">=3.8"
@@ -28,9 +17,10 @@ Issues = "https://github.com/scipion-em/scipion-em-facilities/issues"
 
 [tool.setuptools.dynamic]
 version = {attr = "emfacilities.__version__"}
+dependencies={file = ["requirements.txt"]}
 
 [project.entry-points."pyworkflow.plugin"]
 emfacilities = "emfacilities"
 
 [tool.setuptools.package-data]
-emfacilities = ["protocols.conf", "facilityLogo.png"]
+emfacilities = ["protocols.conf", "facilityLogo.png", "templates/*"]
