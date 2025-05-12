@@ -8,3 +8,4 @@ joblib
 networkx
 scipion-em-xmipp
 pyyaml
+pandas
