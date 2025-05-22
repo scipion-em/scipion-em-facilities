@@ -9,3 +9,6 @@ networkx
 scipion-em-xmipp
 pyyaml
 pandas
+streamlit
+streamlit_autorefresh
+altair

@@ -45,6 +45,8 @@ import pwem.objects as emobj
 XMIPP_QUALITY_PROTOCOLS = ['XmippProtMovieDoseAnalysis', 'XmippProtMovieMaxShift', 'XmippProtTiltAnalysis', 'XmippProtCTFConsensus']
 MIFFI_QUALITY_PROTOCOLS = ['MiffiProtMicrographs']
 
+MONITOR_FN = 'monitor_data.csv'
+
 
 class ProtQualityMetrics(EMProtocol):
     """
@@ -220,7 +222,7 @@ class ProtQualityMetrics(EMProtocol):
                     break
 
         # Save the current dataframe to CSV after processing
-        csv_path = os.path.join(self._getExtraPath(), 'monitor_data.csv')
+        csv_path = os.path.join(self._getExtraPath(), MONITOR_FN)
         self.dataFrame.to_csv(csv_path, index=False)
         self.info(self.dataFrame)
         dict_str = '\n'.join(f'{k}: {v}' for k, v in outputs_dicts.items())
@@ -396,7 +398,7 @@ def extractMaxShift(prot, where):
         else:
             for item in outSet.iterItems(orderBy='creation', direction='ASC', where=where):
                 movieId = item.getObjId()
-                movieEntries[movieId]['micName'] = item.getBaseName() # MicName
+                movieEntries[movieId]['micName'] = item.getFileName()
                 movieEntries[movieId]['accumMotionTotal'] = round(item._rlnAccumMotionTotal.get(), 2)
                 movieEntries[movieId]['accumMotionEarly'] = round(item._rlnAccumMotionEarly.get(), 2)
                 movieEntries[movieId]['accumMotionLate'] = round(item._rlnAccumMotionLate.get(), 2)
@@ -456,7 +458,7 @@ def extractTiltAnalaysis(prot, where):
         outputs[outName] = size
 
         boolPassTiltAnalysis = True
-        if 'Discarded' in outName:
+        if 'DISCARDED' in outName.upper():
             boolPassTiltAnalysis = False
 
         for item in outSet.iterItems(orderBy='creation', direction='ASC', where=where):
@@ -464,7 +466,7 @@ def extractTiltAnalaysis(prot, where):
             objCreationTime = item.getObjCreation()
             entry = {
                 'movieId': objId,
-                'micName': item.getBaseName(),
+                'micName': item.getFileName(),
                 'boolPassTiltAnalysis': boolPassTiltAnalysis,
                 'thresholdMeanCorrelation': mean_corr_th,
                 'thresholdStdCorrelation': std_corr_th,
@@ -565,7 +567,7 @@ def extractMiffi(prot, where):
             objCreationTime = item.getObjCreation()
             entry = {
                 'movieId': objId,
-                'micName': item.getBaseName(),
+                'micName': item.getFileName(),
                 'boolPassMiffi': boolPassMiffi,
                 'miffiLabel': item._miffi_label.get()
             }
