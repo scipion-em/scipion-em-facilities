@@ -1,17 +1,14 @@
 from emfacilities.protocols import ProtQualityMetrics
 from emfacilities.protocols.protocol_quality_metrics import MONITOR_FN
 
-from pwem.viewers import ObjectView, EmProtocolViewer
-from pwem.viewers.showj import *
+from pwem.viewers import EmProtocolViewer
 
 from pyworkflow.viewer import DESKTOP_TKINTER, WEB_DJANGO
 import pyworkflow.protocol.params as params
 
-import matplotlib.pyplot as plt
 import os
 import subprocess
 import sys
-import tempfile
 import webbrowser
 import time
 import socket
