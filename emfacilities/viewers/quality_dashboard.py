@@ -22,12 +22,11 @@ from itertools import chain
 
 VIEWS = ('Main View', 'Dose', 'Drift', 'Tilt', 'Miffi', 'CTF', 'Scores View')
 CREATION_TIME = 'creationTime'
-ACQUISITION_COLUMS = ['magnification','pixelSize','voltage','sphericalAberration','dosePerFrame']
 
 ALL_COLUMNS = {
-    'import': ['movieId','movieName','creationTime','magnification','pixelSize','voltage','sphericalAberration','dosePerFrame'],
+    'import': ['movieId','movieName','creationTime','projectName','magnification','pixelSize','voltage','sphericalAberration','dosePerFrame','status'],
     'dose': ['movieId','micName','creationTime','Filter DoseAnalysis','thresholdPercentageDiff','diffDosePerAngstrom2','meanDosePerAngstrom2','stdDosePerAngstrom2'],
-    'drift': ['movieId','micName','creationTime','Filter MaxShift','thresholdMaxMovieShift','maxMovieShift','thresholdMaxFrameShift','maxFrameShift','accumMotionTotal','accumMotionEarly','accumMotionLate'],
+    'drift': ['movieId','micName','creationTime','Filter MaxShift','thresholdMaxMovieShift','maxMovieShift','thresholdMaxFrameShift','maxFrameShift','accumMotionTotal','accumMotionEarly','accumMotionLate', 'plotGlobal'],
     'tilt': ['movieId','micName','creationTime','Filter TiltAnalysis','thresholdMeanCorrelation','tiltMeanCorrelation','thresholdStdCorrelation','tiltStdCorrelation','tiltImage'],
     'miffi': ['movieId','micName','creationTime','Filter Miffi','miffiLabel'],
     'ctf':['movieId','micName','creationTime','Filter CTFConsensus','thresholdResolution','resolution','fitQuality','thresholdAstigmatismPercentage','astigmatismPercentage','defocusU','defocusV','defocusRatio','defocusAngle','IceRingDensity','thresholdMaxDefocus','thresholdMinDefocus','consensusResolution','thresholdConsensusResolution','psdFile']
@@ -107,11 +106,21 @@ def configure_aggrid_threshold_styles(gb, thresholds_conditions):
         gb.configure_column(col, cellStyle=JsCode(js_code))
 
 # ---------------------------------------- COMMON FUNCTIONS ----------------------------------------------------
+def calculate_total_toll_stats(df):
+    filter_cols = [col for col in df.columns if col.startswith("Filter")]
+    accepted = df[filter_cols].apply(lambda row: row.dropna().all(), axis=1).sum()
+    total = len(df)
+    percentage = (accepted / total) * 100 if total > 0 else 0
+
+    return accepted, total, percentage
+
 def calculate_filter_stats(df, filter_col):
-    passed = df[filter_col].sum()
-    total = df[filter_col].count()
+    col_data = pd.to_numeric(df[filter_col], errors='coerce')  # fuerza conversión a numérico
+    passed = col_data.sum()
+    total = col_data.count()
     percentage = (passed / total) * 100 if total > 0 else 0
-    return passed, total, percentage
+
+    return int(passed), total, percentage
 
 def apply_filter_selection(df, label, option):
     if option == "Accepted":
@@ -121,12 +130,56 @@ def apply_filter_selection(df, label, option):
     return df
 
 # ---------------------------------------- MAIN VIEW COMPONENTS ----------------------------------------------------
+def render_info_acquisition(df, columns_tag):
+    df_filtered = df[[col for col in ALL_COLUMNS[columns_tag] if col in df.columns]].copy()
+    project_col, acquisition_col = st.columns(2)
+
+    with project_col:
+        st.subheader("Project information")
+        project_name = df_filtered['projectName'].iloc[0] if 'projectName' in df_filtered else 'N/A'
+        if 'creationTime' in df_filtered:
+            creation_times = pd.to_datetime(df_filtered['creationTime'], errors='coerce')
+            start_time = creation_times.min()
+            last_update = creation_times.max()
+            duration = last_update - start_time
+        else:
+            start_time = last_update = duration = 'N/A'
+        status = df_filtered['status'].iloc[0] if 'status' in df_filtered else 'N/A'
+
+        st.markdown(f"<p style='font-size:18px'><strong>Project Name:</strong> {project_name}</p>", unsafe_allow_html=True)
+        st.markdown(f"<p style='font-size:18px'><strong>Start Time:</strong> {start_time}</p>", unsafe_allow_html=True)
+        st.markdown(f"<p style='font-size:18px'><strong>Duration:</strong> {duration}</p>", unsafe_allow_html=True)
+        st.markdown(f"<p style='font-size:18px'><strong>Last Update:</strong> {last_update}</p>", unsafe_allow_html=True)
+        st.markdown(f"<p style='font-size:18px'><strong>Status:</strong> {status}</p>", unsafe_allow_html=True)
+
+    with acquisition_col:
+        st.subheader("Acquisition information")
+        acquisition_fields = {
+            'Pixel Size (A/px)': 'pixelSize',
+            'Voltage (kV)': 'voltage',
+            'Magnification': 'magnification',
+            'Cs (mm)': 'sphericalAberration',
+            'Dose (e/A2)': 'dosePerFrame'
+        }
+        for name, field in acquisition_fields.items():
+            value = df_filtered[field].iloc[0] if field in df_filtered else 'N/A'
+            st.markdown(f"<p style='font-size:18px'><strong>{name}:</strong> {value}</p>", unsafe_allow_html=True)
+
 def render_filter_card(filter_name, passed, total, percentage):
     color = "green" if percentage >= 60 else "red"
     st.markdown(f"""
         <div style="text-align: center; padding: 10px; border: 1px solid #eee; border-radius: 5px;">
             <strong>{filter_name}</strong><br>
             <span style="color: {color}; font-size: 18px;">{passed}/{total} ({percentage:.1f}%)</span>
+        </div>
+    """, unsafe_allow_html=True)
+
+def render_total_toll_card(passed, total, percentage):
+    color = "green" if percentage >= 60 else "red"
+    st.markdown(f"""
+        <div style="text-align: center; padding: 10px; border: 3px solid #eee; border-radius: 5px;">
+            <strong style="font-size: 19px;">Total Toll</strong><br>
+            <span style="color: {color}; font-size: 19px;">{passed}/{total} ({percentage:.1f}%)</span>
         </div>
     """, unsafe_allow_html=True)
 
@@ -142,6 +195,12 @@ def render_filter_statistics(df):
                 passed, total, percentage = calculate_filter_stats(df, col)
                 render_filter_card(col, passed, total, percentage)
 
+    # Total toll
+    passed, total, percentage = calculate_total_toll_stats(df)
+    col_total_toll = st.columns(1)[0]
+    with col_total_toll:
+        render_total_toll_card(passed, total, percentage)
+
 def render_one_filter_statistics(df, columns_tag):
     st.markdown("##### Filter statistics")
     df_filtered = df[[col for col in ALL_COLUMNS[columns_tag] if col in df.columns]].copy()
@@ -153,10 +212,22 @@ def render_one_filter_statistics(df, columns_tag):
 
 def render_general_dataframe(df):
     st.subheader("General table")
+    # Select and display the visible columns
     all_visible_columns = list(OrderedDict.fromkeys(
         col for cols in VISIBLE_COLUMNS.values() for col in cols))
     df_visible = df[[col for col in all_visible_columns if col in df.columns]].copy()
-    st.dataframe(df_visible, use_container_width=True)
+
+    # Function to apply row-wise styles
+    def apply_row_styles(row):
+        filter_columns = [col for col in row.index if col.startswith('Filter')]
+        if all(row[filter_columns].dropna()):  # All filters that are not NaN must be True
+            return ['background-color: #d4edda'] * len(row)
+        else:
+            return ['background-color: #f8d7da'] * len(row)
+
+    # Apply styles to the DataFrame
+    styled_df = df_visible.style.apply(apply_row_styles, axis=1)
+    st.dataframe(styled_df, use_container_width=True)
 
 # ------------------------ COMMON VIEW STRUCTURE FOR THE DIFFERENT FILTERS ----------------------------------------
 def filter_slider_manager(df, visible_vars):
@@ -305,7 +376,7 @@ def render_micrograph_viewer(mic_path: str):
             with mrcfile.open(mic_path, permissive=True) as mrc:
                 data = mrc.data
 
-            image = (data - np.min(data)) / (np.max(data) - np.min(data))
+            image = image_contrast_enhancement(data)
             st.image(image, caption=os.path.basename(mic_path), clamp=True)
         except Exception as e:
             st.error(f"Error loading micrograph: {e}")
@@ -524,6 +595,12 @@ def plot_interactive_scatter(df, selected_var, thresholds_conditions, time_col='
     return fig
 
 # ------------------------------------- ANALYSIS FUNCTIONS --------------------------------------
+def image_contrast_enhancement(data: np.ndarray) -> np.ndarray:
+    data = np.nan_to_num(data, nan=0.0, posinf=0.0, neginf=0.0)
+    p2, p98 = np.percentile(data, (2, 98))
+    stretched = np.clip((data - p2) / (p98 - p2), 0.0, 1.0)
+    return stretched.astype(np.float32)
+
 def calculate_discrepancy_matrix(df, metric='discrepancy'):
     filter_columns = [col for col in df.columns if col.startswith('Filter')]
     matrix = np.zeros((len(filter_columns), len(filter_columns)))
@@ -593,7 +670,7 @@ def calculate_correlation_matrix_variables(df):
 
 def plot_correlation_matrix_variables(correlation_matrix, columns, show_legend=False):
     fig, ax = plt.subplots(figsize=(14, 10))
-    sns.heatmap(correlation_matrix, annot=True, cmap='coolwarm', center=0, ax=ax)
+    sns.heatmap(correlation_matrix, annot=True, fmt=".2f", cmap='coolwarm', center=0, ax=ax)
 
     # Color the labels based on their group
     group_colors = {}
@@ -630,6 +707,7 @@ def plot_scatter(df, x, y):
 
 # ------------------------------------- FILTERS VIEWS --------------------------------------
 def main_view(df):
+    render_info_acquisition(df, 'import')
     render_filter_statistics(df)
     render_general_dataframe(df)
 
@@ -688,6 +766,7 @@ def drift_view(df, label, title, columns_tag):
             fig_hist = plot_interactive_histogram(df_current, selected_var)
             st.plotly_chart(fig_hist, use_container_width=True)
         elif view_option == "Others":
+            plot_max_shift(df_current)
             st.write("Different filters plots")
 
         return mic_path
@@ -735,15 +814,12 @@ def miffi_view(df, label, title, columns_tag):
     selected_var = 'miffiLabel'
 
     def plot_tab(df_current):
-        view_option = st.selectbox("", ["Interactive Scatter", "Interactive Histogram", "Others"])
+        view_option = st.selectbox("", ["Miffi Time Evolution", "Labels Histogram"])
         mic_path = ""
-        if view_option == "Interactive Scatter":
-            pass
-        elif view_option == "Interactive Histogram":
-            fig_hist = plot_interactive_histogram(df_current, selected_var)
-            st.plotly_chart(fig_hist, use_container_width=True)
-        elif view_option == "Others":
-            st.write("Different filters plots")
+        if view_option == "Miffi Time Evolution":
+            plot_miffi_time_evolution(df_current)
+        elif view_option == "Labels Histogram":
+            plot_miffi_label_histogram(df_current, selected_var)
 
         return mic_path
 
@@ -778,7 +854,8 @@ def ctf_view(df, label, title, columns_tag):
             fig_hist = plot_interactive_histogram(df_current, selected_var)
             st.plotly_chart(fig_hist, use_container_width=True)
         elif view_option == "Others":
-            st.write("Different filters plots")
+            plot_summary_ctf(df_current)
+            plot_astigmatism_check(df_current)
 
         return mic_path
 
@@ -787,6 +864,187 @@ def ctf_view(df, label, title, columns_tag):
 def scores_view(df):
     st.sidebar.title("Plotting options")
     render_scores_view(df)
+
+# ----------------------- MAXSHIFT PLOTS --------------------------
+def plot_max_shift(df):
+    fig = px.line(df, x='movieId', y=['accumMotionTotal', 'accumMotionEarly', 'accumMotionLate'],
+                  labels={'value': 'Motion per frame (A)', 'variable': 'Motion Type'},
+                  title='Accumulated motion per frame')
+
+    # Customize the appearance
+    fig.update_traces(mode='lines+markers', line=dict(width=1), marker=dict(size=6))
+    fig.update_layout(legend_title_text='Motion Type',legend=dict(itemsizing='constant',
+                                                                  title_font_size=14,
+                                                                  font_size=12))
+    # Customize colors
+    fig.for_each_trace(lambda trace: trace.update(line=dict(color={'accumMotionTotal': 'red', 'accumMotionEarly': 'green', 'accumMotionLate': 'blue'}[trace.name])))
+    st.plotly_chart(fig, use_container_width=True)
+
+# ----------------------- MIFFI PLOTS --------------------------------------
+def plot_miffi_time_evolution(df):
+    time_col = 'movieId' if df['creationTime'].nunique() <= 1 else 'creationTime'
+    df = df.sort_values(by=time_col)
+    df['interval'] = (df.index // 100) * 100
+
+    interval_df = df.groupby('interval').agg({
+        'Filter Miffi': ['sum', 'count']
+    }).reset_index()
+    interval_df.columns = ['interval', 'accepted', 'total']
+    interval_df['rejected'] = interval_df['total'] - interval_df['accepted']
+    interval_df['accepted_cumsum'] = interval_df['accepted'].cumsum()
+    interval_df['rejected_cumsum'] = interval_df['rejected'].cumsum()
+
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(
+        x=interval_df['interval'],
+        y=interval_df['accepted_cumsum'],
+        mode='lines+markers',
+        line=dict(color='green'),
+        name='Accepted'
+    ))
+    fig.add_trace(go.Scatter(
+        x=interval_df['interval'],
+        y=interval_df['rejected_cumsum'],
+        mode='lines+markers',
+        line=dict(color='red'),
+        name='Rejected'
+    ))
+    fig.update_layout(
+        title="Accepted vs Rejected Micrographs Over Time",
+        xaxis_title="Interval",
+        yaxis_title="Cumulative Micrographs",
+        height=500,
+        showlegend=True
+    )
+
+    st.plotly_chart(fig, use_container_width=True)
+
+def plot_miffi_label_histogram(df, labels_var):
+    label_counts = df[labels_var].value_counts().reset_index()
+    label_counts.columns = [labels_var, 'count']
+    label_counts['color'] = label_counts[labels_var].apply(
+        lambda x: 'green' if df[df[labels_var] == x]['Filter Miffi'].iloc[0] else 'red'
+    )
+
+    chart = alt.Chart(label_counts).mark_bar().encode(
+        x=alt.X(labels_var, sort='-y', title='Labels'),
+        y=alt.Y('count', title='Count'),
+        color=alt.Color('color', scale=None),
+        tooltip=[labels_var, 'count']
+    ).properties(
+        title='Micrograph Label Distribution',
+        height=400
+    )
+
+    st.altair_chart(chart, use_container_width=True)
+
+# ----------------------- CTF PLOTS ------------------------------
+def plot_summary_ctf(df):
+    time_col = 'movieId' if df['creationTime'].nunique() <= 1 else 'creationTime'
+    fig = go.Figure()
+
+    # A) Resolution
+    fig.add_trace(go.Scatter(
+        x=df[time_col],
+        y=df['resolution'],
+        mode='lines+markers',
+        name='Resolution (Å)',
+        line=dict(color='blue', width=1),
+        marker=dict(color='blue', size=5),
+        yaxis='y1',
+        hovertemplate='Resolution: %{y:.2f} Å<extra></extra>'
+    ))
+
+    # B) Average Defocus
+    df['average_defocus'] = (df['defocusU'] + df['defocusV']) / 2
+    fig.add_trace(go.Scatter(
+        x=df[time_col],
+        y=df['average_defocus'],
+        mode='lines+markers',
+        name='Average Defocus (Å)',
+        line=dict(color='green', width=1),
+        marker=dict(color='green', size=5),
+        yaxis='y2',
+        hovertemplate='Average Defocus: %{y:.2f} Å<extra></extra>'
+    ))
+
+    # C) Astigmatism Percentage
+    fig.add_trace(go.Scatter(
+        x=df[time_col],
+        y=df['astigmatismPercentage'] * 100,
+        mode='lines+markers',
+        name='Astigmatism (%)',
+        line=dict(color='red', width=1),
+        marker=dict(color='red', size=5),
+        yaxis='y3',
+        hovertemplate='Astigmatism: %{y:.2f} %<extra></extra>'
+    ))
+
+    fig.update_layout(
+        title="CTF Summary Over Time",
+        xaxis=dict(title='Time'),
+        yaxis=dict(
+            title='Resolution (Å)',
+            titlefont=dict(color='blue'),
+            tickfont=dict(color='blue'),
+            side='left',
+            position=0
+        ),
+        yaxis2=dict(
+            title='Average Defocus (Å)',
+            titlefont=dict(color='green'),
+            tickfont=dict(color='green'),
+            anchor='free',
+            overlaying='y',
+            side='right',
+            position=0.95
+        ),
+        yaxis3=dict(
+            title='Astigmatism (%)',
+            titlefont=dict(color='red'),
+            tickfont=dict(color='red'),
+            anchor='x',
+            overlaying='y',
+            side='right',
+            position=1
+        ),
+        height=500,
+        showlegend=True
+    )
+
+    st.plotly_chart(fig, use_container_width=True)
+
+def plot_astigmatism_check(df):
+    fig = go.Figure()
+
+    # Scatter plot
+    fig.add_trace(go.Scatter(
+        x=df['defocusV'],
+        y=df['defocusU'],
+        mode='markers',
+        marker=dict(color='blue', size=7),
+        name='Defocus U vs V'
+    ))
+
+    # Línea 1:1
+    max_val = max(df['defocusU'].max(), df['defocusV'].max())
+    fig.add_trace(go.Scatter(
+        x=[0, max_val],
+        y=[0, max_val],
+        mode='lines',
+        line=dict(color='red', dash='dash'),
+        name='1:1 Line'
+    ))
+
+    fig.update_layout(
+        title="Astigmatism Check: Defocus U vs Defocus V",
+        xaxis_title="Defocus V (A)",
+        yaxis_title="Defocus U (A)",
+        height=500,
+        showlegend=True
+    )
+
+    st.plotly_chart(fig, use_container_width=True)
 
 # ----------------------- SCORES VIEWS PLOTS --------------------------
 def plot_discrepancy_matrix(df):
@@ -924,7 +1182,7 @@ def load_and_validate_data(path):
     return df
 
 VIEW_FUNCTIONS = {
-    'Main View': main_view,
+    'Main View': lambda df: main_view(df),
     'Dose': lambda df: dose_view(df, 'Filter DoseAnalysis', 'Dose Analysis Filter', 'dose'),
     'Drift': lambda df: drift_view(df, 'Filter MaxShift', 'Drift Analysis Filter', 'drift'),
     'Tilt': lambda df: tilt_view(df, 'Filter TiltAnalysis', 'Tilt Analysis Filter', 'tilt'),
@@ -944,7 +1202,7 @@ def main():
     st.set_page_config(page_title="Quality Monitor", layout="wide")
     setStyle()
     st.title("Live Quality Metrics Monitor")
-    st_autorefresh(interval=60_000, limit=None, key="quality_monitor_refresh")  # Auto-refresh every 30 seconds (30,000 milliseconds)
+    st_autorefresh(interval=120_000, limit=None, key="quality_monitor_refresh")  # Auto-refresh every 30 seconds (30,000 milliseconds)
     monitor_path = os.environ.get("STREAMLIT_MONITOR_PATH") # .csv metadata
 
     df = load_and_validate_data(monitor_path)
@@ -956,6 +1214,10 @@ def main():
     st.sidebar.markdown("## Object Views")
     selected_view = st.sidebar.selectbox('Select option:', VIEWS)
 
+    # Manual reload
+    if st.sidebar.button("Reload dashboard"):
+        st.rerun()
+
     # --- Entries range filter ---
     st.sidebar.markdown("### Entries range filter")
     enable_range_filter = st.sidebar.checkbox("Activate range filter")
@@ -964,12 +1226,22 @@ def main():
     if enable_range_filter:
         sort_col = 'movieId' if df['creationTime'].nunique() <= 1 else 'creationTime'
         df = df.sort_values(by=sort_col).reset_index(drop=True)
-
         max_index = len(df) - 1
         default_start = max(0, max_index - 99)
-        entry_range = st.sidebar.slider("Select entries range:", min_value = 0, max_value = max_index,
-                                        value = (default_start, max_index), step = 1)
+
+        entry_range = st.sidebar.slider(
+            "Select entries range:",
+            min_value=0,
+            max_value=max_index,
+            value=(default_start, max_index),
+            step=1,
+            key="entry_range_slider"
+        )
+
         df = df.iloc[entry_range[0]:entry_range[1] + 1]
+
+    # Order the DataFrame by 'creationTime' and 'movieId' in descending order
+    df = df.sort_values(by=['creationTime', 'movieId'], ascending=[False, False])
 
     render_view(selected_view, df)
 

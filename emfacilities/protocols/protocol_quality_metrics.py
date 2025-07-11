@@ -270,6 +270,8 @@ class ProtQualityMetrics(EMProtocol):
 
 def extractImportMovies(prot, where):
     # Common information
+    project_name = prot.getProject().getShortName()
+    status = prot.getStatus()
     voltage = prot.voltage.get()
     spherical_ab = prot.sphericalAberration.get()
     magnification = prot.magnification.get()
@@ -293,6 +295,8 @@ def extractImportMovies(prot, where):
                 'movieId': objId,
                 'movieName': item.getBaseName(),
                 'creationTime': objCreationTime,
+                'projectName': project_name,
+                'status': status,
                 'magnification': magnification,
                 'pixelSize': pixel_size,  # in Å/pixel
                 'voltage': voltage,
@@ -402,6 +406,7 @@ def extractMaxShift(prot, where):
                 movieEntries[movieId]['accumMotionTotal'] = round(item._rlnAccumMotionTotal.get(), 2)
                 movieEntries[movieId]['accumMotionEarly'] = round(item._rlnAccumMotionEarly.get(), 2)
                 movieEntries[movieId]['accumMotionLate'] = round(item._rlnAccumMotionLate.get(), 2)
+                movieEntries[movieId]['plotGlobal'] = item.plotGlobal._filename.get()
 
         outSet.close()
         if movieEntries:
