@@ -423,30 +423,31 @@ def extractMaxShift(prot, where):
 
 def calculateMaxShift(x_shifts, y_shifts, pixel_size):
     """
-    Calculates max frame-to-frame shift and max movie shift range from absolute shifts.
+    Calculates:
+      - max per-frame shift (Å) as the largest vector displacement between consecutive frames.
+      - total accumulated movie shift (Å) as the sum of all per-frame vector displacements.
 
     Parameters:
-        x_shifts (list): Absolute X shifts per frame.
-        y_shifts (list): Absolute Y shifts per frame.
+        x_shifts (list or array): Absolute X shifts per frame.
+        y_shifts (list or array): Absolute Y shifts per frame.
         pixel_size (float): Pixel size in Å/pixel.
 
     Returns:
         max_frame_shift (float): Max per-frame shift (Å).
-        max_movie_shift (float): Max range across movie (Å).
+        total_movie_shift (float): Accumulated shift over the movie (Å).
     """
     x_shifts = np.asarray(x_shifts)
     y_shifts = np.asarray(y_shifts)
-    # Frame-wise shifts (difference between consecutive absolute positions)
+    # Per-frame displacements
     frame_dx = np.diff(x_shifts)
     frame_dy = np.diff(y_shifts)
     frame_shifts = np.sqrt(frame_dx**2 + frame_dy**2)
+    # Max single-frame shift
     max_frame_shift = np.max(frame_shifts) * pixel_size
-    # Movie-wise range (max difference in each direction)
-    range_x = np.max(x_shifts) - np.min(x_shifts)
-    range_y = np.max(y_shifts) - np.min(y_shifts)
-    max_movie_shift = max(range_x, range_y) * pixel_size
+    # Total accumulated shift (sum of all frame displacements)
+    total_movie_shift = np.sum(frame_shifts) * pixel_size
 
-    return max_frame_shift, max_movie_shift
+    return max_frame_shift, total_movie_shift
 
 def extractTiltAnalaysis(prot, where):
     mean_corr_th = round(prot.meanCorr_threshold.get(), 2)
