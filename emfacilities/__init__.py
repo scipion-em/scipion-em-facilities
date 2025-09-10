@@ -54,4 +54,31 @@ class Plugin(pwem.Plugin):
 
     @classmethod
     def defineBinaries(cls, env):
-        pass
+        cls.installStreamlit(env)
+
+    @classmethod
+    def installStreamlit(cls, env):
+        STRM_INSTALLED = '%s_installed' % (STRM_PROGRAM)
+        installationCmd = cls.getCondaActivationCmd()
+        # Create the environment
+        installationCmd += ' conda create -y -n %s -c conda-forge python=3.11 && ' % STRM_ENV_NAME
+
+        # Activate new the environment
+        installationCmd += 'conda activate %s && ' % STRM_ENV_NAME
+
+        # Install Streamlit
+        installationCmd += f'pip install {STRM_PROGRAM} && '
+
+        # Flag installation finished
+        installationCmd += 'touch %s' % STRM_INSTALLED
+
+        STRM_commands = [(installationCmd, STRM_INSTALLED)]
+        envPath = os.environ.get('PATH', "")
+        installEnvVars = {'PATH': envPath} if envPath else None
+
+        env.addPackage(STRM_PROGRAM,
+                       tar='void.tgz',
+                       commands=STRM_commands,
+                       neededProgs=[],
+                       vars=installEnvVars,
+                       default=True)

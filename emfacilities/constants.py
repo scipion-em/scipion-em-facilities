@@ -32,3 +32,6 @@ URL = 'https://scipion-em.github.io/docs/docs/facilities/facilities.html'
 SECRETSFILE = 'secrets.cfg'
 EMFACILITIES_HOME_VARNAME = 'EMFACILITIES_HOME'
 
+# Streamlit environment
+STRM_ENV_NAME = 'streamlitenv'
+STRM_PROGRAM = 'streamlit'
