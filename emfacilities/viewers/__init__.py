@@ -27,3 +27,4 @@
 from .viewer_monitors import (ProtMonitorCTFViewer, ProtMonitorSystemViewer,
                               ProtMonitorMovieGainViewer, ViewerMonitorSummary)
 from .viewer_good_classes_extractor import ViewerGoodClassesExtractor
+from .viewer_oscem_metadata import OscemViewer
