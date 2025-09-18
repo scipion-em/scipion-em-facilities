@@ -225,7 +225,7 @@ st.markdown(\"\"\"
     }}
     
     .zoom-img:hover {{
-        transform: scale(2);
+        transform: scale(2.5);
         box-shadow: 4px 6px 12px rgba(0,0,0,0.25);
         z-index: 999;
     }}
