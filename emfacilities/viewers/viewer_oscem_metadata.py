@@ -160,7 +160,7 @@ def display_node(key, value, level=0, is_last=True):
 # --- MAIN ---
 yaml_path = '{self.protocol._getExtraPath('Processing_metadata.yaml')}'
 st.markdown(
-    "<div style='font-size:36px; font-weight:700; color:#2c3e50; margin-bottom:24px;'>Metadata Viewer</div>",
+    "<div style='font-size:36px; font-weight:700; color:#2c3e50; margin-bottom:24px;'>OSC-EM Metadata Viewer</div>",
     unsafe_allow_html=True
 )
 if Path(yaml_path).exists():
