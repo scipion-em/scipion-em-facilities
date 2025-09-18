@@ -1,3 +1,6 @@
+import subprocess
+import time
+from os.path import abspath
 import pyworkflow.viewer as pwviewer
 from pwem import Plugin
 from emfacilities import STRM_ENV_NAME
@@ -13,14 +16,17 @@ class OscemViewer(pwviewer.Viewer):
         view._tkParent = self.getTkRoot()
         return [view]
 
-class OSCEMView(pwviewer.CommandView):
+class OSCEMView(pwviewer.View):
     def __init__(self, protocol):
         self.protocol = protocol
-        pyFile = self.generateReport()
+        pyFile = abspath(self.generateReport())
         cmd = Plugin.getCondaActivationCmd()
         cmd += f"conda activate {STRM_ENV_NAME} && "
         cmd += f"streamlit run {pyFile}"
-        super().__init__(cmd)
+
+        process = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        time.sleep(1)
+        process.terminate()
 
     def generateReport(self):
         code = f"""
