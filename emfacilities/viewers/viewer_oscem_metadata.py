@@ -25,12 +25,10 @@ class OSCEMView(pwviewer.View):
         cmd += f"streamlit run {pyFile}"
 
         process = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        # time.sleep(1)
         try:
             process.wait(timeout=2)
         except subprocess.TimeoutExpired:
             process.terminate()
-        # process.terminate()
 
     def generateReport(self):
         code = f"""
