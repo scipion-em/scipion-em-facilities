@@ -1,5 +1,6 @@
 
-V3.2.1
+V3.3.0
+- OSCEM viewer
 - Data counter fix 
 
 V3.2.0
