@@ -35,6 +35,7 @@ from .constants import *
 _logo = "facilityLogo.png"
 _references = ["delaRosaTrevin201693"]
 _url = URL
+__version__ = FACILITIES_VERSION
 
 class Plugin(pwem.Plugin):
     _homeVar = EMFACILITIES_HOME_VARNAME 
