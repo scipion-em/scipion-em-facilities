@@ -99,8 +99,8 @@ class ProtDataCounter(EMProtocol):
     def initializeParams(self):
         self.finished = False
         # Important to have both:
-        self.insertedIds = []   # Contains images that have been inserted in a Step (checkNewInput).
-        self.processedIds = [] # Ids to be output
+        self.insertedIds = set() # Contains images that have been inserted in a Step (checkNewInput).
+        self.processedIds = set() # Ids to be output
         self.isStreamClosed = self.inputImages.get().isStreamClosed()
         # Contains images that have been processed in a Step (checkNewOutput).
         self.inputFn = self.inputImages.get().getFileName()
@@ -144,6 +144,10 @@ class ProtDataCounter(EMProtocol):
         # it does not make sense to check for new input data
         if (self.lastCheck > mTime and self.insertedIds) and not self.lastRound:  # If this is empty it is due to a static "continue" action or it is the first round
             return None
+        
+        if self.lastRound:
+            self.info("Last round sleeping for 10 seconds to allow all the input to be loaded")
+            time.sleep(10) # Needs to make sure that eventhough the stream is closed all the data in the inputset is loaded
 
         inputSet = self._loadInputSet(self.inputFn)
         inputSetIds = inputSet.getIdSet()
@@ -162,7 +166,7 @@ class ProtDataCounter(EMProtocol):
             skipIds = list(set(newIds).intersection(set(doneIds)))
             newIds = list(set(newIds).difference(set(doneIds)))
             self.info("Skipping Images with ID: %s, seems to be done" % skipIds)
-            self.insertedIds = doneIds  # During the first round of "Continue" action it has to be filled
+            self.insertedIds = set(doneIds) # During the first round of "Continue" action it has to be filled
 
         if newIds and not self.limitReach and not self.timerOut:
             fDeps = self._insertNewImageSteps(newIds)
@@ -175,8 +179,9 @@ class ProtDataCounter(EMProtocol):
             return
 
         doneListIds, currentOutputSize = self._getAllDoneIds()
-        processedIds = copy.deepcopy(self.processedIds)
-        newDone = [imageId for imageId in processedIds if imageId not in doneListIds]
+        # Make doneListIds a set for fast lookups
+        doneSet = set(doneListIds)
+        newDone = self.processedIds - doneSet
         allDone = len(doneListIds) + len(newDone)
         limitOutputSize = self.outputSize.get()
         maxSize = self._loadInputSet(self.inputFn).getSize()
@@ -246,14 +251,13 @@ class ProtDataCounter(EMProtocol):
         stepId = self._insertFunctionStep(self.registerStep, newIds, needsGPU=False,
                                           prerequisites=[])
         deps.append(stepId)
-        self.insertedIds.extend(newIds)
+        self.insertedIds.update(newIds)
 
         return deps
 
     def registerStep(self, newIds):
         self.info('Registering the %d new images' %len(newIds))
-        for imageId in newIds:
-            self.processedIds.append(imageId)
+        self.processedIds.update(newIds)
 
         if not self.isStreamClosed:
             if self.boolTimer.get():

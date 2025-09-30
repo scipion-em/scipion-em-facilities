@@ -32,10 +32,9 @@ import pwem
 
 from .constants import *
 
-__version__ = "3.2.0"
 _logo = "facilityLogo.png"
 _references = ["delaRosaTrevin201693"]
-
+_url = URL
 
 class Plugin(pwem.Plugin):
     _homeVar = EMFACILITIES_HOME_VARNAME 
@@ -43,15 +42,46 @@ class Plugin(pwem.Plugin):
 
     @classmethod
     def _defineVariables(cls):
-        cls._defineEmVar(EMFACILITIES_HOME_VARNAME, '')
-                         #os.path.expanduser('~/.config/scipion'))
+        cls._defineVar(FACILITIES_ENV_ACTIVATION, FACILITIES_DEFAULT_ACTIVATION_CMD)
 
     @classmethod
     def getEnviron(cls):
         pass
 
-    _url = URL
-
     @classmethod
     def defineBinaries(cls, env):
-        pass
+        cls.installStreamlit(env)
+
+    @classmethod
+    def installStreamlit(cls, env):
+        STRM_INSTALLED = '%s_installed' % (STRM_PROGRAM)
+        installationCmd = cls.getCondaActivationCmd()
+        # Create the environment
+        installationCmd += ' conda create -y -n %s -c conda-forge python=3.11 && ' % STRM_ENV_NAME
+
+        # Activate new the environment
+        installationCmd += 'conda activate %s && ' % STRM_ENV_NAME
+
+        # Install Streamlit
+        installationCmd += f'pip install {STRM_PROGRAM} && '
+
+        # Install pyyaml
+        installationCmd += f'pip install pyyaml && '
+
+        # Install pillow
+        installationCmd += f'pip install pillow && '
+
+        # Flag installation finished
+        installationCmd += 'touch %s' % STRM_INSTALLED
+
+        STRM_commands = [(installationCmd, STRM_INSTALLED)]
+        envPath = os.environ.get('PATH', "")
+        installEnvVars = {'PATH': envPath} if envPath else None
+
+        env.addPackage(FACLITIES_STREAMLIT,
+                       version=FACILITIES_VERSION,
+                       tar='void.tgz',
+                       commands=STRM_commands,
+                       neededProgs=[],
+                       vars=installEnvVars,
+                       default=True)
