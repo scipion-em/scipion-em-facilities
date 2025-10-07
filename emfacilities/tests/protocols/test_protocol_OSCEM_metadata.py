@@ -27,7 +27,7 @@ class TestOscemMetadata(BaseTest):
     """
     """
     sampling_rate = 0.495
-    max_movie_shift = 20.0
+    max_movie_shift = 60
     ctf_down_factor = 2.0
     high_res = 0.5
     test_data = {
@@ -282,7 +282,9 @@ class TestOscemMetadata(BaseTest):
     @classmethod
     def runMovieGain(cls):
         prot = cls.newProtocol(XmippProtMovieGain,
-                               inputMovies=cls.importedmovies)
+                               inputMovies=cls.importedmovies,
+                               estimateGain=False,
+                               estimateResidualGain=False)
 
         cls.launchProtocol(prot)
         output = getattr(prot, 'outputMovies', None)
@@ -393,7 +395,9 @@ class TestOscemMetadata(BaseTest):
         prot = cls.newProtocol(ProtCryoSparcNewNonUniformRefine3D,
                                inputParticles=cls.particles,
                                referenceVolume=cls.imported_volume_classes3D,
-                               symmetryGroup=SYM_TETRAHEDRAL)
+                               symmetryGroup=SYM_TETRAHEDRAL,
+                               refine_defocus_refine=False,
+                               refine_ctf_global_refine=False)
 
         cls.launchProtocol(prot)
         output1 = getattr(prot, 'outputVolume', None)
