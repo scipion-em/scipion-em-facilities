@@ -63,7 +63,7 @@ class TestOscemMetadata(BaseTest):
                 {
                     "descriptor_name": "XmippProtMovieMaxShift",
                     "descriptor_thing":
-                        {"discarded_movies": 9,
+                        {"discarded_movies": 2,
                          "max_frame_shift": {
                              "value": 5.0,
                              "unit": "Å"
