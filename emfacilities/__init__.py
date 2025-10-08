@@ -37,8 +37,6 @@ _references = ["delaRosaTrevin201693"]
 _url = URL
 
 class Plugin(pwem.Plugin):
-    _homeVar = EMFACILITIES_HOME_VARNAME 
-    _pathVars = [EMFACILITIES_HOME_VARNAME]
 
     @classmethod
     def _defineVariables(cls):
