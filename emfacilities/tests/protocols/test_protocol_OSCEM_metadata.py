@@ -163,6 +163,7 @@ class TestOscemMetadata(BaseTest):
                 "images_classes_3D": "Classes_3D/classes_3D.jpg",
                 "volumes": [
                     {
+                        "size": [250, 250, 250],
                         "orthogonal_slices": {
                             "orthogonal_slices_X": "Classes_3D/orthogonal_slices_volume1/orthogonal_slices_X.jpg",
                             "orthogonal_slices_Y": "Classes_3D/orthogonal_slices_volume1/orthogonal_slices_Y.jpg",
