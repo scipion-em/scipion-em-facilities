@@ -27,7 +27,7 @@ class TestOscemMetadata(BaseTest):
     """
     """
     sampling_rate = 0.495
-    max_movie_shift = 20.0
+    max_movie_shift = 60
     ctf_down_factor = 2.0
     high_res = 0.5
     test_data = {
@@ -52,7 +52,7 @@ class TestOscemMetadata(BaseTest):
                              "frameN": 30
                          },
                          "output_avg_shift": {
-                             "value": 11.8,
+                             "value": 11.0,
                              "unit": "Å"
                          },
                          "output_max_shift": {
@@ -63,22 +63,22 @@ class TestOscemMetadata(BaseTest):
                 {
                     "descriptor_name": "XmippProtMovieMaxShift",
                     "descriptor_thing":
-                        {"discarded_movies": 9,
+                        {"discarded_movies": 2,
                          "max_frame_shift": {
-                             "value": 5.0,
+                             "value": 10.0,
                              "unit": "Å"
                          },
                          "max_movie_shift": {
-                             "value": 20.0,
+                             "value": 60.0,
                              "unit": "Å"
                          },
                          "rejection_type": "by frame or movie",
                          "output_avg_shift": {
-                             "value": 11.8,
+                             "value": 11.4,
                              "unit": "Å"
                          },
                          "output_max_shift": {
-                             "value": 29.7,
+                             "value": 34.6,
                              "unit": "Å"
                          },
                          "shift_histogram": "shift_hist.jpg"}
@@ -86,21 +86,21 @@ class TestOscemMetadata(BaseTest):
             ]
         },
             "micrographs": {
-                "number_micrographs": 21
+                "number_micrographs": 28
             },
             "CTFs": {
                 "amplitude_contrast": 0.1,
                 "defocus": {
                     "output_min_defocus": {
-                        "value": 4199.7,
+                        "value": 4794.4,
                         "unit": "Å"
                     },
                     "output_max_defocus": {
-                        "value": 11828.1,
+                        "value": 12373.8,
                         "unit": "Å"
                     },
                     "output_avg_defocus": {
-                        "value": 9424.5,
+                        "value": 9803.1,
                         "unit": "Å"
                     },
                     "defocus_histogram": "defocus_hist.jpg",
@@ -108,11 +108,11 @@ class TestOscemMetadata(BaseTest):
                 },
                 "resolution": {
                     "output_min_resolution": {
-                        "value": 3.9,
+                        "value": 3.4,
                         "unit": "Å"
                     },
                     "output_max_resolution": {
-                        "value": 2.8,
+                        "value": 2.9,
                         "unit": "Å"
                     },
                     "output_avg_resolution": {
@@ -126,43 +126,44 @@ class TestOscemMetadata(BaseTest):
                 }
             },
             "coordinates": {
-                "number_particles": 2937,
-                "particles_per_micrograph": 139.9,
+                "number_particles": 3986,
+                "particles_per_micrograph": 142.4,
                 "particles_histogram": "particles_hist.jpg",
                 "micrograph_examples": "Micro_examples/micro_particles.jpg"
             },
             "classes2D": {
                 "particles_per_2Dclass": [
-                    333,
-                    296,
-                    235,
-                    231,
-                    228,
-                    212,
-                    202,
-                    192,
-                    182,
-                    168,
-                    96,
-                    91,
-                    82,
-                    80,
-                    76,
-                    65,
-                    62,
-                    59,
-                    27,
-                    20
+                    382,
+                    353,
+                    346,
+                    342,
+                    335,
+                    321,
+                    320,
+                    288,
+                    259,
+                    240,
+                    125,
+                    117,
+                    101,
+                    93,
+                    92,
+                    84,
+                    68,
+                    54,
+                    54,
+                    12,
                 ],
                 "images_classes_2D": "classes_2D.jpg"
             },
             "classes3D": {
                 "particles_per_3Dclass": [
-                    2937
+                    3986
                 ],
                 "images_classes_3D": "Classes_3D/classes_3D.jpg",
                 "volumes": [
                     {
+                        "size": [250, 250, 250],
                         "orthogonal_slices": {
                             "orthogonal_slices_X": "Classes_3D/orthogonal_slices_volume1/orthogonal_slices_X.jpg",
                             "orthogonal_slices_Y": "Classes_3D/orthogonal_slices_volume1/orthogonal_slices_Y.jpg",
@@ -193,9 +194,9 @@ class TestOscemMetadata(BaseTest):
                 },
                 {
                     "volume_type": "final volume",
-                    "vol_number_particles": 2937,
+                    "vol_number_particles": 3986,
                     "vol_resolution": {
-                        "value": 3.39,
+                        "value": 3.31,
                         "unit": "Å"
                     },
                     "size": [250, 250, 250],
@@ -282,7 +283,9 @@ class TestOscemMetadata(BaseTest):
     @classmethod
     def runMovieGain(cls):
         prot = cls.newProtocol(XmippProtMovieGain,
-                               inputMovies=cls.importedmovies)
+                               inputMovies=cls.importedmovies,
+                               estimateGain=False,
+                               estimateResidualGain=False)
 
         cls.launchProtocol(prot)
         output = getattr(prot, 'outputMovies', None)
@@ -393,7 +396,9 @@ class TestOscemMetadata(BaseTest):
         prot = cls.newProtocol(ProtCryoSparcNewNonUniformRefine3D,
                                inputParticles=cls.particles,
                                referenceVolume=cls.imported_volume_classes3D,
-                               symmetryGroup=SYM_TETRAHEDRAL)
+                               symmetryGroup=SYM_TETRAHEDRAL,
+                               refine_defocus_refine=False,
+                               refine_ctf_global_refine=False)
 
         cls.launchProtocol(prot)
         output1 = getattr(prot, 'outputVolume', None)

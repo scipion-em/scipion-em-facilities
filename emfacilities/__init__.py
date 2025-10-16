@@ -32,14 +32,13 @@ import pwem
 
 from .constants import *
 
+__version__ = "3.3.0"
 _logo = "facilityLogo.png"
 _references = ["delaRosaTrevin201693"]
 _url = URL
 __version__ = FACILITIES_VERSION
 
 class Plugin(pwem.Plugin):
-    _homeVar = EMFACILITIES_HOME_VARNAME 
-    _pathVars = [EMFACILITIES_HOME_VARNAME]
 
     @classmethod
     def _defineVariables(cls):
@@ -80,7 +79,7 @@ class Plugin(pwem.Plugin):
         installEnvVars = {'PATH': envPath} if envPath else None
 
         env.addPackage(FACLITIES_STREAMLIT,
-                       version=FACILITIES_VERSION,
+                       version=__version__,
                        tar='void.tgz',
                        commands=STRM_commands,
                        neededProgs=[],

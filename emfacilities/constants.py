@@ -31,11 +31,11 @@ This modules contains constants related to emfacilities
 URL = 'https://scipion-em.github.io/docs/docs/facilities/facilities.html'
 SECRETSFILE = 'secrets.cfg'
 EMFACILITIES_HOME_VARNAME = 'EMFACILITIES_HOME'
-FACILITIES_VERSION = '3.3.0'
+FACILITIES_VERSION_FOR_VIEWER = '3.3.0'
 
 # Streamlit environment
 FACLITIES_STREAMLIT = 'facilities-streamlit'
-STRM_ENV_NAME = f'{FACLITIES_STREAMLIT}-{FACILITIES_VERSION}'
+STRM_ENV_NAME = f'{FACLITIES_STREAMLIT}-{FACILITIES_VERSION_FOR_VIEWER}'
 STRM_PROGRAM = 'streamlit'
 
 FACILITIES_ENV_ACTIVATION = 'FACILITIES_ENV_ACTIVATION'
