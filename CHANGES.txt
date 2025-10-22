@@ -1,3 +1,6 @@
+V3.3.1
+- Fixing the test for OSCEM protocol
+- Fixed duplication of __version__ in __init__.py
 
 V3.2.1
 - Data counter fix 
