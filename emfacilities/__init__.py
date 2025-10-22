@@ -32,11 +32,10 @@ import pwem
 
 from .constants import *
 
-__version__ = "3.3.0"
+__version__ = "3.3.1"
 _logo = "facilityLogo.png"
 _references = ["delaRosaTrevin201693"]
 _url = URL
-__version__ = FACILITIES_VERSION
 
 class Plugin(pwem.Plugin):
 
