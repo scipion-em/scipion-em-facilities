@@ -919,6 +919,10 @@ class ProtOSCEM(EMProtocol):
                 ########## VOLUMES ##########
                 #############################
 
+                # Volume size
+                size = data.shape
+                vol_size_list = [int(x) for x in size]
+
                 # Getting orthogonal slices in X, Y and Z
                 # Folder to store orthogonal slices
                 orthogonal_slices_folder = f'orthogonal_slices_volume{i + 1}'
@@ -943,6 +947,7 @@ class ProtOSCEM(EMProtocol):
 
                 # Dictionary fill in:
                 volume = {
+                    "size": vol_size_list,
                     "orthogonal_slices": {
                         "orthogonal_slices_X": join(classes_3D_folder_name, orthogonal_slices_folder,
                                                     slices_x),
