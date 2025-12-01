@@ -13,3 +13,4 @@ streamlit
 streamlit_autorefresh
 altair
 streamlit_plotly_events
+streamlit-aggrid
