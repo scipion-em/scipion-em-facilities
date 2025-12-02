@@ -21,7 +21,7 @@ the system monitor and the movie gain monitor and continuously creates a report.
 
 This module contains protocols and utilities related with monitors.
 
-Please, check the `facilities documentation <https://scipion-em.github.io/docs/docs/facilities/facilities.html>`_
+Please, check the `facilities documentation <https://scipion-em.github.io/docs/release-3.0.0/docs/facilities/facilities.html>`_
 for more details.
 
 
