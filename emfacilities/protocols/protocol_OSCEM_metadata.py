@@ -4,8 +4,6 @@ from os.path import abspath, join, dirname, splitext
 from PIL import Image, ImageDraw, ImageFont, ImageOps
 from matplotlib import pyplot as plt
 import mrcfile
-import tifffile
-import cryoEER
 
 import pyworkflow.protocol.params as params
 import xmipp3
@@ -122,7 +120,7 @@ class ProtOSCEM(EMProtocol):
                       help="Initial volume",
                       allowsNull=True)
 
-        form.addParam('threshold_initVol', params.IntParam, default=-1,
+        form.addParam('threshold_initVol', params.FloatParam, default=-1.0,
                       label="Initial volume threshold",
                       help=threshold_help)
 
@@ -132,7 +130,7 @@ class ProtOSCEM(EMProtocol):
                       help="Set of 3D classes",
                       allowsNull=True)
 
-        form.addParam('threshold_classes3D', params.IntParam, default=-1,
+        form.addParam('threshold_classes3D', params.FloatParam, default=-1.0,
                       label="3D Classes threshold",
                       help=threshold_help)
 
@@ -142,7 +140,7 @@ class ProtOSCEM(EMProtocol):
                       help="Final volume",
                       allowsNull=True)
 
-        form.addParam('threshold_finalVol', params.IntParam, default=-1,
+        form.addParam('threshold_finalVol', params.FloatParam, default=-1.0,
                       label="Final volume threshold",
                       help=threshold_help)
 
@@ -152,7 +150,7 @@ class ProtOSCEM(EMProtocol):
                       help="Sharpened volume",
                       allowsNull=True)
 
-        form.addParam('threshold_sharpenedVol', params.IntParam, default=-1,
+        form.addParam('threshold_sharpenedVol', params.FloatParam, default=-1.0,
                       label="Sharpened volume threshold",
                       help=threshold_help)
 
@@ -162,7 +160,7 @@ class ProtOSCEM(EMProtocol):
                       help="Polished volume",
                       allowsNull=True)
 
-        form.addParam('threshold_polishedVol', params.IntParam, default=-1,
+        form.addParam('threshold_polishedVol', params.FloatParam, default=-1.0,
                       label="Polished volume threshold",
                       help=threshold_help)
 
