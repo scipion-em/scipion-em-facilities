@@ -903,8 +903,9 @@ class ProtOSCEM(EMProtocol):
             # Option 2:
             if ':' in file_name:
                 file_name_without_suffix = file_name.split(':')[0]
+                file_name = file_name_without_suffix
 
-            with mrcfile.open(file_name_without_suffix, 'r') as mrc:
+            with mrcfile.open(file_name, 'r') as mrc:
                 data = mrc.data
 
                 ############################
@@ -956,7 +957,7 @@ class ProtOSCEM(EMProtocol):
                 os.makedirs(isosurface_images_path, exist_ok=True)
 
                 th = int(self.threshold_classes3D.get())
-                volume_file_abspath = abspath(file_name_without_suffix)
+                volume_file_abspath = abspath(file_name)
                 front_view_img = 'front_view.jpg'
                 side_view_img = 'side_view.jpg'
                 top_view_img = 'top_view.jpg'
