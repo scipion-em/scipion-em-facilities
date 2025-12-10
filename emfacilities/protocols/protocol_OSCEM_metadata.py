@@ -280,7 +280,6 @@ class ProtOSCEM(EMProtocol):
         valid_file_keys = [key for key in file_keys if input_movies[key] is not None]
         for key in valid_file_keys:
             data = self.load_image_path(input_movies[key])
-            print(f'data gain: {data}')
 
             p_low, p_high = np.percentile(data, [1, 99])
             data_clip = np.clip(data, p_low, p_high)
@@ -1013,7 +1012,8 @@ class ProtOSCEM(EMProtocol):
         """
         ###### MOVIE ALIGNMENT DESCRIPTOR ######
         MovieAlignmentProt = self.movieAlignment.get()
-        movie_align = {'descriptor_name': MovieAlignmentProt.getClassName()}
+        prot_name = MovieAlignmentProt.getClassName()
+        movie_align = {'descriptor_name': prot_name}
         descriptor_thing_dict = {}
         ################################ INPUT #############################################
         input_alignment = MovieAlignmentProt.getObjDict()
@@ -1092,8 +1092,13 @@ class ProtOSCEM(EMProtocol):
             max_shifts = []
             for index, item in enumerate(output.iterItems()):
                 attributes_dict = dict(item.getAttributes())
-                shiftX = attributes_dict.get('_xmipp_ShiftX')
-                shiftY = attributes_dict.get('_xmipp_ShiftY')
+                if prot_name == 'XmippProtFlexAlign':
+                    shiftX = attributes_dict.get('_xmipp_ShiftX')
+                    shiftY = attributes_dict.get('_xmipp_ShiftY')
+                elif prot_name in ('ProtMotionCorr', 'ProtRelionMotioncorr'):
+                    alignment = attributes_dict.get('_alignment')
+                    shiftX = alignment._xshifts
+                    shiftY = alignment._yshifts
 
                 norm = np.linalg.norm([shiftX, shiftY], axis=0)
                 avg_shifts.append(np.mean(norm))
