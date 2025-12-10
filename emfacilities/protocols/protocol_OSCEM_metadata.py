@@ -992,7 +992,7 @@ class ProtOSCEM(EMProtocol):
     def load_image_path(self, path):
         ext = os.path.splitext(path)[1].lower()
         # MRC/MRCS
-        if ext in [".mrc", ".mrcs"]:
+        if ext in [".mrc", ".mrcs", ".gain"]:
             with mrcfile.open(path, 'r') as mrc:
                 return np.array(mrc.data, dtype=np.float32)
         # TIFF/TIF
