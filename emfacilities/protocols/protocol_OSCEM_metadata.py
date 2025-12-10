@@ -280,11 +280,11 @@ class ProtOSCEM(EMProtocol):
         valid_file_keys = [key for key in file_keys if input_movies[key] is not None]
         for key in valid_file_keys:
             data = self.load_image_path(input_movies[key])
+            print(f'data gain: {data}')
 
-            # Normalize the data to 8-bit (0-255) range
-            min_val = np.min(data)
-            max_val = np.max(data)
-            normalized_data = 255 * (data - min_val) / (max_val - min_val)
+            p_low, p_high = np.percentile(data, [1, 99])
+            data_clip = np.clip(data, p_low, p_high)
+            normalized_data = 255 * (data_clip - p_low) / (p_high - p_low)
             normalized_data = normalized_data.astype(np.uint8)
 
             # Apply Histogram Equalization
@@ -992,7 +992,7 @@ class ProtOSCEM(EMProtocol):
     def load_image_path(self, path):
         ext = os.path.splitext(path)[1].lower()
         # MRC/MRCS
-        if ext in [".mrc", ".mrcs", ".gain"]:
+        if ext in [".mrc", ".mrcs"]:
             with mrcfile.open(path, 'r') as mrc:
                 return np.array(mrc.data, dtype=np.float32)
         # TIFF/TIF
@@ -1000,11 +1000,12 @@ class ProtOSCEM(EMProtocol):
             img = Image.open(path)
             arr = np.array(img, dtype=np.float32)
             return arr
-        # EER
-        elif ext == ".eer":
-            raise ValueError(
-                f"File {path} is EER."
-            )
+        # GAIN
+        elif ext == ".gain":
+            G = emlib.Image()
+            G.read(path)
+            data = G.getData()
+            return data
 
     def get_movie_alignment_descriptor(self):
         """
