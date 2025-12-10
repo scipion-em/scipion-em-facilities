@@ -279,9 +279,7 @@ class ProtOSCEM(EMProtocol):
         file_keys = [_gainFile, _darkFile]
         valid_file_keys = [key for key in file_keys if input_movies[key] is not None]
         for key in valid_file_keys:
-            with mrcfile.open(input_movies[key], 'r') as mrc:
-                # Read the data from the MRC file
-                data = mrc.data
+            data = self.load_image_path(input_movies[key])
 
             # Normalize the data to 8-bit (0-255) range
             min_val = np.min(data)
@@ -392,21 +390,21 @@ class ProtOSCEM(EMProtocol):
 
         # To draw defocus value on image, we make images smaller and then larger
         # since the default font cannot be increased in size
-        with mrcfile.open(lowest_defocus_path, permissive=True) as mrc1:
-            data1 = mrc1.data
-            img1 = Image.fromarray(np.uint8(data1 / np.max(data1) * 255))
-            img1 = img1.convert('RGB')
-            img1_resized = self.resize_image(img1, scale=0.05)
-        with mrcfile.open(medium_defocus_path, permissive=True) as mrc2:
-            data2 = mrc2.data
-            img2 = Image.fromarray(np.uint8(data2 / np.max(data2) * 255))
-            img2 = img2.convert('RGB')
-            img2_resized = self.resize_image(img2, scale=0.05)
-        with mrcfile.open(highest_defocus_path, permissive=True) as mrc3:
-            data3 = mrc3.data
-            img3 = Image.fromarray(np.uint8(data3 / np.max(data3) * 255))
-            img3 = img3.convert('RGB')
-            img3_resized = self.resize_image(img3, scale=0.05)
+
+        data1 = self.load_image_path(lowest_defocus_path)
+        img1 = Image.fromarray(np.uint8(data1 / np.max(data1) * 255))
+        img1 = img1.convert('RGB')
+        img1_resized = self.resize_image(img1, scale=0.05)
+
+        data2 = self.load_image_path(medium_defocus_path)
+        img2 = Image.fromarray(np.uint8(data2 / np.max(data2) * 255))
+        img2 = img2.convert('RGB')
+        img2_resized = self.resize_image(img2, scale=0.05)
+
+        data3 = self.load_image_path(highest_defocus_path)
+        img3 = Image.fromarray(np.uint8(data3 / np.max(data3) * 255))
+        img3 = img3.convert('RGB')
+        img3_resized = self.resize_image(img3, scale=0.05)
 
 
         font = ImageFont.load_default()
@@ -611,8 +609,7 @@ class ProtOSCEM(EMProtocol):
                     if not values['mic_path']:
                         continue
 
-                    with mrcfile.open(values['mic_path'], permissive=True) as mrc:
-                        mrc_data = mrc.data
+                    mrc_data = self.load_image_path(values['mic_path'])
                     mrc_normalized = 255 * (mrc_data - np.min(mrc_data)) / (np.max(mrc_data) - np.min(mrc_data))
                     mrc_normalized = mrc_normalized.astype(np.uint8)
                     image = Image.fromarray(mrc_normalized).convert('RGB')
@@ -678,38 +675,38 @@ class ProtOSCEM(EMProtocol):
         # Saving images in .jpg, drawing number of particles on them
         particles_list = []
         img_filenames = []
-        with mrcfile.open(img_classes_file, 'r') as mrc:
-            data = mrc.data
-            for i, class_2D in enumerate(sorted_list_classes):
-                particles = class_2D.getSize()
-                particles_list.append(particles)
-                index = class_2D.getRepresentative().getIndex()
 
-                img = data[index - 1, :, :]
+        data = self.load_image_path(img_classes_file)
+        for i, class_2D in enumerate(sorted_list_classes):
+            particles = class_2D.getSize()
+            particles_list.append(particles)
+            index = class_2D.getRepresentative().getIndex()
 
-                img_normalized = 255 * (img - np.min(img)) / (np.max(img) - np.min(img))
-                img_normalized = img_normalized.astype(np.uint8)
-                image = Image.fromarray(img_normalized)
-                image = image.convert('RGB')
+            img = data[index - 1, :, :]
 
-                # Draw the number of particles on the images
-                draw = ImageDraw.Draw(image)
-                font = ImageFont.load_default()
-                position = (10, 10)
-                draw.text(position, str(particles), fill='#80FF00', font=font)
+            img_normalized = 255 * (img - np.min(img)) / (np.max(img) - np.min(img))
+            img_normalized = img_normalized.astype(np.uint8)
+            image = Image.fromarray(img_normalized)
+            image = image.convert('RGB')
 
-                # Saving images
-                new_img_filename = splitext(img_classes_file)[0] + f'_image_{i}.jpg'
-                image.save(new_img_filename)
-                img_filenames.append(new_img_filename)
+            # Draw the number of particles on the images
+            draw = ImageDraw.Draw(image)
+            font = ImageFont.load_default()
+            position = (10, 10)
+            draw.text(position, str(particles), fill='#80FF00', font=font)
 
-            # Creating collage in .jpg with all images ordered in descending order
-            images = [Image.open(filename) for filename in img_filenames]
+            # Saving images
+            new_img_filename = splitext(img_classes_file)[0] + f'_image_{i}.jpg'
+            image.save(new_img_filename)
+            img_filenames.append(new_img_filename)
 
-            output_folder = self._getExtraPath()
-            collage_filename = 'classes_2D.jpg'
-            collage_filepath = join(output_folder, collage_filename)
-            self.create_collage(images, collage_filepath)
+        # Creating collage in .jpg with all images ordered in descending order
+        images = [Image.open(filename) for filename in img_filenames]
+
+        output_folder = self._getExtraPath()
+        collage_filename = 'classes_2D.jpg'
+        collage_filepath = join(output_folder, collage_filename)
+        self.create_collage(images, collage_filepath)
 
         classes_2D = {"particles_per_2Dclass": particles_list,
                       "images_classes_2D": collage_filename}
@@ -905,82 +902,81 @@ class ProtOSCEM(EMProtocol):
                 file_name_without_suffix = file_name.split(':')[0]
                 file_name = file_name_without_suffix
 
-            with mrcfile.open(file_name, 'r') as mrc:
-                data = mrc.data
+            data = self.load_image_path(file_name)
 
-                ############################
-                ########## CLASSES #########
-                ############################
+            ############################
+            ########## CLASSES #########
+            ############################
 
-                particles = class_3D.getSize()
-                particles_list.append(particles)
+            particles = class_3D.getSize()
+            particles_list.append(particles)
 
-                mid_index = data.shape[0] // 2
+            mid_index = data.shape[0] // 2
 
-                img = data[mid_index, :, :]
+            img = data[mid_index, :, :]
 
-                img_normalized = 255 * (img - np.min(img)) / (np.max(img) - np.min(img))
-                img_normalized = img_normalized.astype(np.uint8)
-                image = Image.fromarray(img_normalized)
-                image = image.convert('RGB')
+            img_normalized = 255 * (img - np.min(img)) / (np.max(img) - np.min(img))
+            img_normalized = img_normalized.astype(np.uint8)
+            image = Image.fromarray(img_normalized)
+            image = image.convert('RGB')
 
-                # Draw the number of particles on the images
-                draw = ImageDraw.Draw(image)
-                font = ImageFont.load_default()
-                position = (10, 10)
-                draw.text(position, str(particles), fill='#80FF00', font=font)
+            # Draw the number of particles on the images
+            draw = ImageDraw.Draw(image)
+            font = ImageFont.load_default()
+            position = (10, 10)
+            draw.text(position, str(particles), fill='#80FF00', font=font)
 
-                new_img_filename = splitext(file_name)[0] + '.jpg'
-                image.save(new_img_filename)
-                img_filenames.append(new_img_filename)
+            new_img_filename = splitext(file_name)[0] + '.jpg'
+            image.save(new_img_filename)
+            img_filenames.append(new_img_filename)
 
-                #############################
-                ########## VOLUMES ##########
-                #############################
+            #############################
+            ########## VOLUMES ##########
+            #############################
 
-                # Volume size
-                size = data.shape
-                vol_size_list = [int(x) for x in size]
+            # Volume size
+            size = data.shape
+            vol_size_list = [int(x) for x in size]
 
-                # Getting orthogonal slices in X, Y and Z
-                # Folder to store orthogonal slices
-                orthogonal_slices_folder = f'orthogonal_slices_volume{i + 1}'
-                orthogonal_slices_path = join(classes3D_folder_path, orthogonal_slices_folder)
-                os.makedirs(orthogonal_slices_path, exist_ok=True)
+            # Getting orthogonal slices in X, Y and Z
+            # Folder to store orthogonal slices
+            orthogonal_slices_folder = f'orthogonal_slices_volume{i + 1}'
+            orthogonal_slices_path = join(classes3D_folder_path, orthogonal_slices_folder)
+            os.makedirs(orthogonal_slices_path, exist_ok=True)
 
-                self.orthogonalSlices(fnRoot=orthogonal_slices_path, map=data)
+            self.orthogonalSlices(fnRoot=orthogonal_slices_path, map=data)
 
-                # Getting 3 isosurface images
-                # Folder to store isosurface images
-                isosurface_images_folder = f'isosurface_images_volume{i + 1}'
-                isosurface_images_path = join(classes3D_folder_path, isosurface_images_folder)
-                os.makedirs(isosurface_images_path, exist_ok=True)
+            # Getting 3 isosurface images
+            # Folder to store isosurface images
+            isosurface_images_folder = f'isosurface_images_volume{i + 1}'
+            isosurface_images_path = join(classes3D_folder_path, isosurface_images_folder)
+            os.makedirs(isosurface_images_path, exist_ok=True)
 
-                th = int(self.threshold_classes3D.get())
-                volume_file_abspath = abspath(file_name)
-                front_view_img = 'front_view.jpg'
-                side_view_img = 'side_view.jpg'
-                top_view_img = 'top_view.jpg'
-                self.generate_isosurfaces(isosurface_images_path, volume_file_abspath,
-                                          th, front_view_img, side_view_img, top_view_img)
+            th = int(self.threshold_classes3D.get())
+            volume_file_abspath = abspath(file_name)
+            front_view_img = 'front_view.jpg'
+            side_view_img = 'side_view.jpg'
+            top_view_img = 'top_view.jpg'
+            self.generate_isosurfaces(isosurface_images_path, volume_file_abspath,
+                                      th, front_view_img, side_view_img, top_view_img)
 
-                # Dictionary fill in:
-                volume = {
-                    "size": vol_size_list,
-                    "orthogonal_slices": {
-                        "orthogonal_slices_X": join(classes_3D_folder_name, orthogonal_slices_folder,
-                                                    slices_x),
-                        "orthogonal_slices_Y": join(classes_3D_folder_name, orthogonal_slices_folder,
-                                                    slices_y),
-                        "orthogonal_slices_Z": join(classes_3D_folder_name, orthogonal_slices_folder,
-                                                    slices_z)},
-                    'isosurface_images': {
-                        'front_view': join(classes_3D_folder_name, isosurface_images_folder, front_view_img),
-                        'side_view': join(classes_3D_folder_name, isosurface_images_folder, side_view_img),
-                        'top_view': join(classes_3D_folder_name, isosurface_images_folder, top_view_img)
-                    }}
+            # Dictionary fill in:
+            volume = {
+                "size": vol_size_list,
+                "orthogonal_slices": {
+                    "orthogonal_slices_X": join(classes_3D_folder_name, orthogonal_slices_folder,
+                                                slices_x),
+                    "orthogonal_slices_Y": join(classes_3D_folder_name, orthogonal_slices_folder,
+                                                slices_y),
+                    "orthogonal_slices_Z": join(classes_3D_folder_name, orthogonal_slices_folder,
+                                                slices_z)},
+                'isosurface_images': {
+                    'front_view': join(classes_3D_folder_name, isosurface_images_folder, front_view_img),
+                    'side_view': join(classes_3D_folder_name, isosurface_images_folder, side_view_img),
+                    'top_view': join(classes_3D_folder_name, isosurface_images_folder, top_view_img)
+                }}
 
-                volumes_list.append(volume)
+            volumes_list.append(volume)
 
         # Creating collage in .jpg with all images ordered in descending order
         images = [Image.open(filename) for filename in img_filenames]
@@ -992,6 +988,23 @@ class ProtOSCEM(EMProtocol):
                       "images_classes_3D": join(classes_3D_folder_name, collage_filename),
                       "volumes": volumes_list}
         return classes_3D
+
+    def load_image_path(self, path):
+        ext = os.path.splitext(path)[1].lower()
+        # MRC/MRCS
+        if ext in [".mrc", ".mrcs"]:
+            with mrcfile.open(path, 'r') as mrc:
+                return np.array(mrc.data, dtype=np.float32)
+        # TIFF/TIF
+        elif ext in [".tif", ".tiff"]:
+            img = Image.open(path)
+            arr = np.array(img, dtype=np.float32)
+            return arr
+        # EER
+        elif ext == ".eer":
+            raise ValueError(
+                f"File {path} is EER."
+            )
 
     def get_movie_alignment_descriptor(self):
         """
