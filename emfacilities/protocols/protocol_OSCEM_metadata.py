@@ -1017,7 +1017,6 @@ class ProtOSCEM(EMProtocol):
         descriptor_thing_dict = {}
         ################################ INPUT #############################################
         input_alignment = MovieAlignmentProt.getObjDict()
-        print(dir(MovieAlignmentProt))
         # List of keys to retrieve
         keys_to_retrieve = ['binFactor', 'maxResForCorrelation', 'gainRot', 'gainFlip']
 
