@@ -1017,6 +1017,7 @@ class ProtOSCEM(EMProtocol):
         descriptor_thing_dict = {}
         ################################ INPUT #############################################
         input_alignment = MovieAlignmentProt.getObjDict()
+        print(dir(MovieAlignmentProt))
         # List of keys to retrieve
         keys_to_retrieve = ['binFactor', 'maxResForCorrelation', 'gainRot', 'gainFlip']
 
@@ -1077,9 +1078,9 @@ class ProtOSCEM(EMProtocol):
         }
         frames_aligned = {key_mapping[key]: input_alignment[key] for key in keys_to_retrieve if
                           key in input_alignment and input_alignment[key] is not None}
-
-        if frames_aligned['frameN'] == 0:
-            frames_aligned['frameN'] = self.number_movies
+        if 'frameN' in frames_aligned:
+            if frames_aligned['frameN'] == 0:
+                frames_aligned['frameN'] = self.number_movies
 
         descriptor_thing_dict['frames_aligned'] = frames_aligned
 
@@ -1095,7 +1096,7 @@ class ProtOSCEM(EMProtocol):
                 if prot_name == 'XmippProtFlexAlign':
                     shiftX = attributes_dict.get('_xmipp_ShiftX')
                     shiftY = attributes_dict.get('_xmipp_ShiftY')
-                elif prot_name in ('ProtMotionCorr', 'ProtRelionMotioncorr'):
+                elif prot_name in ('ProtMotionCorr', 'ProtRelionMotioncor'):
                     alignment = attributes_dict.get('_alignment')
                     shiftX = alignment._xshifts
                     shiftY = alignment._yshifts
