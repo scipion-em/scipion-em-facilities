@@ -1092,14 +1092,12 @@ class ProtOSCEM(EMProtocol):
             max_shifts = []
             for index, item in enumerate(output.iterItems()):
                 attributes_dict = dict(item.getAttributes())
-                if prot_name == 'XmippProtFlexAlign':
-                    shiftX = attributes_dict.get('_xmipp_ShiftX')
-                    shiftY = attributes_dict.get('_xmipp_ShiftY')
-                elif prot_name in ('ProtMotionCorr', 'ProtRelionMotioncor'):
+                shiftX = attributes_dict.get('_xmipp_ShiftX')
+                shiftY = attributes_dict.get('_xmipp_ShiftY')
+                if not shiftX or not shiftY:
                     alignment = attributes_dict.get('_alignment')
-                    shiftX = alignment._xshifts
-                    shiftY = alignment._yshifts
-
+                    shiftX = getattr(alignment, "_xshifts", None)
+                    shiftY = getattr(alignment, "_yshifts", None)
                 norm = np.linalg.norm([shiftX, shiftY], axis=0)
                 avg_shifts.append(np.mean(norm))
                 max_shifts.append(np.max(norm))
