@@ -1124,7 +1124,8 @@ class ProtOSCEM(EMProtocol):
         """
         ###### MAX SHIFT DESCRIPTOR######
         MaxShiftProt = self.maxShift.get()
-        movie_maxshift = {'descriptor_name': MaxShiftProt.getClassName()}
+        prot_name = MaxShiftProt.getClassName()
+        movie_maxshift = {'descriptor_name': prot_name}
         descriptor_thing_dict = {}
         ############################### INPUT #############################################
         input_shift = MaxShiftProt.getObjDict()
@@ -1164,6 +1165,10 @@ class ProtOSCEM(EMProtocol):
                     attributes_dict = dict(attributes)
                     shiftX = attributes_dict.get('_xmipp_ShiftX')
                     shiftY = attributes_dict.get('_xmipp_ShiftY')
+                    if not shiftX or not shiftY:
+                        alignment = attributes_dict.get('_alignment')
+                        shiftX = getattr(alignment, "_xshifts", None)
+                        shiftY = getattr(alignment, "_yshifts", None)
                     norm = np.linalg.norm([shiftX, shiftY], axis=0)
                     shift_list.append(norm)
 
