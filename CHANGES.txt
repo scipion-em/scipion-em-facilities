@@ -1,3 +1,10 @@
+v3.4.0 (not published)
+- OSCEM protocol: Updated the threshold for volumes to be a float instead of integer
+- OSCEM protocol: Create a function to open images that detects if it comes from a .mr, .tif or .gain file
+- OSCEM protocol: If not having micrographs, not creating the micrographs example thumbail
+- OSCEM protocol: Updated the way shifts in x and y where retrieved in the movie alingment and maxh shift protocols to adjust to different plugins (xmipp, motioncorr and relion)
+-...
+
 V3.3.1
 - Fixing the test for OSCEM protocol
 - Fixed duplication of __version__ in __init__.py
