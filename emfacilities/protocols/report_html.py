@@ -33,6 +33,8 @@ import numpy as np
 import subprocess
 import multiprocessing
 from datetime import datetime
+from PIL import Image as ImagePIL
+from PIL import ImageDraw
 from statistics import median, mean
 
 from pyworkflow.protocol import getUpdatedProtocol
@@ -48,6 +50,7 @@ from .summary_provider import SummaryProvider
 MIC_PATH = 'imgMicPath'
 PSD_PATH = 'imgPsdPath'
 SHIFT_PATH = 'imgShiftPath'
+PICK_PATH = 'imgPickPath'
 # These constants are the name of the folders where thumbnails
 # for the html report will be stored. They are also the keys to
 # used in the execution.summary.template.html to read data (where
@@ -55,9 +58,11 @@ SHIFT_PATH = 'imgShiftPath'
 MIC_THUMBS = 'imgMicThumbs'
 PSD_THUMBS = 'imgPsdThumbs'
 SHIFT_THUMBS = 'imgShiftThumbs'
+PICK_THUMBS = 'imgPickThumbs'
 MIC_ID = 'micId'
 DEFOCUS_HIST_BIN_WIDTH = 0.5
 RESOLUTION_HIST_BIN_WIDTH = 0.5
+COORD = []
 
 
 class ReportHtml:
@@ -69,6 +74,7 @@ class ReportHtml:
         self.protocol = protocol
         self.ctfProtocol = protocol._getCtfProtocol()
         self.alignProtocol = protocol._getAlignProtocol()
+        self.picking = protocol._getPickingProtocol()
         self.micThumbSymlinks = False
         self.reportPath = protocol.reportPath
         self.reportDir = protocol.reportDir
@@ -91,11 +97,14 @@ class ReportHtml:
         self.thumbPaths = {MIC_THUMBS: [],
                            PSD_THUMBS: [],
                            SHIFT_THUMBS: [],
+                           PICK_THUMBS:[],
                            MIC_PATH: [],
                            SHIFT_PATH: [],
                            PSD_PATH: [],
-                           MIC_ID: []}
-
+                           PICK_PATH: [],
+                           MIC_ID: [],
+                           }
+        self.coordSet = []
         # Get the html template to be used, by default use the one
         # in scipion/config/templates
         self.template = self._getHTMLTemplatePath()
@@ -162,6 +171,24 @@ class ReportHtml:
                 and self.alignProtocol._doComputeMicThumbnail()):
             self.micThumbSymlinks = True
 
+    def getCoordset(self):
+        # TODO get this output names from Protocol constants
+            if hasattr(self.picking, 'outputCoordinates'):
+                return self.picking.outputCoordinates 
+            elif hasattr(self.picking, 'outputCoordinates'):
+                return self.picking.outputCoordinates
+            else:
+                return None
+            
+    def getboxsice(self):
+        # TODO get this output names from Protocol constants
+            if hasattr(self.picking, 'boxsize'):
+                return self.picking.boxsize
+            elif hasattr(self.picking, 'boxsize'):
+                return self.picking.boxsize
+            else:
+                return None
+
     def getThumbPaths(self, thumbsDone=0, ctfData=None, ext='jpg', micIdSet=None):
         """Adds to self.thumbPaths the paths to the report thumbnails
            that come from the alignment and/or ctf protocol.
@@ -213,6 +240,9 @@ class ReportHtml:
                 return
         else:
             return
+        
+        if self.picking is not None:
+            updatedProt = getUpdatedProtocol(self.picking)
 
         for micId in micIdSet[thumbsDone:]:
             mic = outputSet[micId]
@@ -225,6 +255,11 @@ class ReportHtml:
             micThumbFn = join(MIC_THUMBS, pwutils.replaceExt(basename(srcMicFn), ext))
             self.thumbPaths[MIC_PATH].append(srcMicFn)
             self.thumbPaths[MIC_THUMBS].append(micThumbFn)
+
+            if self.picking is not None:
+                micThumbFn = join(PICK_THUMBS, pwutils.replaceExt(basename(srcMicFn), ext))
+                self.thumbPaths[PICK_PATH].append(srcMicFn)
+                self.thumbPaths[PICK_THUMBS].append(micThumbFn)
 
             shiftPlot = (getattr(mic, 'plotCart', None) or getattr(mic, 'plotGlobal', None))
             if shiftPlot is not None:
@@ -262,6 +297,43 @@ class ReportHtml:
                         self.thumbPaths.pop(PSD_THUMBS, None)
                     if PSD_PATH in self.thumbPaths:
                         self.thumbPaths.pop(PSD_PATH, None)
+    
+    def plotParticlePicking(self):
+        """
+        Function to plot 2D particle Picking
+        """
+        coord = self.getCoordset()
+        boxsize = self.getboxsice()
+        mic = self.getCoordset().getMicrographs()
+        coordinatesDict = {}
+        i = 0
+        numMics = len(self.thumbPaths[MIC_PATH])
+
+        for micrograph in mic:
+            if i <= numMics:
+                repPath = join(self.reportDir, self.thumbPaths[MIC_THUMBS][i])
+                coordinatesDict[micrograph.getMicName()] = {'path': repPath, 'Xdim': micrograph.getXDim(),
+                                                            'Ydim': micrograph.getYDim()}
+            i = i+1
+            
+        for coordinate in coord: # for each micrograph, get its coordinates
+            if coordinate.getMicName() in coordinatesDict:
+                coordinatesDict[coordinate.getMicName()].setdefault('coords', []).append([coordinate.getX(), coordinate.getY()])
+             
+        for micrograph, values in coordinatesDict.items(): # draw coordinates in micrographs jpgs
+            if 'coords' in values:
+                image = ImagePIL.open(values['path']).convert('RGB')
+                W_mic = values['Xdim']
+                H_mic = values['Ydim']
+                W_jpg, H_jpg = image.size
+                draw = ImageDraw.Draw(image)
+                r = int(boxsize)/2
+                border_color = (0, 255, 0)  # Set the border color here
+                for coord in values['coords']:
+                    x = coord[0] * (W_jpg / W_mic)
+                    y = coord[1] * (H_jpg / H_mic)
+                    draw.ellipse((x - r, y - r, x + r, y + r), outline=border_color)
+                image.save(values['path'], quality=95)
 
     def generateReportImages(self, firstThumbIndex=0, micScaleFactor=6):
         """ Function to generate thumbnails for the report. Uses data from
@@ -280,6 +352,7 @@ class ReportHtml:
             print('Generating images for mic %d' % (i+1))
             # mic thumbnails
             dstImgPath = join(self.reportDir, self.thumbPaths[MIC_THUMBS][i])
+
             if not exists(dstImgPath):
                 if self.micThumbSymlinks:
                     pwutils.copyFile(self.thumbPaths[MIC_PATH][i], dstImgPath)
@@ -387,7 +460,6 @@ class ReportHtml:
 
         # Get timeStamp
         ts = data[TIME_STAMP]
-
         timeSeries = dict()
 
         # Get phaseShift
@@ -527,6 +599,9 @@ class ReportHtml:
         data[MIC_ID] = self.thumbPaths[MIC_ID]
 
         reportFinished = self.thumbsReady == numMics
+
+        if data:
+            self.plotParticlePicking()
 
         def convert(o):
             if isinstance(o, np.int64): return int(o)
