@@ -43,8 +43,139 @@ from xmipp3.convert import (writeSetOfCoordinates, writeCoordsListToPosFname,
 
 class UsedItemsTracker(EMProtocol):
   """
-  This protocol will track the items (micrographs, classes2D,...) that has been used in a scipion protocol to
-  generate a final volume. If the ids have been maintained, it will also track the not used items.
+  Tracks the relationship between reconstructed cryo-EM volumes and the experimental data that contributed to them. The protocol identifies which particles, micrographs, coordinates, CTF estimations, and classification results were effectively used during the generation of a final reconstruction, while also separating the elements that were excluded during processing. Its main objective is to provide traceability and biological interpretability across complex image-processing workflows by connecting final structural results with their original experimental sources.
+
+  AI Generated:
+
+  Used Items Tracker (UsedItemsTracker) - User Manual
+      Overview
+
+      The Used Items Tracker protocol is designed to reconstruct the provenance of a final cryo-EM volume by
+      identifying all intermediate and original data elements that contributed to its generation. In practical
+      biological workflows, many particles, micrographs, coordinates, and classifications are progressively
+      filtered through several processing stages. This protocol helps determine which experimental observations
+      ultimately participated in the final reconstruction and which were discarded along the way.
+
+      For biological users, this capability is especially useful when evaluating data quality, understanding
+      reconstruction bias, analyzing particle-selection strategies, or generating curated datasets for further
+      machine-learning or validation tasks. The protocol can also recover excluded particles and coordinates,
+      making it valuable for studying rejected populations or training negative datasets.
+
+      General Workflow
+
+      The protocol begins from one or more reconstructed volumes and traverses the associated processing history
+      across the project. By analyzing the relationships between protocol outputs and inputs, it reconstructs the
+      chain of dependencies leading from the final reconstruction back to the original experimental data.
+
+      During this process, the protocol identifies the particle sets that contributed to the final map and
+      optionally determines the original complete particle population. By comparing both sets, it can generate
+      collections of used and unused particles. Similar tracking can be applied to micrographs, coordinates,
+      CTF estimations, and classification results.
+
+      The resulting outputs provide a biologically meaningful view of how the dataset evolved during processing.
+
+      Particle Tracking
+
+      Particle tracking is the core functionality of the protocol. The protocol determines which particles were
+      effectively used to generate the final reconstruction and separates them from particles discarded during
+      filtering or classification stages.
+
+      This distinction is biologically important because discarded particles may correspond to contaminants,
+      damaged particles, aggregation states, preferred orientations, or alternative conformations. Recovering
+      these subsets allows users to investigate whether biologically relevant information was unintentionally
+      removed during processing.
+
+      The protocol can automatically infer the original particle population or use a user-provided complete set.
+      Providing the original particle set is recommended when the workflow contains several branches or when
+      particle identifiers may have changed during processing.
+
+      Micrograph and CTF Tracking
+
+      The protocol can also identify the micrographs that contributed particles to the final reconstruction.
+      Each micrograph is scored according to the number of particles that were ultimately used.
+
+      From a biological and experimental perspective, this information is useful for identifying acquisition
+      biases, problematic imaging conditions, or highly productive micrographs. Micrographs contributing many
+      particles may indicate regions with optimal ice thickness or particle distribution, whereas low-contributing
+      micrographs may reveal imaging problems or poor particle quality.
+
+      When enabled, the protocol additionally tracks associated CTF estimations. This allows users to relate
+      reconstruction contribution with optical quality indicators such as defocus values. Power spectral density
+      representations can also be generated to facilitate visual inspection of micrograph quality.
+
+      Coordinate Tracking and Negative Examples
+
+      Coordinate tracking reconstructs the particle-picking positions associated with both used and discarded
+      particles. This functionality is particularly relevant for users interested in re-extraction, validation,
+      or machine-learning workflows.
+
+      An advanced option allows the generation of negative coordinates representing regions without particles.
+      These negative examples are especially valuable for training particle-picking algorithms or benchmarking
+      classification pipelines. The protocol attempts to place noise coordinates away from true particle
+      locations to avoid overlap with biologically meaningful signal.
+
+      From a biological standpoint, separating true particle coordinates from negative examples enables more
+      robust development of automated particle-selection approaches.
+
+      Tracking 2D and 3D Classes
+
+      The protocol can identify which 2D and 3D classes contributed particles to the final reconstruction and
+      distinguish them from classes that were not represented in the final volume.
+
+      This information is useful for understanding how structural heterogeneity was handled during processing.
+      For example, discarded classes may correspond to damaged particles, contaminants, rare conformations,
+      dissociation states, or alignment failures. Conversely, strongly represented classes may reveal dominant
+      structural states or stable particle populations.
+
+      The protocol also generates quantitative summaries describing the number of contributing particles per
+      class. These summaries can support biological interpretation of classification results and facilitate
+      downstream reporting.
+
+      Graph-Based Provenance Analysis
+
+      Internally, the protocol reconstructs the relationships between processing steps as a directed dependency
+      graph. This graph-based strategy allows it to navigate complex workflows involving multiple branches,
+      classifications, refinements, or filtering operations.
+
+      In practical terms, this means the protocol can automatically infer which datasets are closest to the
+      original experimental data and which are most directly connected to the final reconstruction. This
+      approach reduces manual bookkeeping and improves reproducibility in large cryo-EM projects.
+
+      Exporting and Visualization
+
+      The protocol can export particles, micrographs, class representatives, and power spectral density images
+      as JPG files for rapid inspection and reporting. These visual outputs are particularly useful when
+      preparing presentations, validating datasets, or building external annotation workflows.
+
+      Quantitative reports describing particle counts per micrograph or class are also generated. These outputs
+      facilitate quality-control analyses and help identify dominant or underrepresented subsets within the
+      dataset.
+
+      Practical Recommendations
+
+      In routine cryo-EM workflows, the protocol is especially valuable after extensive particle cleaning or
+      classification procedures. Running it after obtaining a final reconstruction allows users to understand
+      exactly which experimental observations supported the final map.
+
+      For machine-learning applications, enabling coordinate tracking together with negative coordinate
+      extraction provides high-quality labeled datasets suitable for training particle-picking systems.
+
+      When processing highly heterogeneous datasets, tracking 2D and 3D classes can reveal whether minority
+      conformations survived the refinement process or were filtered out during classification.
+
+      Providing manually selected original particle or micrograph sets is recommended when workflows contain
+      non-standard branches or imported intermediate datasets.
+
+      Final Perspective
+
+      In cryo-EM data processing, understanding which experimental observations contribute to the final
+      reconstruction is essential for reproducibility, validation, and biological interpretation. The Used
+      Items Tracker protocol transforms complex processing histories into interpretable datasets that connect
+      final structural results with the original experimental evidence.
+
+      By recovering both used and discarded data elements, the protocol supports quality control, heterogeneity
+      analysis, dataset curation, and machine-learning preparation, making it a valuable provenance-analysis
+      tool within advanced Scipion workflows.
   """
   _label = 'Track used items'
 

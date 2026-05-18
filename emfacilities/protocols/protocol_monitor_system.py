@@ -61,7 +61,156 @@ def initGPU():
 
 
 class ProtMonitorSystem(ProtMonitor):
-    """ check CPU, mem and IO usage.
+    """
+    Monitors computational resources during scientific data processing workflows,
+    including CPU usage, memory consumption, swap allocation, GPU activity,
+    network traffic, and disk input and output operations. The protocol is
+    designed to provide continuous supervision of processing environments so
+    that users can detect hardware bottlenecks, overloaded resources, or
+    abnormal execution conditions while long-running analyses are in progress.
+
+    AI Generated:
+
+    System Monitor (ProtMonitorSystem) — User Manual
+        Overview
+
+        The System Monitor protocol supervises the status and performance of
+        computational resources used during data processing workflows. Its
+        purpose is to provide real-time operational awareness of the machine
+        executing scientific protocols, allowing users to identify excessive
+        resource consumption, detect unstable conditions, and maintain reliable
+        execution of demanding cryo-EM pipelines.
+
+        In practical cryo-EM environments, data processing tasks often require
+        prolonged use of CPUs, memory, GPUs, storage systems, and network
+        resources. Monitoring these components becomes especially important
+        during computationally intensive operations such as motion correction,
+        particle extraction, classification, refinement, or deep learning based
+        analyses. The protocol helps facility operators and researchers verify
+        that processing jobs remain within safe operational limits.
+
+        General Monitoring Workflow
+
+        The protocol supervises one or more running workflows and periodically
+        records system statistics over time. These measurements are stored in a
+        persistent database that can later be visualized, inspected, or exported
+        for infrastructure analysis. Monitoring continues automatically while
+        the associated processing tasks remain active.
+
+        The sampling interval determines how frequently the system state is
+        recorded. Short intervals provide fine temporal detail and are useful
+        for diagnosing transient spikes or unstable hardware behavior. Longer
+        intervals reduce storage overhead and are generally sufficient for
+        routine supervision of stable processing pipelines.
+
+        CPU, Memory, and Swap Monitoring
+
+        CPU utilization monitoring allows users to evaluate how heavily the
+        processor resources are being used during execution. Sustained CPU usage
+        near maximum capacity may indicate highly parallel workloads, while
+        unexpectedly low values may reveal inefficient resource utilization or
+        stalled processes.
+
+        Memory monitoring is particularly important in cryo-EM workflows because
+        large particle stacks, tomographic datasets, and intermediate volumes
+        can rapidly exhaust available RAM. Monitoring memory allocation helps
+        identify situations where workflows risk becoming unstable or excessively
+        dependent on disk swapping.
+
+        Swap monitoring provides additional insight into memory pressure. High
+        swap usage is often a sign that physical memory is insufficient for the
+        workload being executed. In biological data processing environments,
+        excessive swapping may significantly degrade performance and can
+        compromise throughput on shared computational infrastructure.
+
+        GPU Monitoring
+
+        The protocol optionally monitors GPU devices commonly used for accelerated
+        cryo-EM processing. Users can select specific GPUs to supervise when
+        multiple accelerators are available in the system.
+
+        GPU monitoring includes memory occupancy, processing utilization, and
+        temperature tracking. These measurements are highly relevant for
+        workflows involving GPU-accelerated reconstruction, particle polishing,
+        neural network inference, or image preprocessing.
+
+        GPU memory usage helps determine whether a workflow is approaching the
+        limits of device capacity. GPU utilization reflects the level of
+        computational activity, while temperature monitoring provides operational
+        insight into cooling efficiency and hardware stress. Sustained elevated
+        temperatures may indicate insufficient ventilation or excessive workload
+        density in shared computational environments.
+
+        The monitoring summary can also report active GPU processes together
+        with their associated memory usage, helping users identify which tasks
+        are consuming accelerator resources.
+
+        Network and Disk Activity
+
+        The protocol optionally supervises network traffic through a selected
+        network interface. This functionality is useful in distributed or
+        facility-scale processing systems where large datasets are transferred
+        between storage servers, processing nodes, or remote visualization
+        services.
+
+        Monitoring network transmission and reception rates can help identify
+        data transfer bottlenecks, unstable connectivity, or storage access
+        limitations that affect workflow performance.
+
+        Disk monitoring measures read and write activity during execution. In
+        cryo-EM processing, storage throughput is often critical because many
+        workflows continuously access large image stacks and intermediate files.
+        Excessive disk activity may indicate I/O bottlenecks that slow down
+        reconstruction or classification procedures.
+
+        Alarm and Notification System
+
+        The protocol supports configurable warning thresholds for CPU, memory,
+        and swap utilization. When usage exceeds the specified limits, warning
+        notifications can be generated automatically.
+
+        These alerts are particularly useful in unattended facility environments
+        where long-running workflows may continue overnight or across multiple
+        days. Early detection of resource saturation allows operators to take
+        corrective actions before failures occur or before shared infrastructure
+        becomes unstable.
+
+        Data Storage and Visualization
+
+        Monitoring results are stored chronologically in a database and can be
+        retrieved either for web visualization or for integration with external
+        monitoring infrastructures. The recorded information forms a time series
+        representation of system activity throughout workflow execution.
+
+        Historical monitoring information can be valuable for performance tuning,
+        hardware benchmarking, facility administration, and reproducibility
+        studies. Comparing resource profiles across workflows may also help
+        optimize computational strategies for future experiments.
+
+        Practical Recommendations
+
+        In routine cryo-EM practice, monitoring CPU and memory usage is usually
+        sufficient for standard workstation environments. GPU monitoring becomes
+        especially important when using accelerated reconstruction or machine
+        learning workflows.
+
+        For shared facilities or cluster infrastructures, enabling network and
+        disk monitoring provides additional operational visibility and can help
+        diagnose infrastructure-level limitations affecting multiple users.
+
+        Threshold alarms should be configured conservatively. Excessively strict
+        thresholds may generate unnecessary warnings, while overly permissive
+        values may fail to detect meaningful problems in time.
+
+        Final Perspective
+
+        System monitoring is an essential operational component of modern cryo-EM
+        data processing environments. Beyond simple hardware supervision, it
+        provides insight into workflow behavior, infrastructure stability, and
+        computational efficiency. Careful monitoring of CPU, memory, GPU, disk,
+        and network activity helps ensure reliable execution of large-scale
+        biological analyses and contributes to more stable and reproducible
+        scientific processing pipelines.
     """
     _label = 'system_monitor'
     _lastUpdateVersion = VERSION_1_1

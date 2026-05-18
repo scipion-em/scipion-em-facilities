@@ -47,7 +47,150 @@ CTF_LOG_SQLITE = 'ctf_log.sqlite'
 
 
 class ProtMonitorCTF(ProtMonitor):
-    """ check CPU, mem and IO usage.
+    """
+    Monitors the quality and stability of Contrast Transfer Function
+    estimation during cryo-EM image processing workflows. The protocol
+    supervises defocus behavior, astigmatism levels, phase shift
+    estimation, fit quality, and related acquisition parameters in order
+    to help users identify problematic micrographs or unstable imaging
+    conditions early in data collection and processing.
+
+    AI Generated:
+
+    CTF Monitor (ProtMonitorCTF) — User Manual
+        Overview
+
+        The CTF Monitor protocol is designed to supervise the evolution
+        of CTF estimation results while cryo-EM processing is running.
+        Its primary objective is to provide continuous quality control
+        during data acquisition or preprocessing so that imaging problems,
+        microscope instabilities, or processing failures can be detected
+        before they compromise an entire dataset.
+
+        In practical cryo-EM workflows, CTF estimation represents one of
+        the most important indicators of data quality. Parameters such as
+        defocus, astigmatism, resolution estimation, and phase shift are
+        directly related to microscope alignment, specimen stability, and
+        imaging conditions. By continuously monitoring these values, users
+        can rapidly identify deviations that may indicate ice contamination,
+        charging effects, poor microscope tuning, stage instability, or
+        processing inconsistencies.
+
+        Biological Importance of CTF Monitoring
+
+        For biological interpretation, reliable CTF estimation is essential
+        because downstream reconstruction quality strongly depends on the
+        accuracy of these measurements. Incorrect defocus estimation can
+        reduce achievable resolution, while excessive astigmatism may
+        indicate optical misalignment or beam instability. Monitoring these
+        values in real time allows facility operators and researchers to
+        intervene early and preserve data quality.
+
+        Continuous supervision becomes especially valuable during automated
+        acquisition sessions that may last many hours or even days. In such
+        situations, gradual microscope drift or environmental instability
+        may remain unnoticed without automated monitoring tools.
+
+        Defocus Supervision
+
+        One of the central functions of the protocol is the supervision of
+        defocus values. Users can define acceptable minimum and maximum
+        defocus ranges according to the experimental design. Defocus values
+        outside these limits may indicate acquisition problems or unexpected
+        microscope behavior.
+
+        In biological workflows, the appropriate defocus range depends on
+        the desired balance between contrast and high-resolution information.
+        Higher defocus values improve particle visibility but reduce the
+        preservation of fine structural details. Lower defocus values improve
+        high-resolution transfer but may produce images with weaker contrast.
+        Monitoring ensures that the acquisition remains within the intended
+        operating range throughout the session.
+
+        Astigmatism Control
+
+        The protocol also evaluates astigmatism levels derived from the
+        difference between principal defocus directions. Elevated astigmatism
+        often reflects imperfect microscope alignment, contamination, or
+        optical instability.
+
+        From a practical perspective, moderate astigmatism may still allow
+        acceptable reconstructions, but persistent or increasing astigmatism
+        frequently predicts reduced map quality. Early detection enables
+        corrective microscope alignment before additional data are collected.
+
+        Resolution and Fit Quality
+
+        In addition to defocus supervision, the monitor tracks estimated CTF
+        resolution and fit quality metrics. These measurements provide a
+        broader assessment of how reliably the experimental power spectrum is
+        being modeled.
+
+        Poor resolution estimates or unstable fit quality values may suggest
+        motion contamination, crystalline ice, low signal-to-noise ratio, or
+        acquisition defects. In high-throughput facilities, these indicators
+        are especially useful for detecting systematic problems affecting
+        large groups of micrographs.
+
+        Phase Shift Monitoring
+
+        When phase plates are used, the protocol can also supervise phase
+        shift evolution. Stable phase shift values are important for obtaining
+        reproducible contrast conditions and consistent image interpretation.
+        Unexpected variations may indicate phase plate contamination, charging,
+        or instability during acquisition.
+
+        Data Logging and Visualization
+
+        The protocol maintains a continuous record of monitored parameters,
+        enabling users to inspect trends over time and correlate imaging
+        quality with acquisition conditions. This historical information is
+        valuable both for troubleshooting and for documenting microscope
+        performance across multiple sessions.
+
+        The monitoring system can support both local visualization and remote
+        reporting environments, making it suitable for automated facilities,
+        distributed collaborations, and long unattended acquisition sessions.
+
+        Alarm and Notification System
+
+        A major feature of the protocol is the ability to generate warnings
+        whenever monitored values exceed user-defined thresholds. These alerts
+        help users respond quickly to problematic acquisition conditions before
+        substantial processing time or microscope time is lost.
+
+        Typical warning scenarios include excessive astigmatism, unexpectedly
+        high defocus values, unusually low defocus values, or unstable quality
+        metrics. In facility environments, automated notifications can provide
+        continuous operational supervision even when users are not directly
+        observing the processing session.
+
+        Practical Recommendations
+
+        In routine cryo-EM practice, users should define threshold values that
+        match the biological target and imaging strategy. High-resolution
+        single-particle projects generally require tighter astigmatism and
+        defocus constraints than exploratory screening datasets.
+
+        During long automated acquisitions, it is advisable to periodically
+        review the monitored trends instead of relying solely on isolated
+        warnings. Progressive deterioration often becomes visible in temporal
+        trends before absolute thresholds are exceeded.
+
+        For challenging specimens, occasional outliers may be expected and do
+        not necessarily invalidate the dataset. However, persistent deviations
+        usually indicate underlying microscope or sample preparation problems
+        that should be investigated.
+
+        Final Perspective
+
+        The CTF Monitor protocol serves as an automated quality assurance layer
+        for cryo-EM preprocessing workflows. By continuously supervising the
+        physical and computational parameters associated with CTF estimation,
+        it helps researchers maintain acquisition stability, detect technical
+        issues early, and maximize the reliability of downstream structural
+        analysis. For modern automated cryo-EM facilities, such monitoring is
+        increasingly essential for efficient and reproducible data collection.
     """
     _label = 'ctf monitor'
     _lastUpdateVersion = VERSION_1_1

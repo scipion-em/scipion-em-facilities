@@ -44,11 +44,128 @@ from pyworkflow import BETA, UPDATED, NEW, PROD
 
 
 class ProtMonitorSummary(ProtMonitor):
-    """ Provide some summary of the basic steps of the Scipion-Box:
-    - Import movies
-    - Align movies (global and/or local)
-    - CTF estimation
-    - Movie gain estimation.
+    """
+    Provides an integrated monitoring and reporting environment for key stages of cryo-EM data processing workflows,
+    including movie alignment, CTF estimation, movie gain evaluation, and computational resource supervision. The
+    protocol is intended to give facility operators, platform administrators, and cryo-EM users a unified overview
+    of both data quality and system health during ongoing processing campaigns.
+
+    AI Generated:
+
+    Monitor Summary (ProtMonitorSummary) — User Manual
+        Overview
+
+        The Monitor Summary protocol combines several monitoring utilities into a single reporting framework designed
+        for continuous supervision of cryo-EM processing pipelines. Its primary goal is to help users detect data
+        quality problems, computational bottlenecks, and hardware instability while acquisitions or processing jobs
+        are still running. By consolidating multiple monitoring sources into a unified report, the protocol supports
+        rapid decision making and early intervention before significant processing time or microscope resources are lost.
+
+        In practical cryo-EM environments, monitoring is especially important during automated or unattended workflows.
+        Long acquisition sessions, large movie collections, and GPU-intensive processing can produce failures that may
+        remain unnoticed for hours without active supervision. This protocol addresses that need by generating live
+        summaries of processing behavior and system activity.
+
+        General Workflow
+
+        The protocol operates as a centralized supervisor that coordinates several independent monitoring tasks. These
+        tasks may include movie gain analysis, CTF quality inspection, CPU and memory tracking, GPU usage monitoring,
+        network activity observation, and disk throughput analysis. Each monitoring component contributes information
+        to a common reporting interface.
+
+        Users typically connect the protocol to existing processing steps already present in a Scipion workflow. The
+        monitoring process then runs periodically during execution and updates reports as new information becomes
+        available. This design allows the monitoring system to evolve continuously alongside the processing pipeline.
+
+        Movie Gain Monitoring
+
+        One important function of the protocol is the supervision of movie gain estimation quality. Gain references are
+        essential for detector normalization, and problems in gain estimation may introduce structured artifacts or
+        reduce overall reconstruction quality. The monitoring system evaluates statistical indicators associated with
+        gain behavior and can raise alarms when abnormal variability or intensity distributions are detected.
+
+        From a biological and practical perspective, sudden changes in gain statistics may indicate detector instability,
+        acquisition inconsistencies, or calibration problems. Early detection helps prevent the accumulation of unusable
+        datasets and supports more stable downstream image processing.
+
+        CTF Quality Supervision
+
+        The protocol also supervises contrast transfer function estimation results. Monitoring defocus ranges and
+        astigmatism values provides a rapid overview of acquisition quality and microscope stability. Excessively large
+        defocus values, unusually small defocus ranges, or strong astigmatism can indicate focusing problems, optical
+        instability, contamination, or acquisition setup issues.
+
+        In routine cryo-EM practice, continuous monitoring of CTF parameters is particularly valuable during overnight
+        acquisition sessions or automated facility operation. Detecting problematic trends early may allow microscope
+        operators to intervene before large portions of a dataset become compromised.
+
+        System Resource Monitoring
+
+        Beyond image quality assessment, the protocol supervises computational infrastructure during processing.
+        Monitoring CPU utilization, memory allocation, swap activity, GPU load, network traffic, and disk input/output
+        helps identify resource saturation and infrastructure limitations that may slow or destabilize workflows.
+
+        GPU supervision is especially important in modern cryo-EM processing because many alignment and reconstruction
+        tasks rely heavily on accelerator hardware. Monitoring GPU usage and memory consumption allows users to verify
+        that computational resources are being used efficiently and helps detect overloaded or malfunctioning devices.
+
+        Network and disk activity monitoring are particularly relevant in shared facilities or distributed processing
+        environments where large cryo-EM datasets are continuously transferred between storage systems and compute
+        nodes. Sustained bottlenecks in these areas may strongly affect processing throughput.
+
+        Alarm and Notification System
+
+        The protocol supports configurable warning thresholds for several monitored quantities. Users can define limits
+        for resource utilization and quality indicators so that abnormal conditions trigger notifications. This approach
+        allows facilities to implement proactive monitoring policies adapted to their own hardware and acquisition
+        standards.
+
+        In production environments, automated alarms are especially useful for minimizing downtime and avoiding wasted
+        microscope time. Notifications can help users react rapidly to hardware overload, unstable GPU behavior,
+        problematic gain estimation, or deteriorating image quality.
+
+        HTML and Dashboard Reporting
+
+        A central feature of the protocol is the generation of continuously updated reports summarizing all monitored
+        information. Reports may be produced as standard HTML summaries or integrated into external visualization
+        infrastructures based on Grafana and InfluxDB.
+
+        HTML reports are suitable for lightweight deployment and local monitoring environments. They provide an
+        accessible overview of acquisition and processing activity that can easily be shared within a laboratory or
+        facility. Dashboard-oriented infrastructures offer a more scalable solution for larger installations requiring
+        long-term monitoring, centralized visualization, or multi-user access.
+
+        Publication and Remote Access
+
+        The protocol supports automatic publication of generated reports through external commands. This capability is
+        useful for facilities that maintain remote dashboards, institutional web portals, or centralized monitoring
+        servers. Reports may therefore remain accessible even when processing occurs on remote clusters or isolated
+        compute systems.
+
+        From an operational perspective, centralized report publication simplifies supervision of multiple ongoing
+        projects and allows facility staff to monitor workflows without direct access to the processing nodes.
+
+        Practical Recommendations
+
+        In most cryo-EM facilities, it is advisable to enable both image-quality monitoring and system-resource
+        supervision simultaneously. Problems in computational infrastructure frequently correlate with processing
+        instability, while image-quality metrics provide direct biological feedback about acquisition performance.
+
+        GPU monitoring should generally be activated whenever acceleration hardware is used extensively. Similarly,
+        disk and network supervision become increasingly important in high-throughput acquisition facilities where
+        storage bandwidth may become a limiting factor.
+
+        Thresholds for alarms should initially remain conservative and later be adapted to the normal behavior of the
+        local microscope and computational infrastructure. Excessively strict thresholds may produce unnecessary alarms,
+        while overly permissive values may delay the detection of important problems.
+
+        Final Perspective
+
+        For cryo-EM users and facility administrators, workflow monitoring is not only a technical convenience but an
+        essential operational safeguard. Continuous supervision of image quality, detector behavior, and computational
+        infrastructure improves reliability, reduces wasted acquisition time, and supports more reproducible biological
+        results. By combining processing supervision with infrastructure monitoring into a unified reporting framework,
+        the protocol provides a practical foundation for stable and efficient cryo-EM operations.
     """
     _label = 'monitor summary'
     _lastUpdateVersion = VERSION_1_1

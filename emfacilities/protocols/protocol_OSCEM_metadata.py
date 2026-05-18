@@ -51,7 +51,144 @@ slices_y = "orthogonal_slices_Y.jpg"
 slices_z = "orthogonal_slices_Z.jpg"
 
 class ProtOSCEM(EMProtocol):
-    """ This is the class for generating the OSCEM metadata json file from Scipion workflow
+    """
+    Generates a structured OSCEM metadata report from cryo-EM processing workflows,
+    collecting acquisition, preprocessing, reconstruction, and visualization information
+    into a unified format suitable for documentation, quality assessment, and data sharing.
+
+    AI Generated:
+
+    OSCEM Metadata (ProtOSCEM) - User Manual
+        Overview
+
+        The OSCEM Metadata protocol is designed to generate a comprehensive metadata
+        description of a cryo-EM workflow processed within Scipion environments. Its
+        main objective is to organize relevant experimental and processing information
+        into a structured representation that can later be exported, visualized, or
+        incorporated into reporting and archival systems.
+
+        In practical biological workflows, cryo-EM projects often involve a large number
+        of processing stages distributed across movie correction, CTF estimation,
+        particle extraction, classification, and volume reconstruction. This protocol
+        centralizes that information into a coherent metadata package, helping users
+        document the provenance and quality of their reconstructions in a standardized
+        manner.
+
+        The protocol is especially useful for facilities, collaborative projects, and
+        reproducibility-oriented pipelines where maintaining an interpretable summary of
+        processing conditions and reconstruction outputs is essential. By consolidating
+        metadata from multiple workflow stages, it becomes easier to track processing
+        history, compare datasets, and prepare results for dissemination.
+
+        Input Data and Workflow Context
+
+        The protocol supports workflows starting either from movies or from already
+        processed micrographs. This flexibility allows users to generate metadata reports
+        from both complete processing pipelines and partially processed datasets. In a
+        typical cryo-EM experiment, movie-based workflows provide the richest metadata
+        because they include acquisition parameters, motion correction information, and
+        frame statistics. Micrograph-based workflows remain useful when the original
+        movies are unavailable or when processing begins from curated images.
+
+        During execution, the protocol gathers information related to acquisition
+        parameters, particle processing, classifications, and reconstructed volumes.
+        Rather than focusing on a single reconstruction stage, it attempts to provide a
+        global overview of the biological dataset and the associated image-processing
+        strategy.
+
+        Biological and Experimental Metadata
+
+        A central purpose of this protocol is to preserve biologically meaningful
+        contextual information associated with cryo-EM experiments. Parameters such as
+        dose conditions, detector corrections, micrograph statistics, particle counts,
+        and reconstruction descriptors are integrated into the final metadata structure.
+
+        For biological interpretation, these descriptors are important because they
+        provide insight into data quality, sample behavior, and reconstruction reliability.
+        High particle counts, stable alignment behavior, and consistent reconstruction
+        statistics generally correlate with improved map interpretability and downstream
+        structural analysis.
+
+        The protocol also records information related to 2D and 3D classifications,
+        helping users identify whether the reconstruction originated from homogeneous
+        particle populations or from more heterogeneous datasets. This distinction is
+        biologically important because conformational variability, compositional
+        heterogeneity, or preferred orientations can strongly influence the quality and
+        interpretability of the final maps.
+
+        Visualization and Reporting
+
+        Beyond metadata extraction, the protocol generates visual assets intended to
+        facilitate inspection and presentation of cryo-EM results. These include
+        orthogonal slices, image collages, histogram representations, and volume
+        visualizations. Such outputs are particularly useful when preparing reports,
+        validating reconstructions, or communicating results to collaborators who may
+        not directly interact with the original processing workflow.
+
+        Orthogonal slice representations allow users to inspect internal density
+        distributions within reconstructed maps, while generated visual summaries help
+        identify global structural features, noise levels, and reconstruction quality.
+        These visualizations are valuable both for exploratory analysis and for
+        publication-oriented documentation.
+
+        Volume Analysis and Resolution Assessment
+
+        The protocol incorporates utilities for analyzing reconstructed volumes and
+        estimating structural descriptors associated with map quality. In cryo-EM
+        workflows, resolution estimation and density interpretation are central to
+        evaluating the biological reliability of a reconstruction.
+
+        Isosurface generation and orthogonal slicing provide complementary perspectives
+        on the reconstructed density. Isosurfaces emphasize the external morphology and
+        connectivity of molecular assemblies, while internal slices reveal density
+        continuity, local disorder, and potential reconstruction artifacts.
+
+        Resolution-related descriptors help contextualize the level of structural detail
+        that can be interpreted biologically. Users should remember that nominal
+        resolution alone does not fully define map quality; local heterogeneity,
+        flexibility, masking strategies, and reconstruction anisotropy can significantly
+        affect interpretability.
+
+        Metadata Export and Interoperability
+
+        One of the primary strengths of the protocol is its ability to export workflow
+        metadata into structured formats suitable for external systems. This enables
+        interoperability with visualization portals, archival infrastructures, and
+        reproducibility frameworks.
+
+        In collaborative environments, structured metadata improves transparency by
+        allowing researchers to understand how a reconstruction was produced, which
+        processing decisions were applied, and how quality indicators evolved throughout
+        the workflow. Such traceability is increasingly important in modern cryo-EM
+        facilities and data-sharing initiatives.
+
+        Practical Recommendations
+
+        For the most complete metadata reports, users should provide workflows that
+        preserve acquisition and preprocessing information from the earliest stages of
+        the experiment. Whenever possible, workflows starting from movies provide richer
+        contextual information than workflows beginning from curated micrographs alone.
+
+        Users are encouraged to verify that reconstruction outputs, classification
+        stages, and associated metadata remain biologically consistent before generating
+        final reports. Metadata summaries are most valuable when they accurately reflect
+        the true processing history and reconstruction strategy of the dataset.
+
+        Visual outputs should also be interpreted critically. Slice views, histograms,
+        and isosurface representations provide useful guidance, but they do not replace
+        detailed structural validation or expert biological interpretation.
+
+        Final Perspective
+
+        The OSCEM Metadata protocol serves as a bridge between cryo-EM image processing
+        workflows and structured scientific reporting. By organizing experimental,
+        computational, and visualization information into a unified metadata package, it
+        supports reproducibility, transparency, and long-term usability of cryo-EM
+        datasets.
+
+        For biological researchers, the protocol provides a practical way to summarize
+        complex processing histories while preserving the contextual information needed
+        for interpretation, collaboration, and future reanalysis.
     """
     _label = 'OSCEM Metadata'
     _devStatus = NEW
