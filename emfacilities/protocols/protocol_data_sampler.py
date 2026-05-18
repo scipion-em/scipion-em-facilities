@@ -44,9 +44,143 @@ OUTPUT = "outputSet"
 
 class ProtDataSampler(EMProtocol):
     """
-    Protocol to make a subset of images from the original one.
-    Waits until certain batch of images is prepared, then it samples a percentage of it and send them to output.
-    The protocol will accept Micrographs, Particles, ..., and any kind of object that inherits from Image base class.
+    Creates randomized subsets from streaming or static image datasets in
+    order to reduce data volume while preserving representative sampling
+    across large cryo-EM workflows.
+
+    AI Generated:
+
+    Data Sampler (ProtDataSampler) - User Manual
+        Overview
+
+        The Data Sampler protocol is designed to generate smaller,
+        randomly selected subsets from large image collections such as
+        particles, micrographs, or other image-based cryo-EM datasets.
+        Its main purpose is to reduce dataset size in a controlled and
+        statistically representative way while preserving enough data for
+        exploratory analysis, rapid testing, benchmarking, or preliminary
+        processing workflows.
+
+        In practical cryo-EM environments, datasets can become extremely
+        large, especially during streaming acquisition or automated
+        processing sessions. Working with the complete dataset may be
+        computationally expensive or unnecessary during early evaluation
+        stages. This protocol allows users to extract a fraction of the
+        available images while maintaining random selection across the
+        incoming data population.
+
+        General Workflow
+
+        The protocol receives an input image collection and continuously
+        monitors it during execution. Images are grouped into batches,
+        and once enough new data becomes available, a random subset is
+        selected according to the user-defined sampling proportion. The
+        selected images are then transferred to the output dataset for
+        downstream processing.
+
+        This strategy is particularly useful in streaming workflows where
+        data acquisition is still ongoing. Instead of waiting for the
+        entire experiment to finish, users can immediately begin testing
+        classification, reconstruction, or quality-control procedures on
+        representative subsets.
+
+        Input Data Considerations
+
+        The protocol accepts any image-based dataset derived from the
+        Scipion image framework, including particles, micrographs, and
+        related image collections. Since the sampling process is random,
+        the biological interpretation of the resulting subset depends on
+        the diversity and quality of the original dataset.
+
+        For highly heterogeneous samples, random sampling generally
+        preserves the overall population distribution when enough images
+        are selected. However, very small sampling proportions may fail
+        to capture rare conformational states, uncommon particle views,
+        or low-abundance structural populations. Users interested in
+        detecting subtle heterogeneity should therefore choose sampling
+        proportions carefully.
+
+        Batch Size and Streaming Behavior
+
+        The batch size determines how many new images must accumulate
+        before sampling is performed. Smaller batch sizes allow more
+        responsive streaming behavior and faster early feedback during
+        data collection, but they may increase processing overhead and
+        produce noisier statistical representation.
+
+        Larger batch sizes improve statistical stability because the
+        random selection occurs over a broader image population. This is
+        often preferable for large-scale production workflows or when the
+        sampled subset will be used for biologically meaningful
+        interpretation.
+
+        During live acquisition, the protocol continuously evaluates the
+        incoming dataset and processes only newly available images. This
+        allows long-running experiments to generate progressively updated
+        sampled outputs without reprocessing previously handled data.
+
+        Sampling Proportion
+
+        The sampling proportion controls how much of each batch is kept.
+        A value close to one preserves most of the dataset, while smaller
+        values aggressively reduce dataset size. The optimal value depends
+        on the intended downstream application.
+
+        For rapid testing of processing parameters, very small subsets
+        are often sufficient and can dramatically reduce computational
+        cost. For structural interpretation or classification tasks,
+        larger sampling proportions are generally recommended to preserve
+        biological diversity and angular coverage.
+
+        Random selection is especially useful for creating unbiased test
+        datasets, validating workflows, benchmarking algorithms, or
+        performing quick quality assessments during microscope sessions.
+
+        Outputs and Interpretation
+
+        The protocol produces a new image dataset containing only the
+        randomly selected subset. The output preserves the metadata and
+        structural organization required for downstream cryo-EM
+        processing pipelines.
+
+        Because the selection is random, repeated executions may produce
+        different subsets even when applied to the same dataset. This is
+        biologically acceptable in most exploratory workflows, although
+        users performing strict reproducibility studies may wish to
+        control randomness externally.
+
+        In streaming conditions, the output dataset grows progressively
+        over time until the input stream is closed and all eligible
+        images have been evaluated.
+
+        Practical Recommendations
+
+        For rapid workflow validation, users commonly begin with small
+        sampling proportions and moderate batch sizes. This provides fast
+        turnaround while still preserving enough diversity for testing
+        alignment, classification, or reconstruction parameters.
+
+        For heterogeneous samples or difficult datasets, larger sampling
+        proportions are advisable to avoid unintentionally excluding rare
+        structural states. When downstream analysis depends strongly on
+        particle diversity, users should visually inspect the sampled
+        dataset before drawing biological conclusions.
+
+        In facility or automated processing environments, this protocol
+        can substantially reduce computational cost by limiting the
+        number of images entering expensive downstream steps during early
+        exploratory analysis.
+
+        Final Perspective
+
+        Randomized dataset reduction is an important strategy in modern
+        cryo-EM processing because it allows efficient exploration of
+        large datasets without requiring full-scale computation at every
+        stage. By producing representative subsets during streaming or
+        offline processing, the Data Sampler protocol enables faster
+        experimentation, rapid quality assessment, and more efficient
+        allocation of computational resources while preserving the
+        biological relevance of the sampled data.
     """
     _label = 'data sampler'
     _devStatus = NEW

@@ -54,8 +54,116 @@ SHIFT_PATH = 'imgShiftPath'
 CONFILE = 'monitor.conf'
 
 class ReportInflux:
-    """ Create a report (html or influxdb) with a summary of the processing.
-    The report will be updated with a given frequency.
+    """
+    Creates and maintains a continuously updated monitoring and reporting system for scientific processing
+    workflows, integrating execution summaries, acquisition metadata, quality control measurements,
+    system statistics, and remote visualization services.
+
+    AI Generated:
+
+    Report Influx (ReportInflux) — User Manual
+        Overview
+
+        The ReportInflux class provides a centralized monitoring and reporting infrastructure designed for
+        long-running scientific processing workflows. Its main purpose is to collect, organize, store, and
+        distribute operational and analytical information generated during data processing, allowing users
+        to monitor workflow progress and inspect quality metrics in near real time.
+
+        In cryo-EM and large-scale imaging environments, workflows frequently execute for many hours or
+        days while generating large amounts of intermediate data and quality indicators. This reporting
+        system enables users and facility operators to follow processing activity remotely, detect problems
+        early, and maintain visibility over both computational performance and biological data quality.
+
+        General Workflow
+
+        The reporting system gathers information from multiple monitoring sources associated with the
+        workflow. These sources may include acquisition metadata, CTF estimation statistics, movie gain
+        measurements, computational resource utilization, and workflow execution summaries.
+
+        All collected information is organized into structured measurements and stored in a time-oriented
+        database environment suitable for continuous updates and remote visualization dashboards. This
+        allows processing activity to be reviewed historically while also supporting live monitoring during
+        active execution.
+
+        Project Metadata and Workflow Summary
+
+        One of the primary responsibilities of the reporting system is maintaining a persistent description
+        of the processing project. This includes project identity, execution status, creation time,
+        processing duration, software version information, and summaries of generated outputs.
+
+        The reporting infrastructure also organizes workflow outputs into structured hierarchical summaries
+        so users can inspect relationships between protocols and generated datasets. This improves
+        transparency and traceability in complex processing pipelines where many intermediate products are
+        created.
+
+        Acquisition Information
+
+        The reporting process preserves acquisition parameters associated with imported datasets, including
+        microscope settings and image sampling information. Maintaining these parameters together with
+        processing results is biologically important because acquisition conditions strongly influence
+        reconstruction quality and downstream interpretation.
+
+        By integrating acquisition metadata into the reporting environment, users can correlate
+        computational results with experimental conditions and verify that datasets were processed using
+        expected microscope configurations.
+
+        CTF and Image Quality Monitoring
+
+        The system continuously tracks CTF-related measurements and associated image products generated
+        during processing. These monitoring capabilities are essential in cryo-EM workflows because CTF
+        quality strongly affects reconstruction accuracy and final map interpretability.
+
+        The reporting environment supports visualization-oriented representations of diagnostic images and
+        quality plots, allowing users to review micrographs, power spectra, drift plots, and related
+        quality indicators remotely through external dashboards or web-based interfaces.
+
+        Continuous monitoring of these metrics helps identify acquisition instability, contamination,
+        incorrect microscope settings, or processing anomalies before large amounts of unusable data are
+        accumulated.
+
+        System Resource Monitoring
+
+        In addition to biological and imaging metrics, the reporting system also tracks computational
+        resource usage. Monitoring processor utilization, memory consumption, and related infrastructure
+        statistics is important in high performance computing environments where processing stability and
+        resource allocation directly influence workflow efficiency.
+
+        Facility administrators and advanced users can use this information to diagnose bottlenecks,
+        optimize infrastructure usage, and evaluate processing scalability across large datasets.
+
+        Remote Synchronization and Data Distribution
+
+        The reporting infrastructure includes support for transferring visualization assets and monitoring
+        products to remote systems. This capability enables centralized dashboards, remote monitoring
+        portals, and collaborative visualization environments where users can inspect workflow progress
+        without direct access to the processing machine.
+
+        Such synchronization mechanisms are especially valuable in institutional cryo-EM facilities,
+        distributed computing infrastructures, and collaborative environments where processing and analysis
+        occur across multiple physical systems.
+
+        Database Integration and Persistence
+
+        The monitoring framework stores information using a time-series oriented architecture designed for
+        efficient incremental updates and historical tracking. This enables repeated measurements to be
+        recorded over time while preserving chronological context for workflow evolution.
+
+        Persistent storage also allows dashboards and external visualization systems to retrieve project
+        information dynamically, supporting both real-time monitoring and retrospective analysis.
+
+        Auxiliary Utility Functions
+
+        The associated utility components support normalization of project identifiers and lightweight
+        encoding and decoding of stored credential information. These utilities help maintain compatibility
+        with external storage systems and simplify communication with remote infrastructures.
+
+        Final Perspective
+
+        The ReportInflux class acts as a comprehensive operational reporting framework for scientific
+        processing workflows. By combining workflow summaries, acquisition metadata, image quality
+        monitoring, computational statistics, database persistence, and remote synchronization, it enables
+        robust real-time supervision of complex cryo-EM and imaging pipelines while improving
+        reproducibility, operational awareness, and collaborative accessibility.
     """
     def __init__(self, protocol, ctfMonitor,
                  sysMonitor, movieGainMonitor, publishCmd=None,
