@@ -21,6 +21,7 @@
 # *  e-mail address 'scipion@cnb.csic.es'
 # ***************************************************************************/
 from datetime import datetime, timedelta
+from unittest.mock import patch
 from pyworkflow.tests import BaseTest, DataSet
 from pwem.protocols.protocol_import import ProtImportMicrographs
 from pyworkflow.object import Pointer
@@ -54,6 +55,58 @@ class TestDataCounter(BaseTest):
 
 
 
+
+
+
+    def testDetectsNewInputWhenMtimeDoesNotChange(self):
+        class InputSet:
+            def getIdSet(self):
+                return {1, 2, 3, 4, 5, 6}
+
+            def isStreamClosed(self):
+                return False
+
+            def close(self):
+                pass
+
+        insertedBatches = []
+
+        prot = self.newProtocol(
+            ProtDataCounter,
+            outputSize=100,
+            boolTimer=False,
+        )
+        prot.finished = False
+        prot.inputFn = "input.sqlite"
+        prot.insertedIds = {1, 2, 3}
+        prot.processedIds = {1, 2, 3}
+        prot.isStreamClosed = False
+        prot.lastRound = False
+        prot.limitReach = False
+        prot.timerOut = False
+        prot.isContinued = lambda: False
+        prot._loadInputSet = lambda _: InputSet()
+        prot._getFirstJoinStep = lambda: None
+        prot.updateSteps = lambda: None
+
+        def insertNewImageSteps(newIds):
+            insertedBatches.append(list(newIds))
+            return []
+
+        prot._insertNewImageSteps = insertNewImageSteps
+
+        with patch(
+                "emfacilities.protocols.protocol_data_counter.os.path.getmtime",
+                return_value=0,
+        ):
+            prot._checkNewInput()
+
+        self.assertEqual(
+            insertedBatches,
+            [[4, 5, 6]],
+            "New logical Set items must be detected even when the sqlite "
+            "mtime does not change.",
+        )
 
 
     def testTimeoutDaysUse24Hours(self):
