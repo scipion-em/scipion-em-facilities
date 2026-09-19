@@ -23,7 +23,6 @@
 # *  e-mail address 'scipion@cnb.csic.es'
 # *
 # **************************************************************************
-from datetime import datetime
 import ast
 import os
 import tempfile
@@ -31,7 +30,6 @@ import time
 import sys
 import matplotlib.pyplot as plt
 
-from pyworkflow.utils import prettyTime
 import pyworkflow.protocol.params as params
 from pyworkflow.object import Set
 from pyworkflow.protocol import ProtStreamingBase, STEPS_PARALLEL
@@ -267,30 +265,31 @@ class ProtGoodClassesExtractor(EMProtocol, ProtStreamingBase):
         return outputSet
 
     def _newParticlesToProcess(self):
-        classesFile = self.inputClasses.get().getFileName()
-        now = datetime.now()
-        self.lastCheck = getattr(self, 'lastCheck', now)
-        mTime = datetime.fromtimestamp(os.path.getmtime(classesFile))
-        self.debug('Last check: %s, modification: %s'
-                   % (prettyTime(self.lastCheck),
-                      prettyTime(mTime)))
-
-        inputChanged = not (self.lastCheck > mTime and self.dictsTimes)
-        self.lastCheck = now
-
-        if inputChanged:
-            return True
-
-        # Even when there are no new particles, the upstream protocol may
-        # have closed its stream. Refresh the input state so Continue can
-        # terminate instead of waiting forever for another file update.
         classSet = self._loadInputClassesSet()
         try:
             self.isStreamClosed = classSet.getStreamState()
+
+            # First pass must process the current contents, independently of
+            # the storage backend used by the input set.
+            if not self.dictsTimes:
+                return True
+
+            for clazz in classSet.iterItems():
+                lastTime = self.dictsTimes.get(str(clazz.getObjId()))
+                where = None
+                if lastTime is not None:
+                    where = 'creation>"%s"' % lastTime
+
+                if next(clazz.iterItems(
+                        orderBy='creation',
+                        direction='ASC',
+                        where=where,
+                ), None) is not None:
+                    return True
+
+            return False
         finally:
             classSet.close()
-
-        return False
 
 
     def _loadInputClassesSet(self):

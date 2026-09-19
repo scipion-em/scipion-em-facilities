@@ -78,6 +78,65 @@ class TestGoodClassesExtractor(BaseTest):
 
 
 
+
+    def testDetectsNewParticlesWhenInputMtimeDoesNotChange(self):
+        class Particle:
+            def getObjId(self):
+                return 101
+
+        class InputClass:
+            def getObjId(self):
+                return 1
+
+            def iterItems(self, **kwargs):
+                return iter((Particle(),))
+
+        class InputSet:
+            def __init__(self):
+                self.closed = False
+
+            def getFileName(self):
+                return "classes.sqlite"
+
+            def getStreamState(self):
+                return Set.STREAM_OPEN
+
+            def iterItems(self, **kwargs):
+                return iter((InputClass(),))
+
+            def close(self):
+                self.closed = True
+
+        class InputPointer:
+            def __init__(self, value):
+                self.value = value
+
+            def get(self):
+                return self.value
+
+        inputSet = InputSet()
+
+        prot = self.newProtocol(ProtGoodClassesExtractor)
+        prot.inputClasses = InputPointer(inputSet)
+        prot.dictsTimes = {"1": "2026-09-19 08:00:00"}
+        prot.isStreamClosed = Set.STREAM_OPEN
+        prot.lastCheck = datetime.now()
+        prot._loadInputClassesSet = lambda: inputSet
+
+        with patch(
+                "emfacilities.protocols.protocol_good_classes_extractor.os.path.getmtime",
+                return_value=0,
+        ):
+            hasNewParticles = prot._newParticlesToProcess()
+
+        self.assertTrue(
+            hasNewParticles,
+            "Logical Set contents must be checked even when the sqlite mtime "
+            "does not change.",
+        )
+        self.assertTrue(inputSet.closed)
+
+
     def testContinueDetectsClosedStreamWithoutNewParticles(self):
         class ClosedInputSet:
             def __init__(self):
@@ -88,6 +147,9 @@ class TestGoodClassesExtractor(BaseTest):
 
             def getStreamState(self):
                 return Set.STREAM_CLOSED
+
+            def iterItems(self, **kwargs):
+                return iter(())
 
             def close(self):
                 self.closed = True
