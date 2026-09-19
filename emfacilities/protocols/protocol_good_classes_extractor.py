@@ -178,6 +178,7 @@ class ProtGoodClassesExtractor(EMProtocol, ProtStreamingBase):
         """
         output = self._loadOutputSet(OUTPUT_PARTICLES, "")
         outputDiscarded = self._loadOutputSet(OUTPUT_DISCARDED_PARTICLES, "discarded")
+        persistedParticleIds = output.getIdSet() | outputDiscarded.getIdSet()
 
         with self._lock:
             # For each class (order by number of items)
@@ -195,18 +196,24 @@ class ProtGoodClassesExtractor(EMProtocol, ProtStreamingBase):
                     tmp_accepted = None
                     for image in clazz.iterItems(orderBy='creation', direction='ASC', where=where):
                         tmp_accepted = image.getObjCreation()
+                        if image.getObjId() in persistedParticleIds:
+                            continue
                         newImage = image.clone()
                         output.append(newImage)
                         self.goodParticles.append(image.getObjId())
+                        persistedParticleIds.add(image.getObjId())
                     if tmp_accepted is not None:
                         self.dictsTimes[str(clazz.getObjId())] = tmp_accepted  # Store the latest time
                 else:  # Discarded particles
                     tmp_discarded = None
                     for image in clazz.iterItems(orderBy='creation', direction='ASC', where=where):
                         tmp_discarded = image.getObjCreation()
+                        if image.getObjId() in persistedParticleIds:
+                            continue
                         newImageDiscarded = image.clone()
                         outputDiscarded.append(newImageDiscarded)
                         self.badParticles.append(image.getObjId())
+                        persistedParticleIds.add(image.getObjId())
                     if tmp_discarded is not None:
                         self.dictsTimes[str(clazz.getObjId())] = tmp_discarded  # Store the latest time
 

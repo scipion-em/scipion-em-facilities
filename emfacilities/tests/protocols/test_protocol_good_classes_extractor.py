@@ -196,6 +196,9 @@ class TestGoodClassesExtractor(BaseTest):
             def __len__(self):
                 return 0
 
+            def getIdSet(self):
+                return set()
+
             def append(self, item):
                 raise AssertionError("No particle should be appended")
 
@@ -229,6 +232,79 @@ class TestGoodClassesExtractor(BaseTest):
         self.assertEqual(prot.dictsTimes["1"], previousTime)
         self.assertEqual(prot.goodParticles, [])
         self.assertEqual(prot.badParticles, [])
+
+
+    def testContinueSkipsPersistedParticlesWhenCheckpointLagsOutput(self):
+        class Particle:
+            def __init__(self, objId, creation):
+                self._objId = objId
+                self._creation = creation
+
+            def getObjId(self):
+                return self._objId
+
+            def getObjCreation(self):
+                return self._creation
+
+            def clone(self):
+                return Particle(self._objId, self._creation)
+
+        class OutputSet:
+            def __init__(self, ids):
+                self.ids = set(ids)
+                self.appended = []
+
+            def getIdSet(self):
+                return set(self.ids)
+
+            def append(self, item):
+                self.appended.append(item.getObjId())
+                self.ids.add(item.getObjId())
+
+            def __len__(self):
+                return len(self.ids)
+
+        class InputClass:
+            def getObjId(self):
+                return 1
+
+            def iterItems(self, **kwargs):
+                return iter((
+                    Particle(101, "2026-09-19 08:05:00"),
+                    Particle(102, "2026-09-19 08:10:00"),
+                ))
+
+        class InputClasses:
+            def iterItems(self, **kwargs):
+                return iter((InputClass(),))
+
+        goodOutput = OutputSet({101})
+        discardedOutput = OutputSet(set())
+
+        prot = self.newProtocol(ProtGoodClassesExtractor)
+        prot.dictsTimes = {"1": "2026-09-19 08:00:00"}
+        prot.goodClassesIDs = [1]
+        prot.goodParticles = [101]
+        prot.badParticles = []
+        prot.particlesDistribution = {"good": [1], "bad": [0]}
+        prot.isStreamClosed = Set.STREAM_OPEN
+
+        def loadOutput(outputName, suffix):
+            if outputName == "outputParticles":
+                return goodOutput
+            return discardedOutput
+
+        prot._loadOutputSet = loadOutput
+        prot._updateOutputSet = lambda *args, **kwargs: None
+        prot._writeLastDone = lambda value: None
+        prot._createPlots = lambda: None
+
+        prot.extractElements(InputClasses())
+
+        self.assertEqual(goodOutput.appended, [102])
+        self.assertEqual(prot.goodParticles, [101, 102])
+        self.assertEqual(prot.dictsTimes["1"], "2026-09-19 08:10:00")
+
 
     def testLastDoneLegacyCheckpointDoesNotUseEval(self):
         prot = self.newProtocol(ProtGoodClassesExtractor)
