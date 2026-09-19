@@ -20,6 +20,9 @@
 # *  All comments concerning this program package may be sent to the
 # *  e-mail address 'scipion@cnb.csic.es'
 # ***************************************************************************/
+import os
+import json
+from unittest.mock import patch
 from pyworkflow.tests import BaseTest, DataSet
 from pwem.protocols.protocol_import import ProtImportMicrographs
 from pyworkflow.object import Pointer
@@ -60,6 +63,213 @@ class TestDataSampler(BaseTest):
     def testDataSampler50(self):
         prot = self._runDataSampler("Random sampling of 0.70 proportion", batch=4,  proportion=0.70)
         self.assertSetSize(prot.outputSet, size=2)
+
+
+
+
+    def testSamplingStepPersistsChosenIdsForContinue(self):
+        prot = self.newProtocol(
+            ProtDataSampler,
+            batchSize=3,
+            samplingProportion=0.5,
+        )
+        prot.processedIds = set()
+        prot.sampleIds = set()
+
+        with patch(
+                "emfacilities.protocols.protocol_data_sampler.sample_proportion",
+                return_value=[2],
+        ):
+            stateFile = prot.samplingStep([1, 2, 3])
+
+        self.assertTrue(stateFile)
+        self.assertTrue(os.path.exists(stateFile))
+
+        with open(stateFile, "r", encoding="utf-8") as handle:
+            state = json.load(handle)
+
+        self.assertEqual(state["processedIds"], [1, 2, 3])
+        self.assertEqual(state["sampledIds"], [2])
+        self.assertEqual(prot.processedIds, {1, 2, 3})
+        self.assertEqual(prot.sampleIds, {2})
+
+
+    def testContinueRestoresSampleChosenBeforeOutputFlush(self):
+        class Value:
+            def __init__(self, value):
+                self.value = value
+
+            def get(self):
+                return self.value
+
+            def hasValue(self):
+                return self.value not in (None, "")
+
+            def __eq__(self, other):
+                return self.value == other
+
+        class FinishedSamplingStep:
+            funcName = Value("samplingStep")
+            argsStr = Value("[[1, 2, 3]]")
+
+            def __init__(self, resultFile):
+                self._resultFiles = Value(
+                    '["%s"]' % resultFile.replace("\\\\", "\\\\\\\\")
+                )
+
+            def isFinished(self):
+                return True
+
+        class InputSet:
+            def getIdSet(self):
+                return {1, 2, 3, 4, 5, 6}
+
+            def isStreamClosed(self):
+                return False
+
+            def close(self):
+                pass
+
+        prot = self.newProtocol(
+            ProtDataSampler,
+            batchSize=3,
+            samplingProportion=0.5,
+        )
+        stateFile = prot._getExtraPath("sampling_state_test.json")
+        os.makedirs(os.path.dirname(stateFile), exist_ok=True)
+
+        with open(stateFile, "w", encoding="utf-8") as handle:
+            handle.write(
+                '{"processedIds": [1, 2, 3], "sampledIds": [2]}'
+            )
+
+        insertedBatches = []
+
+        prot.inputFn = "input.sqlite"
+        prot.insertedIds = set()
+        prot.processedIds = set()
+        prot.sampleIds = set()
+        prot.isStreamClosed = False
+        prot._steps = [FinishedSamplingStep(stateFile)]
+        prot.isContinued = lambda: True
+        prot._loadInputSet = lambda _: InputSet()
+        prot._getAllDoneIds = lambda: ([], 0)
+        prot._getFirstJoinStep = lambda: None
+        prot.updateSteps = lambda: None
+
+        def insertNewImageSteps(newIds, batchSize):
+            insertedBatches.append(list(newIds))
+            return []
+
+        prot._insertNewImageSteps = insertNewImageSteps
+
+        with patch(
+                "emfacilities.protocols.protocol_data_sampler.os.path.getmtime",
+                return_value=0,
+        ):
+            prot._checkNewInput()
+
+        self.assertEqual(insertedBatches, [[4, 5, 6]])
+        self.assertEqual(prot.insertedIds, {1, 2, 3})
+        self.assertEqual(prot.processedIds, {1, 2, 3})
+        self.assertEqual(prot.sampleIds, {2})
+
+
+    def testContinueRestoresFinishedSamplingBatches(self):
+        class Value:
+            def __init__(self, value):
+                self.value = value
+
+            def get(self):
+                return self.value
+
+            def __eq__(self, other):
+                return self.value == other
+
+        class FinishedSamplingStep:
+            funcName = Value("samplingStep")
+            argsStr = Value("[[1, 2, 3]]")
+
+            def isFinished(self):
+                return True
+
+        class InputSet:
+            def getIdSet(self):
+                return {1, 2, 3, 4, 5, 6}
+
+            def isStreamClosed(self):
+                return False
+
+            def close(self):
+                pass
+
+        insertedBatches = []
+
+        prot = self.newProtocol(
+            ProtDataSampler,
+            batchSize=3,
+            samplingProportion=0.5,
+        )
+        prot.inputFn = "input.sqlite"
+        prot.insertedIds = set()
+        prot.processedIds = set()
+        prot.sampleIds = set()
+        prot.isStreamClosed = False
+        prot._steps = [FinishedSamplingStep()]
+        prot.isContinued = lambda: True
+        prot._loadInputSet = lambda _: InputSet()
+        prot._getAllDoneIds = lambda: ([2], 1)
+        prot._getFirstJoinStep = lambda: None
+        prot.updateSteps = lambda: None
+
+        def insertNewImageSteps(newIds, batchSize):
+            insertedBatches.append(list(newIds))
+            return []
+
+        prot._insertNewImageSteps = insertNewImageSteps
+
+        with patch(
+                "emfacilities.protocols.protocol_data_sampler.os.path.getmtime",
+                return_value=0,
+        ):
+            prot._checkNewInput()
+
+        self.assertEqual(insertedBatches, [[4, 5, 6]])
+        self.assertEqual(prot.insertedIds, {1, 2, 3})
+        self.assertEqual(prot.processedIds, {1, 2, 3})
+        self.assertEqual(prot.sampleIds, {2})
+
+
+    def testClosedStreamFinishesAfterAllInputWasProcessed(self):
+        class InputSet:
+            def getSize(self):
+                return 6
+
+            def getIdSet(self):
+                return {1, 2, 3, 4, 5, 6}
+
+            def close(self):
+                pass
+
+        prot = self.newProtocol(ProtDataSampler, batchSize=3, samplingProportion=0.5)
+        prot.finished = False
+        prot.isStreamClosed = True
+        prot.processedIds = {1, 2, 3, 4, 5, 6}
+        prot.sampleIds = {1, 4}
+        prot.inputFn = 'input.sqlite'
+        prot._inputClass = object
+        prot._baseName = 'images.sqlite'
+        prot._getAllDoneIds = lambda: ([1, 4], 2)
+        prot._loadInputSet = lambda _: InputSet()
+        prot._loadOutputSet = lambda *args: object()
+        prot._updateOutputSet = lambda *args, **kwargs: None
+        prot._getFirstJoinStep = lambda: None
+        prot._store = lambda: None
+
+        prot._checkNewOutput()
+
+        self.assertTrue(prot.finished)
+
 
     def _runDataSampler(cls, label, batch, proportion):
         protDataSampler = cls.newProtocol(ProtDataSampler,
