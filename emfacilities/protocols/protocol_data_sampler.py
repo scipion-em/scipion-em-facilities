@@ -26,7 +26,6 @@
 import os
 import hashlib
 import json
-from datetime import datetime
 import time
 import copy
 import random
@@ -34,7 +33,6 @@ import random
 from pyworkflow import VERSION_3_0
 from pwem.objects import SetOfImages, Set
 import pyworkflow.protocol.params as params
-import pyworkflow.utils as pwutils
 
 from pwem.protocols import EMProtocol
 from pyworkflow import UPDATED, NEW
@@ -112,21 +110,11 @@ class ProtDataSampler(EMProtocol):
         self._checkNewOutput()
 
     def _checkNewInput(self):
-        # Check if there are new images to process from the input set
-        self.lastCheck = getattr(self, 'lastCheck', datetime.now())
-        mTime = datetime.fromtimestamp(os.path.getmtime(self.inputFn))
-        self.debug('Last check: %s, modification: %s'
-                    % (pwutils.prettyTime(self.lastCheck),
-                        pwutils.prettyTime(mTime)))
-        # If the input.sqlite have not changed since our last check,
-        # it does not make sense to check for new input data
-        if self.lastCheck > mTime and self.insertedIds:
-            return None
-
+        # Always inspect the logical input set. File mtimes are not a valid
+        # change detector when the set is backed by PostgreSQL.
         inputSet = self._loadInputSet(self.inputFn)
         inputSetIds = inputSet.getIdSet()
 
-        self.lastCheck = datetime.now()
         self.isStreamClosed = inputSet.isStreamClosed()
         inputSet.close()
 
