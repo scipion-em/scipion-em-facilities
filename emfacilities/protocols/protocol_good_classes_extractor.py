@@ -24,7 +24,9 @@
 # *
 # **************************************************************************
 from datetime import datetime
+import ast
 import os
+import tempfile
 import time
 import sys
 import matplotlib.pyplot as plt
@@ -297,18 +299,36 @@ class ProtGoodClassesExtractor(EMProtocol, ProtStreamingBase):
         return listIDs
 
     def _writeLastDone(self, creationTimeDict):
-        """ Write to a text file the last item creation time done. """
-        dictStr = str(creationTimeDict)
+        """Write the last processed creation times atomically."""
+        checkpoint = self._getExtraPath(LAST_DONE_FILE)
+        directory = os.path.dirname(checkpoint)
+        fd, tmpPath = tempfile.mkstemp(
+            prefix=os.path.basename(checkpoint) + ".",
+            suffix=".tmp",
+            dir=directory,
+        )
 
-        with open(self._getExtraPath(LAST_DONE_FILE), 'w') as f:
-            f.write(dictStr)
+        try:
+            with os.fdopen(fd, "w") as handle:
+                handle.write(repr(creationTimeDict))
+            os.replace(tmpPath, checkpoint)
+        except Exception:
+            try:
+                os.unlink(tmpPath)
+            except FileNotFoundError:
+                pass
+            raise
 
     def _getLastDone(self):
-        """ Read from a text file the last item creation time done. """
-        # Open the file in read mode and read the number
+        """Read the last processed creation times safely."""
         with open(self._getExtraPath(LAST_DONE_FILE), "r") as file:
             content = file.read()
-        dictTimes = eval(content)
+
+        dictTimes = ast.literal_eval(content)
+        if not isinstance(dictTimes, dict):
+            raise ValueError(
+                "Invalid last-done checkpoint: expected a dictionary."
+            )
 
         return dictTimes
 

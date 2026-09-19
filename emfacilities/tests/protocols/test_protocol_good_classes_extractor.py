@@ -22,6 +22,7 @@
 # ***************************************************************************/
 from pyworkflow.tests import BaseTest, setupTestProject, DataSet
 from datetime import datetime
+import os
 from unittest.mock import patch
 from pwem.protocols.protocol_import import ProtImportParticles
 import pwem.protocols as emprot
@@ -228,6 +229,53 @@ class TestGoodClassesExtractor(BaseTest):
         self.assertEqual(prot.dictsTimes["1"], previousTime)
         self.assertEqual(prot.goodParticles, [])
         self.assertEqual(prot.badParticles, [])
+
+    def testLastDoneLegacyCheckpointDoesNotUseEval(self):
+        prot = self.newProtocol(ProtGoodClassesExtractor)
+        checkpoint = prot._getExtraPath("last_done.txt")
+        os.makedirs(os.path.dirname(checkpoint), exist_ok=True)
+        expected = {
+            "1": "2026-09-19 08:00:00",
+            "5": "2026-09-19 08:01:00",
+        }
+
+        with open(checkpoint, "w") as handle:
+            handle.write(str(expected))
+
+        with patch(
+                "builtins.eval",
+                side_effect=AssertionError("eval must not be used"),
+        ):
+            restored = prot._getLastDone()
+
+        self.assertEqual(restored, expected)
+
+    def testLastDoneWritePreservesPreviousCheckpointOnReplaceFailure(self):
+        prot = self.newProtocol(ProtGoodClassesExtractor)
+        checkpoint = prot._getExtraPath("last_done.txt")
+        os.makedirs(os.path.dirname(checkpoint), exist_ok=True)
+        previous = {"1": "2026-09-19 08:00:00"}
+        updated = {
+            "1": "2026-09-19 08:00:00",
+            "2": "2026-09-19 08:05:00",
+        }
+
+        with open(checkpoint, "w") as handle:
+            handle.write(str(previous))
+
+        with patch(
+                "emfacilities.protocols.protocol_good_classes_extractor.os.replace",
+                side_effect=OSError("simulated replace failure"),
+        ):
+            with self.assertRaises(OSError):
+                prot._writeLastDone(updated)
+
+        with open(checkpoint, "r") as handle:
+            content = handle.read()
+
+        self.assertEqual(content, str(previous))
+
+
 
 
 
