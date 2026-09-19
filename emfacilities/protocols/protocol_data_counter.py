@@ -127,8 +127,12 @@ class ProtDataCounter(EMProtocol):
         return None
 
     def _stepsCheck(self):
+        if self.boolTimer.get() and not self.finished and not self.timerOut:
+            self.timerStep()
+
         self._checkNewInput()
         self._checkNewOutput()
+
 
     def _checkNewInput(self):
         # Check if there are new images to process from the input set
@@ -256,30 +260,38 @@ class ProtDataCounter(EMProtocol):
         return deps
 
     def registerStep(self, newIds):
-        self.info('Registering the %d new images' %len(newIds))
+        self.info('Registering the %d new images' % len(newIds))
         self.processedIds.update(newIds)
 
-        if not self.isStreamClosed:
-            if self.boolTimer.get():
-                self.info('Using timer:')
-                self.timerStep()
 
     def timerStep(self):
-        endTime = self.lastTimeCheckTimer + timedelta(seconds=self.timeoutSecs)
         now = datetime.now()
+
+        if self.initTime.hasValue():
+            startTime = self.initTime.datetime()
+            timeoutSecs = self.getTimeOutInSeconds(self.timeout.get())
+            endTime = startTime + timedelta(seconds=timeoutSecs)
+        else:
+            # Fallback for isolated/unit usage where the protocol has not
+            # gone through Protocol.setRunning().
+            endTime = self.lastTimeCheckTimer + timedelta(seconds=self.timeoutSecs)
+
         remainingTime = (endTime - now).total_seconds()
 
         if remainingTime <= 0:
+            self.timeoutSecs = 0
             self.timerOut = True
             self.info("  timer is consumed terminating protocol.")
             self.summaryVar.set("Timer is consumed terminating protocol.")
         else:
             self.timeoutSecs = int(remainingTime)
-            self.info(f"  remaining time: {int(remainingTime)} seconds.")
-            self.summaryVar.set("Time activated remaining time: %d seconds" % self.timeoutSecs)
+            self.info(f"  remaining time: {self.timeoutSecs} seconds.")
+            self.summaryVar.set(
+                "Time activated remaining time: %d seconds" % self.timeoutSecs
+            )
 
-        # Update the last time check
         self.lastTimeCheckTimer = now
+
 
     # ------------------------- UTILS functions --------------------------------
     def _getAllDoneIds(self):

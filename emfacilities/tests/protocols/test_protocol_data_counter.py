@@ -20,6 +20,7 @@
 # *  All comments concerning this program package may be sent to the
 # *  e-mail address 'scipion@cnb.csic.es'
 # ***************************************************************************/
+from datetime import datetime, timedelta
 from pyworkflow.tests import BaseTest, DataSet
 from pwem.protocols.protocol_import import ProtImportMicrographs
 from pyworkflow.object import Pointer
@@ -50,6 +51,71 @@ class TestDataCounter(BaseTest):
         cls.launchProtocol(protImport)
 
         return protImport
+
+
+
+
+    def testTimerUsesPreservedProtocolStartOnContinue(self):
+        class SummaryVar:
+            def __init__(self):
+                self.value = None
+
+            def set(self, value):
+                self.value = value
+
+        prot = self.newProtocol(
+            ProtDataCounter,
+            outputSize=100,
+            boolTimer=True,
+            timeout="10s",
+        )
+        prot.finished = False
+        prot.timerOut = False
+        prot.timeoutSecs = 10
+        prot.lastTimeCheckTimer = datetime.now()
+        prot.summaryVar = SummaryVar()
+        prot.initTime.set(datetime.now() - timedelta(seconds=7))
+
+        prot.timerStep()
+
+        self.assertFalse(prot.timerOut)
+        self.assertLessEqual(
+            prot.timeoutSecs,
+            3,
+            "Continue must preserve the elapsed timer budget from the original run.",
+        )
+
+
+    def testTimerExpiresWithoutNewInput(self):
+        class SummaryVar:
+            def __init__(self):
+                self.value = None
+
+            def set(self, value):
+                self.value = value
+
+        prot = self.newProtocol(
+            ProtDataCounter,
+            outputSize=100,
+            boolTimer=True,
+            timeout="10s",
+        )
+        prot.finished = False
+        prot.timerOut = False
+        prot.timeoutSecs = 10
+        prot.lastTimeCheckTimer = datetime.now() - timedelta(seconds=11)
+        prot.summaryVar = SummaryVar()
+
+        # Simulate an idle streaming round: no new input and no new output.
+        prot._checkNewInput = lambda: None
+        prot._checkNewOutput = lambda: None
+
+        prot._stepsCheck()
+
+        self.assertTrue(
+            prot.timerOut,
+            "The timer must expire even when no new input batch arrives.",
+        )
 
 
     def testDataCounter2000(self):
