@@ -186,6 +186,201 @@ class TestMonitor2dStreamer(BaseTest):
         self.assertTrue(any(obj is prot._runIds for obj in stored))
         self.assertEqual(prot._runPrerequisites, [101, 102, 321])
 
+
+    def testContinueRecoversScheduledRunMissingFromRunIds(self):
+        class OutputSet:
+            def getIdSet(self):
+                return {1, 2}
+
+        class ParentProtocol:
+            def getObjId(self):
+                return 99
+
+        class ParticlePointer:
+            def getObjValue(self):
+                return ParentProtocol()
+
+            def getExtended(self):
+                return "outputParticles_001"
+
+        class ScheduledRun:
+            inputParticles = ParticlePointer()
+
+            def getObjId(self):
+                return 321
+
+        class Project:
+            def getRuns(self):
+                return [ScheduledRun()]
+
+        class FakeManager:
+            def loadProject(self, name):
+                return Project()
+
+        class ProjectInfo:
+            def getName(self):
+                return "Monitor2dResumeTest"
+
+        class Input2dProtocol:
+            def isActive(self):
+                return False
+
+        class Pointer:
+            def __init__(self, value):
+                self.value = value
+
+            def get(self):
+                return self.value
+
+        prot = self.newProtocol(
+            ProtMonitor2dStreamer,
+            samplingInterval=1,
+        )
+        prot.isContinued = lambda: True
+        prot._runIds.set([])
+        prot.getProject = lambda: ProjectInfo()
+        prot.getObjId = lambda: 99
+        prot.input2dProtocol = Pointer(Input2dProtocol())
+
+        def createSubset():
+            prot._counter += 1
+            return object()
+
+        prot._createSubset = createSubset
+        prot.iterOutputAttributes = lambda: [
+            ("outputParticles_001", OutputSet()),
+        ]
+
+        restoredState = {}
+
+        def checkNewInput():
+            restoredState["runIds"] = list(prot._runIds)
+            restoredState["prerequisites"] = list(prot._runPrerequisites)
+            prot._streamClosed = True
+
+        prot._checkNewInput = checkNewInput
+
+        with patch(
+                "emfacilities.protocols.protocol_monitor_2d_streamer.Manager",
+                return_value=FakeManager(),
+        ):
+            prot.monitorStep()
+
+        self.assertEqual(restoredState["runIds"], [321])
+        self.assertEqual(restoredState["prerequisites"], [321])
+
+
+
+    def testContinueSchedulesRunForPersistedSubsetMissingClassification(self):
+        class OutputSet:
+            def getIdSet(self):
+                return {1, 2}
+
+        class ParentProtocol:
+            def getObjId(self):
+                return 99
+
+        class ParticlePointer:
+            def __init__(self):
+                self.parent = None
+                self.extended = None
+
+            def set(self, value):
+                self.parent = value
+
+            def setExtended(self, value):
+                self.extended = value
+
+        class CopyProtocol:
+            def __init__(self):
+                self.inputParticles = ParticlePointer()
+
+            def getObjId(self):
+                return 321
+
+        class Input2dProtocol:
+            def isActive(self):
+                return False
+
+            def getObjId(self):
+                return 50
+
+        class Project:
+            def __init__(self):
+                self.scheduled = []
+
+            def getRuns(self):
+                return []
+
+            def getProtocol(self, objId):
+                if objId == 99:
+                    return ParentProtocol()
+                return object()
+
+            def copyProtocol(self, protocol):
+                return CopyProtocol()
+
+            def scheduleProtocol(self, protocol, prerequisites):
+                self.scheduled.append(
+                    (protocol.inputParticles.extended, list(prerequisites))
+                )
+
+        project = Project()
+
+        class FakeManager:
+            def loadProject(self, name):
+                return project
+
+        class ProjectInfo:
+            def getName(self):
+                return "Monitor2dResumeTest"
+
+        class Pointer:
+            def __init__(self, value):
+                self.value = value
+
+            def get(self):
+                return self.value
+
+        prot = self.newProtocol(
+            ProtMonitor2dStreamer,
+            samplingInterval=1,
+        )
+        prot.isContinued = lambda: True
+        prot._runIds.set([])
+        prot.getProject = lambda: ProjectInfo()
+        prot.getObjId = lambda: 99
+        prot.input2dProtocol = Pointer(Input2dProtocol())
+
+        def createSubset():
+            prot._counter += 1
+            return object()
+
+        prot._createSubset = createSubset
+        prot.iterOutputAttributes = lambda: [
+            ("outputParticles_001", OutputSet()),
+        ]
+
+        restoredState = {}
+
+        def checkNewInput():
+            restoredState["runIds"] = list(prot._runIds)
+            restoredState["prerequisites"] = list(prot._runPrerequisites)
+            prot._streamClosed = True
+
+        prot._checkNewInput = checkNewInput
+
+        with patch(
+                "emfacilities.protocols.protocol_monitor_2d_streamer.Manager",
+                return_value=FakeManager(),
+        ):
+            prot.monitorStep()
+
+        self.assertEqual(project.scheduled, [("outputParticles_001", [])])
+        self.assertEqual(restoredState["runIds"], [321])
+        self.assertEqual(restoredState["prerequisites"], [321])
+
+
     def testStartingNumberSkipsParticleCountNotIds(self):
         class Particle:
             def __init__(self, objId):

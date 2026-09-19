@@ -158,6 +158,7 @@ class ProtMonitor2dStreamer(ProtMonitor):
     # -------------------------- UTILS functions ------------------------------
     def _restoreContinueState(self):
         processedIds = set()
+        outputNames = set()
         lastSubsetNumber = 0
 
         for outputName, outputSet in self.iterOutputAttributes():
@@ -169,8 +170,11 @@ class ProtMonitor2dStreamer(ProtMonitor):
             except (IndexError, ValueError):
                 continue
 
+            outputNames.add(outputName)
             lastSubsetNumber = max(lastSubsetNumber, subsetNumber)
             processedIds.update(outputSet.getIdSet())
+
+        self._restoreScheduledRuns(outputNames)
 
         self._counter = lastSubsetNumber
         self._counterParticlesProcessed = len(processedIds)
@@ -185,6 +189,64 @@ class ProtMonitor2dStreamer(ProtMonitor):
                 self._counter,
             )
         )
+
+    def _restoreScheduledRuns(self, outputNames):
+        if not outputNames:
+            return
+
+        manager = Manager()
+        project = manager.loadProject(self.getProject().getName())
+        knownRunIds = set(self._runIds)
+        runsByOutput = {}
+
+        for run in project.getRuns():
+            inputParticles = getattr(run, 'inputParticles', None)
+            if inputParticles is None:
+                continue
+
+            try:
+                parentProtocol = inputParticles.getObjValue()
+                outputName = inputParticles.getExtended()
+            except (AttributeError, TypeError):
+                continue
+
+            if parentProtocol is None or outputName not in outputNames:
+                continue
+
+            try:
+                parentId = parentProtocol.getObjId()
+                runId = run.getObjId()
+            except AttributeError:
+                continue
+
+            if parentId == self.getObjId():
+                runsByOutput.setdefault(outputName, runId)
+
+        input2D = self.input2dProtocol.get()
+        runPrerequisites = []
+        if input2D.isActive():
+            runPrerequisites.append(input2D.getObjId())
+
+        for outputName in sorted(outputNames):
+            runId = runsByOutput.get(outputName)
+
+            if runId is None:
+                copyProt = project.copyProtocol(
+                    project.getProtocol(input2D.getObjId())
+                )
+                copyProt.inputParticles.set(
+                    project.getProtocol(self.getObjId())
+                )
+                copyProt.inputParticles.setExtended(outputName)
+                project.scheduleProtocol(copyProt, runPrerequisites)
+                runId = copyProt.getObjId()
+
+            if runId not in knownRunIds:
+                self._runIds.append(runId)
+                knownRunIds.add(runId)
+
+            if runId not in runPrerequisites:
+                runPrerequisites.append(runId)
 
     def _createSubset(self):
         """ Create a new empty set of particles with a given suffix. """
