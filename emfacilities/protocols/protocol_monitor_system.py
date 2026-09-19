@@ -129,7 +129,7 @@ class ProtMonitorSystem(ProtMonitor):
     # --------------------------- STEPS functions ----------------------------
 
     def monitorStep(self):
-        self.createMonitor().loop()
+        self.createMonitor().loop(startTime=self.initTime.datetime())
 
     def createMonitor(self):
         protocols = []

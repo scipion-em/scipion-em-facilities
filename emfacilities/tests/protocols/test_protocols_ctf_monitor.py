@@ -22,6 +22,7 @@
 # ***************************************************************************/
 
 import os
+import tempfile
 
 
 import pyworkflow.tests as pwtests
@@ -37,6 +38,45 @@ MICS = os.environ.get('SCIPION_TEST_MICS', 3)
 
 
 class TestCtfStream(pwtests.BaseTest):
+
+    def testInitLoopRestoresReadCtfIdsFromExistingDatabase(self):
+        class DummyProtocol:
+            pass
+
+        with tempfile.TemporaryDirectory() as tmpDir:
+            monitor = monitorsProt.MonitorCTF(
+                DummyProtocol(),
+                workingDir=tmpDir,
+                samplingInterval=1,
+                monitorTime=1,
+                minDefocus=1000,
+                maxDefocus=40000,
+                astigmatism=2000,
+            )
+            monitor.initLoop()
+            monitor.cur.execute(
+                "INSERT INTO log (ctfID) VALUES (?)",
+                (7,),
+            )
+            monitor.conn.close()
+
+            resumed = monitorsProt.MonitorCTF(
+                DummyProtocol(),
+                workingDir=tmpDir,
+                samplingInterval=1,
+                monitorTime=1,
+                minDefocus=1000,
+                maxDefocus=40000,
+                astigmatism=2000,
+            )
+            resumed.initLoop()
+
+            try:
+                self.assertEqual(resumed.readCTFs, {7})
+            finally:
+                resumed.conn.close()
+
+
     @classmethod
     def setUpClass(cls):
         pwtests.setupTestProject(cls)

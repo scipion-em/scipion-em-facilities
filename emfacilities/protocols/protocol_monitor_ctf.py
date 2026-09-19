@@ -83,7 +83,7 @@ class ProtMonitorCTF(ProtMonitor):
     # -------------------------- STEPS functions ------------------------------
     def monitorStep(self):
 
-        self.createMonitor().loop()
+        self.createMonitor().loop(startTime=self.initTime.datetime())
 
     def createMonitor(self):
 
@@ -152,6 +152,11 @@ class MonitorCTF(Monitor):
 
     def initLoop(self):
         self._createTable()
+        self.cur.execute(
+            "SELECT ctfID FROM %s WHERE ctfID IS NOT NULL" % self._tableName
+        )
+        self.readCTFs = {row[0] for row in self.cur.fetchall()}
+
 
     def step(self):
         prot = getUpdatedProtocol(self.protocol)
