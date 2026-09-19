@@ -127,10 +127,22 @@ class ProtMonitor2dStreamer(ProtMonitor):
         self._counter = 0
         self._lastMicId = None
         self._lastPartId = 0
-        self._subset = self._createSubset()
         self._runPrerequisites = []
+
+        if self.isContinued():
+            self._restoreContinueState()
+
+        self._subset = self._createSubset()
+
         if self.input2dProtocol.get().isActive():
-            self._runPrerequisites.append(self.input2dProtocol.get().getObjId())
+            inputProtId = self.input2dProtocol.get().getObjId()
+            if inputProtId not in self._runPrerequisites:
+                self._runPrerequisites.insert(0, inputProtId)
+
+        for runId in self._runIds:
+            if runId not in self._runPrerequisites:
+                self._runPrerequisites.append(runId)
+
         self._streamClosed = False
         # list of runs that has been (or will) be scheduled/run
 
@@ -141,7 +153,38 @@ class ProtMonitor2dStreamer(ProtMonitor):
             time.sleep(interval)
             finished = self._streamClosed
 
+
     # -------------------------- UTILS functions ------------------------------
+    def _restoreContinueState(self):
+        processedIds = set()
+        lastSubsetNumber = 0
+
+        for outputName, outputSet in self.iterOutputAttributes():
+            if not outputName.startswith('outputParticles_'):
+                continue
+
+            try:
+                subsetNumber = int(outputName.rsplit('_', 1)[1])
+            except (IndexError, ValueError):
+                continue
+
+            lastSubsetNumber = max(lastSubsetNumber, subsetNumber)
+            processedIds.update(outputSet.getIdSet())
+
+        self._counter = lastSubsetNumber
+        self._counterParticlesProcessed = len(processedIds)
+        self._lastPartId = max(processedIds) if processedIds else 0
+
+        self.info(
+            'Restored monitor progress: %d particles, last particle %d, '
+            '%d written subsets.'
+            % (
+                self._counterParticlesProcessed,
+                self._lastPartId,
+                self._counter,
+            )
+        )
+
     def _createSubset(self):
         """ Create a new empty set of particles with a given suffix. """
         self._counter += 1
@@ -168,8 +211,14 @@ class ProtMonitor2dStreamer(ProtMonitor):
         copyProt.inputParticles.set(project.getProtocol(self.getObjId()))
         copyProt.inputParticles.setExtended(newSubsetName)
         project.scheduleProtocol(copyProt, self._runPrerequisites)
-        # Next schedule will be after this one
-        self._runPrerequisites.append(copyProt.getObjId())
+
+        # Persist scheduled runs so Continue can rebuild the dependency chain.
+        runId = copyProt.getObjId()
+        self._runIds.append(runId)
+        self._store(self._runIds)
+
+        # Next schedule will be after this one.
+        self._runPrerequisites.append(runId)
 
     def _checkNewInput(self):
         """ Check if there are new particles and generate a new set
@@ -219,12 +268,28 @@ class ProtMonitor2dStreamer(ProtMonitor):
         inputParts.loadAllProperties()
         self._streamClosed = inputParts.isStreamClosed()
 
-        for p in inputParts.iterItems(orderBy=['_micId', 'id'],
-                                      direction='ASC',
-                                      where='id > %d' % self._lastPartId):
-            yield p
+        particles = inputParts.iterItems(
+            orderBy=['_micId', 'id'],
+            direction='ASC',
+            where='id > %d' % self._lastPartId,
+        )
 
-        inputParts.close()
+        # startingNumber means "skip this many particles", not "skip IDs <= N".
+        # Apply it only before any particle has been processed. On Continue,
+        # _lastPartId is restored from previous subsets, so the initial skip
+        # must not be applied again.
+        if self._lastPartId == 0:
+            for _ in range(self.startingNumber.get()):
+                try:
+                    next(particles)
+                except StopIteration:
+                    break
+
+        try:
+            for particle in particles:
+                yield particle
+        finally:
+            inputParts.close()
 
     def classificationStop(self):
         response = False
