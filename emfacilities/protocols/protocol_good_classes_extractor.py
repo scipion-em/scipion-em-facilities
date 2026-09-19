@@ -149,6 +149,24 @@ class ProtGoodClassesExtractor(EMProtocol, ProtStreamingBase):
                     'starting without restored class times.'
                 )
 
+            goodOutput = getattr(self, OUTPUT_PARTICLES, None)
+            badOutput = getattr(self, OUTPUT_DISCARDED_PARTICLES, None)
+
+            if goodOutput is not None:
+                self.goodParticles = list(goodOutput.getIdSet())
+            if badOutput is not None:
+                self.badParticles = list(badOutput.getIdSet())
+
+            if goodOutput is not None or badOutput is not None:
+                self.particlesDistribution = {
+                    'good': [len(self.goodParticles)],
+                    'bad': [len(self.badParticles)],
+                }
+                self.info(
+                    'Restored particle counters: %d good, %d discarded'
+                    % (len(self.goodParticles), len(self.badParticles))
+                )
+
 
     def extractElements(self, inputClasses):
         """
@@ -172,19 +190,23 @@ class ProtGoodClassesExtractor(EMProtocol, ProtStreamingBase):
 
                 # Two sets of particles:
                 if clazz.getObjId() in self.goodClassesIDs:  # Accepted particles
+                    tmp_accepted = None
                     for image in clazz.iterItems(orderBy='creation', direction='ASC', where=where):
                         tmp_accepted = image.getObjCreation()
                         newImage = image.clone()
                         output.append(newImage)
                         self.goodParticles.append(image.getObjId())
-                    self.dictsTimes[str(clazz.getObjId())] = tmp_accepted  # Store the latest time
+                    if tmp_accepted is not None:
+                        self.dictsTimes[str(clazz.getObjId())] = tmp_accepted  # Store the latest time
                 else:  # Discarded particles
+                    tmp_discarded = None
                     for image in clazz.iterItems(orderBy='creation', direction='ASC', where=where):
                         tmp_discarded = image.getObjCreation()
                         newImageDiscarded = image.clone()
                         outputDiscarded.append(newImageDiscarded)
                         self.badParticles.append(image.getObjId())
-                    self.dictsTimes[str(clazz.getObjId())] = tmp_discarded  # Store the latest time
+                    if tmp_discarded is not None:
+                        self.dictsTimes[str(clazz.getObjId())] = tmp_discarded  # Store the latest time
 
         self.info('Size output %d and size discarded output %d' % (len(output), len(outputDiscarded)))
         self.debug(str(self.dictsTimes))

@@ -165,3 +165,70 @@ class TestGoodClassesExtractor(BaseTest):
         cls.launchProtocol(protGoodClassSelectorIds)
 
         return protGoodClassSelectorIds
+    def testContinueRestoresParticleCountersFromOutputs(self):
+        class OutputSet:
+            def __init__(self, ids):
+                self._ids = set(ids)
+
+            def getIdSet(self):
+                return set(self._ids)
+
+        prot = self.newProtocol(ProtGoodClassesExtractor)
+        prot.isContinued = lambda: True
+        prot._getLastDone = lambda: {
+            "1": "2026-09-19 08:00:00",
+        }
+        prot.outputParticles = OutputSet({1, 2, 3})
+        prot.outputParticlesDiscarded = OutputSet({4, 5})
+
+        prot.initialStep()
+
+        self.assertEqual(set(prot.goodParticles), {1, 2, 3})
+        self.assertEqual(set(prot.badParticles), {4, 5})
+        self.assertEqual(
+            prot.particlesDistribution,
+            {"good": [3], "bad": [2]},
+        )
+
+    def testContinueClassWithoutNewParticlesKeepsCheckpoint(self):
+        class EmptyOutput:
+            def __len__(self):
+                return 0
+
+            def append(self, item):
+                raise AssertionError("No particle should be appended")
+
+        class EmptyClass:
+            def getObjId(self):
+                return 1
+
+            def iterItems(self, **kwargs):
+                return iter(())
+
+        class InputClasses:
+            def iterItems(self, **kwargs):
+                return iter((EmptyClass(),))
+
+        prot = self.newProtocol(ProtGoodClassesExtractor)
+        previousTime = "2026-09-19 08:00:00"
+        prot.dictsTimes = {"1": previousTime}
+        prot.goodClassesIDs = [1]
+        prot.goodParticles = []
+        prot.badParticles = []
+        prot.particlesDistribution = {"good": [], "bad": []}
+        prot.isStreamClosed = Set.STREAM_OPEN
+
+        prot._loadOutputSet = lambda *args: EmptyOutput()
+        prot._updateOutputSet = lambda *args, **kwargs: None
+        prot._writeLastDone = lambda value: None
+        prot._createPlots = lambda: None
+
+        prot.extractElements(InputClasses())
+
+        self.assertEqual(prot.dictsTimes["1"], previousTime)
+        self.assertEqual(prot.goodParticles, [])
+        self.assertEqual(prot.badParticles, [])
+
+
+
+

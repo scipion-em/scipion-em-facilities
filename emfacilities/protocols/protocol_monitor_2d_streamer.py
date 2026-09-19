@@ -230,6 +230,21 @@ class ProtMonitor2dStreamer(ProtMonitor):
         for particle in self._iterParticles():
             micId = particle.getMicId()
             partId = particle.getObjId()
+
+            # For a particle-count limit, stop at the micrograph boundary
+            # before adding the first particle beyond the requested maximum.
+            if (micId != self._lastMicId
+                    and self.maximumOption == self.NUMBER_PARTICLES
+                    and self.classificationStop()):
+                self._streamClosed = True
+                if self._counterNewParticles > 0:
+                    self._writeSubset(subset)
+                self.info(
+                    "The limit for launching classification jobs has been "
+                    "reached, stopping protocol"
+                )
+                return
+
             subset.append(particle)
             self.debug("micId: %03d, particle: %05s, size: %s"
                       % (micId, partId, subset.getSize()))
@@ -297,7 +312,7 @@ class ProtMonitor2dStreamer(ProtMonitor):
 
         if self.maximumOption == self.NUMBER_PARTICLES:
             inputSize = self._counterParticlesProcessed
-            if inputSize > self.numberParticles.get():
+            if inputSize >= self.numberParticles.get():
                 response = True
 
         if self.maximumOption == self.CLASSIFICATION_JOBS:

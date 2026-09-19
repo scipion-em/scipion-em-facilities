@@ -292,6 +292,70 @@ class TestMonitor2dStreamer(BaseTest):
 
         self.assertEqual(written, [])
 
+    def testParticleLimitStopsAtExactMaximum(self):
+        prot = self.newProtocol(
+            ProtMonitor2dStreamer,
+            maximumOption=ProtMonitor2dStreamer.NUMBER_PARTICLES,
+            numberParticles=100,
+        )
+        prot._counterParticlesProcessed = 100
+
+        self.assertTrue(prot.classificationStop())
+
+    def testParticleLimitWritesPendingSubsetWithoutExtraParticle(self):
+        class Particle:
+            def __init__(self, objId, micId):
+                self._objId = objId
+                self._micId = micId
+
+            def getObjId(self):
+                return self._objId
+
+            def getMicId(self):
+                return self._micId
+
+        class Subset:
+            def __init__(self):
+                self.ids = []
+
+            def append(self, particle):
+                self.ids.append(particle.getObjId())
+
+            def getSize(self):
+                return len(self.ids)
+
+        prot = self.newProtocol(
+            ProtMonitor2dStreamer,
+            maximumOption=ProtMonitor2dStreamer.NUMBER_PARTICLES,
+            numberParticles=2,
+            batchSize=100,
+        )
+        prot._subset = Subset()
+        prot._lastMicId = None
+        prot._lastPartId = 0
+        prot._counterNewParticles = 0
+        prot._counterParticlesProcessed = 0
+        prot._streamClosed = False
+        prot._iterParticles = lambda: iter([
+            Particle(1, 1),
+            Particle(2, 1),
+            Particle(3, 2),
+        ])
+
+        written = []
+        prot._writeSubset = lambda subset: written.append(list(subset.ids))
+
+        prot._checkNewInput()
+
+        self.assertTrue(prot._streamClosed)
+        self.assertEqual(written, [[1, 2]])
+        self.assertEqual(prot._lastPartId, 2)
+        self.assertEqual(prot._counterParticlesProcessed, 2)
+
+
+
+
+
 
 
 
