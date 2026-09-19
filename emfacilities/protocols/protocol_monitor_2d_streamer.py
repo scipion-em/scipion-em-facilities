@@ -150,8 +150,9 @@ class ProtMonitor2dStreamer(ProtMonitor):
 
         while not finished:
             self._checkNewInput()
-            time.sleep(interval)
             finished = self._streamClosed
+            if not finished:
+                time.sleep(interval)
 
 
     # -------------------------- UTILS functions ------------------------------
@@ -257,7 +258,7 @@ class ProtMonitor2dStreamer(ProtMonitor):
             self._counterParticlesProcessed += 1
 
             # Write last group of particles if input stream is closed
-        if self._streamClosed:
+        if self._streamClosed and self._counterNewParticles > 0:
             self._writeSubset(subset)
 
         self._subset = subset

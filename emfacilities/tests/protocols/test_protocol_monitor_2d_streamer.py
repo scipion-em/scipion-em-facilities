@@ -234,5 +234,67 @@ class TestMonitor2dStreamer(BaseTest):
 
         self.assertEqual(particleIds, [30, 40])
 
+    def testMonitorDoesNotSleepAfterStreamCloses(self):
+        class Input2dProtocol:
+            def isActive(self):
+                return False
+
+        class Pointer:
+            def __init__(self, value):
+                self.value = value
+
+            def get(self):
+                return self.value
+
+        prot = self.newProtocol(
+            ProtMonitor2dStreamer,
+            samplingInterval=10,
+        )
+        prot.isContinued = lambda: False
+        prot.input2dProtocol = Pointer(Input2dProtocol())
+        prot._createSubset = lambda: object()
+
+        def checkNewInput():
+            prot._streamClosed = True
+
+        prot._checkNewInput = checkNewInput
+
+        with patch(
+                "emfacilities.protocols.protocol_monitor_2d_streamer.time.sleep",
+        ) as sleepMock:
+            prot.monitorStep()
+
+        sleepMock.assert_not_called()
+
+    def testClosedStreamWithNoNewParticlesDoesNotWriteEmptySubset(self):
+        class EmptySubset:
+            def getSize(self):
+                return 0
+
+        prot = self.newProtocol(ProtMonitor2dStreamer)
+        prot._subset = EmptySubset()
+        prot._lastMicId = None
+        prot._lastPartId = 6
+        prot._counterNewParticles = 0
+        prot._counterParticlesProcessed = 6
+        prot._streamClosed = False
+
+        def iterParticles():
+            prot._streamClosed = True
+            return iter(())
+
+        prot._iterParticles = iterParticles
+
+        written = []
+        prot._writeSubset = lambda subset: written.append(subset)
+
+        prot._checkNewInput()
+
+        self.assertEqual(written, [])
+
+
+
+
+
 
 
