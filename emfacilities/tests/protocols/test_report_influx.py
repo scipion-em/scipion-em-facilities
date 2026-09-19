@@ -57,30 +57,30 @@ class TestReportInfluxResume(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmpDir:
             with open(os.path.join(tmpDir, CONFILE), "w") as handle:
                 handle.write(
-                    "[ctf]\\nlastId = 8\\n"
-                    "[gain]\\nlastId = 4\\n"
-                    "[system]\\nlastId = 12\\n"
+                    "[ctf]\nlastId = 8\n"
+                    "[gain]\nlastId = 4\n"
+                    "[system]\nlastId = 12\n"
                 )
 
             with open(os.path.join(tmpDir, "secrets.cfg"), "w") as handle:
                 handle.write(
-                    "[influx]\\n"
-                    "dataBase = scipion\\n"
-                    "passwordInflux = cGFzcw==\\n"
-                    "usernameInflux = dXNlcg==\\n"
-                    "hostinflux = localhost\\n"
-                    "port = 8086\\n"
-                    "ssl = false\\n"
-                    "verify_ssl = false\\n"
-                    "TimeDelta = 0\\n"
-                    "apacheImgDir = /tmp\\n"
-                    "[paramiko]\\n"
-                    "usernameParamiko = user\\n"
-                    "passwordParamiko = pass\\n"
-                    "keyfilepath = key\\n"
-                    "keyfiletype = rsa\\n"
-                    "remote_path = /tmp\\n"
-                    "hostparamiko = localhost\\n"
+                    "[influx]\n"
+                    "dataBase = scipion\n"
+                    "passwordInflux = cGFzcw==\n"
+                    "usernameInflux = dXNlcg==\n"
+                    "hostinflux = localhost\n"
+                    "port = 8086\n"
+                    "ssl = false\n"
+                    "verify_ssl = false\n"
+                    "TimeDelta = 0\n"
+                    "apacheImgDir = /tmp\n"
+                    "[paramiko]\n"
+                    "usernameParamiko = user\n"
+                    "passwordParamiko = pass\n"
+                    "keyfilepath = key\n"
+                    "keyfiletype = rsa\n"
+                    "remote_path = /tmp\n"
+                    "hostparamiko = localhost\n"
                 )
 
             fakeInfluxModule = types.ModuleType("influxdb")

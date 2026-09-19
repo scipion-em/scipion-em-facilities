@@ -96,7 +96,8 @@ class ReportInflux:
         # but it certainly  be used by hte standard html
         # for example to decide which files need to be tranfered
         self.confFileName = self.protocol._getTmpPath(CONFILE)
-        if not os.path.isfile(self.confFileName):
+        newReport = not os.path.isfile(self.confFileName)
+        if newReport:
             # Create the configuration file as it doesn't exist yet
             self.confParser = ConfigParser()
             self.confParser.add_section("project")
@@ -175,7 +176,8 @@ class ReportInflux:
             # project names may contain forbiden character
             # IF this is a problem we will need to slugify the projName
             # self.client.drop_measurement(self.projectName)
-            self.client.delete_series(measurement=self.projectName)
+            if newReport:
+                self.client.delete_series(measurement=self.projectName)
             print("dropping meassurement:", self.projectName) 
             # replication -> number of copies of the DB stored in the cluster
             # 12w -> delete data after 12 weeks
