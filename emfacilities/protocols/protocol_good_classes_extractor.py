@@ -136,6 +136,20 @@ class ProtGoodClassesExtractor(EMProtocol, ProtStreamingBase):
         self.goodClassesIDs = []
         self.dictsTimes = {}
 
+        if self.isContinued():
+            try:
+                self.dictsTimes = self._getLastDone()
+                self.info(
+                    'Restored last processed creation times for %d classes'
+                    % len(self.dictsTimes)
+                )
+            except FileNotFoundError:
+                self.info(
+                    'No previous last-done checkpoint found; '
+                    'starting without restored class times.'
+                )
+
+
     def extractElements(self, inputClasses):
         """
         Method to extract the particles from the selected classes, this method generates two output sets:
@@ -229,15 +243,24 @@ class ProtGoodClassesExtractor(EMProtocol, ProtStreamingBase):
         self.debug('Last check: %s, modification: %s'
                    % (prettyTime(self.lastCheck),
                       prettyTime(mTime)))
-        # If the input have not changed since our last check,
-        # it does not make sense to check for new input data
-        if self.lastCheck > mTime and self.dictsTimes:
-            newParticlesBool = False
-        else:
-            newParticlesBool = True
 
+        inputChanged = not (self.lastCheck > mTime and self.dictsTimes)
         self.lastCheck = now
-        return newParticlesBool
+
+        if inputChanged:
+            return True
+
+        # Even when there are no new particles, the upstream protocol may
+        # have closed its stream. Refresh the input state so Continue can
+        # terminate instead of waiting forever for another file update.
+        classSet = self._loadInputClassesSet()
+        try:
+            self.isStreamClosed = classSet.getStreamState()
+        finally:
+            classSet.close()
+
+        return False
+
 
     def _loadInputClassesSet(self):
         """ Returns te input set of particles"""

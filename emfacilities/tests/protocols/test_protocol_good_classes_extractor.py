@@ -21,9 +21,12 @@
 # *  e-mail address 'scipion@cnb.csic.es'
 # ***************************************************************************/
 from pyworkflow.tests import BaseTest, setupTestProject, DataSet
+from datetime import datetime
+from unittest.mock import patch
 from pwem.protocols.protocol_import import ProtImportParticles
 import pwem.protocols as emprot
 from pyworkflow.object import Pointer
+from pyworkflow.object import Set
 from emfacilities.protocols.protocol_good_classes_extractor import ProtGoodClassesExtractor
 
 
@@ -70,6 +73,65 @@ class TestGoodClassesExtractor(BaseTest):
 
         cls.classSelector.inputClasses = Pointer(cls.protImport, extended='outputClasses')
         cls.launchProtocol(cls.classSelector)
+
+
+
+
+    def testContinueDetectsClosedStreamWithoutNewParticles(self):
+        class ClosedInputSet:
+            def __init__(self):
+                self.closed = False
+
+            def getFileName(self):
+                return "classes.sqlite"
+
+            def getStreamState(self):
+                return Set.STREAM_CLOSED
+
+            def close(self):
+                self.closed = True
+
+        class InputPointer:
+            def __init__(self, value):
+                self.value = value
+
+            def get(self):
+                return self.value
+
+        inputSet = ClosedInputSet()
+
+        prot = self.newProtocol(ProtGoodClassesExtractor)
+        prot.inputClasses = InputPointer(inputSet)
+        prot.dictsTimes = {"1": "2026-09-19 08:00:00"}
+        prot.isStreamClosed = Set.STREAM_OPEN
+        prot.lastCheck = datetime.now()
+
+        prot._loadInputClassesSet = lambda: inputSet
+
+        with patch(
+                "emfacilities.protocols.protocol_good_classes_extractor.os.path.getmtime",
+                return_value=0,
+        ):
+            hasNewParticles = prot._newParticlesToProcess()
+
+        self.assertFalse(hasNewParticles)
+        self.assertEqual(prot.isStreamClosed, Set.STREAM_CLOSED)
+        self.assertTrue(inputSet.closed)
+
+
+    def testContinueRestoresLastProcessedClassTimes(self):
+        expectedTimes = {
+            "1": "2026-09-19 08:00:00",
+            "5": "2026-09-19 08:01:00",
+        }
+
+        prot = self.newProtocol(ProtGoodClassesExtractor)
+        prot.isContinued = lambda: True
+        prot._getLastDone = lambda: expectedTimes.copy()
+
+        prot.initialStep()
+
+        self.assertEqual(prot.dictsTimes, expectedTimes)
 
 
     def testGoodClassesSelectorAvgs(self):
