@@ -55,6 +55,17 @@ class TestDataCounter(BaseTest):
 
 
 
+
+    def testTimeoutDaysUse24Hours(self):
+        prot = self.newProtocol(ProtDataCounter)
+
+        self.assertEqual(prot.getTimeOutInSeconds("1d"), 86400)
+        self.assertEqual(
+            prot.getTimeOutInSeconds("1d 2h 20m 15s"),
+            86400 + 2 * 3600 + 20 * 60 + 15,
+        )
+
+
     def testTimerUsesPreservedProtocolStartOnContinue(self):
         class SummaryVar:
             def __init__(self):

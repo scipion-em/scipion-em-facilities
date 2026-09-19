@@ -306,7 +306,7 @@ class ProtDataCounter(EMProtocol):
 
     def getTimeOutInSeconds(self, timeOut):
         timeOutFormatRegexList = {r'\d+s': 1, r'\d+m': 60, r'\d+h': 3600,
-                                  r'\d+d': 72000}
+                                  r'\d+d': 86400}
         try:
             return int(timeOut)
         except Exception:
