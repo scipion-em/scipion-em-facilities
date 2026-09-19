@@ -157,6 +157,15 @@ class MonitorCTF(Monitor):
         )
         self.readCTFs = {row[0] for row in self.cur.fetchall()}
 
+        self.cur.execute(
+            "SELECT MAX(defocusU), MIN(defocusV) FROM %s" % self._tableName
+        )
+        maxDefocus, minDefocus = self.cur.fetchone()
+        if maxDefocus is not None:
+            self.maxDefocus = max(self.maxDefocus, maxDefocus)
+        if minDefocus is not None:
+            self.minDefocus = min(self.minDefocus, minDefocus)
+
 
     def step(self):
         prot = getUpdatedProtocol(self.protocol)

@@ -275,6 +275,17 @@ class MonitorSystem(Monitor):
 
     def initLoop(self):
         self._createTable()
+        self.cur.execute(
+            "SELECT MAX(cpu), MAX(mem), MAX(swap) FROM %s" % self._tableName
+        )
+        cpuAlert, memAlert, swapAlert = self.cur.fetchone()
+        if cpuAlert is not None:
+            self.cpuAlert = max(self.cpuAlert, cpuAlert)
+        if memAlert is not None:
+            self.memAlert = max(self.memAlert, memAlert)
+        if swapAlert is not None:
+            self.swapAlert = max(self.swapAlert, swapAlert)
+
         psutil.cpu_percent(True)
         psutil.virtual_memory()
 

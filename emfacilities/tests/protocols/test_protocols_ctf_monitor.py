@@ -77,6 +77,50 @@ class TestCtfStream(pwtests.BaseTest):
                 resumed.conn.close()
 
 
+
+    def testInitLoopRestoresDefocusAlertThresholdsFromExistingDatabase(self):
+        class DummyProtocol:
+            pass
+
+        with tempfile.TemporaryDirectory() as tmpDir:
+            monitor = monitorsProt.MonitorCTF(
+                DummyProtocol(),
+                workingDir=tmpDir,
+                samplingInterval=1,
+                monitorTime=1,
+                minDefocus=1000,
+                maxDefocus=40000,
+                astigmatism=2000,
+            )
+            monitor.initLoop()
+            monitor.cur.execute(
+                "INSERT INTO log (ctfID, defocusU, defocusV) VALUES (?, ?, ?)",
+                (7, 45000, 900),
+            )
+            monitor.cur.execute(
+                "INSERT INTO log (ctfID, defocusU, defocusV) VALUES (?, ?, ?)",
+                (8, 47000, 850),
+            )
+            monitor.conn.close()
+
+            resumed = monitorsProt.MonitorCTF(
+                DummyProtocol(),
+                workingDir=tmpDir,
+                samplingInterval=1,
+                monitorTime=1,
+                minDefocus=1000,
+                maxDefocus=40000,
+                astigmatism=2000,
+            )
+            resumed.initLoop()
+
+            try:
+                self.assertEqual(resumed.maxDefocus, 47000)
+                self.assertEqual(resumed.minDefocus, 850)
+            finally:
+                resumed.conn.close()
+
+
     @classmethod
     def setUpClass(cls):
         pwtests.setupTestProject(cls)

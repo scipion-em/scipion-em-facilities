@@ -22,12 +22,67 @@
 # ***************************************************************************/
 
 import os.path
+import tempfile
 
 import pyworkflow.tests as pwtests
 import pyworkflow.utils as pwutils
 
 import pwem.protocols as emprot
 import emfacilities.protocols as monitorsProt
+from emfacilities.protocols.protocol_monitor_system import MonitorSystem
+
+
+class TestSystemMonitorResume(pwtests.BaseTest):
+    def testInitLoopRestoresAlertThresholdsFromExistingDatabase(self):
+        with tempfile.TemporaryDirectory() as tmpDir:
+            monitor = MonitorSystem(
+                [],
+                workingDir=tmpDir,
+                samplingInterval=1,
+                monitorTime=1,
+                cpuAlert=50,
+                memAlert=60,
+                swapAlert=70,
+                doGpu=False,
+                doNetwork=False,
+                doDiskIO=False,
+                gpusToUse="0",
+                nif=None,
+            )
+            monitor.initLoop()
+            monitor.cur.execute(
+                "INSERT INTO log (cpu, mem, swap) VALUES (?, ?, ?)",
+                (65, 75, 72),
+            )
+            monitor.cur.execute(
+                "INSERT INTO log (cpu, mem, swap) VALUES (?, ?, ?)",
+                (80, 70, 90),
+            )
+            monitor.conn.close()
+
+            resumed = MonitorSystem(
+                [],
+                workingDir=tmpDir,
+                samplingInterval=1,
+                monitorTime=1,
+                cpuAlert=50,
+                memAlert=60,
+                swapAlert=70,
+                doGpu=False,
+                doNetwork=False,
+                doDiskIO=False,
+                gpusToUse="0",
+                nif=None,
+            )
+            resumed.initLoop()
+
+            try:
+                self.assertEqual(resumed.cpuAlert, 80)
+                self.assertEqual(resumed.memAlert, 75)
+                self.assertEqual(resumed.swapAlert, 90)
+            finally:
+                resumed.conn.close()
+
 
 
 class TestStress(pwtests.BaseTest):
