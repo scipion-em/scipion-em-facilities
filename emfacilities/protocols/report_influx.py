@@ -200,7 +200,7 @@ class ReportInflux:
         # Project Properties Section
         # Do not delete this variables. We are using them
         # in an eval command
-        self.projectName = project.getShortName()
+        self.projectName = slugify(project.getShortName())
         startTime = pwutils.dateStr(project.getCreationTime(), secs=True),
         tnow = datetime.now()
         _now = project.getCreationTime()
