@@ -146,6 +146,8 @@ class ReportHtml:
             pathsReady = [exists(join(self.reportDir, self.thumbPaths[k][i])) for k in thumbKeys]
             if all(pathsReady):
                 self.thumbsReady += 1
+            else:
+                break
         return self.thumbsReady
 
     def setUp(self):

@@ -15,6 +15,58 @@ from emfacilities.protocols.report_html import (
 
 class TestReportHtml(unittest.TestCase):
 
+    def testCheckNewThumbsReadyStopsAtFirstMissingThumbnail(self):
+        import os
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as tmpDir:
+            report = object.__new__(ReportHtml)
+            report.reportDir = tmpDir
+            report.thumbsReady = 0
+            report.thumbPaths = {
+                MIC_THUMBS: [
+                    "imgMicThumbs/mic001.jpg",
+                    "imgMicThumbs/mic002.jpg",
+                    "imgMicThumbs/mic003.jpg",
+                ],
+                PSD_THUMBS: [
+                    "imgPsdThumbs/psd001.jpg",
+                    "imgPsdThumbs/psd002.jpg",
+                    "imgPsdThumbs/psd003.jpg",
+                ],
+            }
+
+            for relPath in (
+                "imgMicThumbs/mic002.jpg",
+                "imgMicThumbs/mic003.jpg",
+                "imgPsdThumbs/psd002.jpg",
+                "imgPsdThumbs/psd003.jpg",
+            ):
+                absPath = os.path.join(tmpDir, relPath)
+                os.makedirs(os.path.dirname(absPath), exist_ok=True)
+                open(absPath, "w").close()
+
+            self.assertEqual(
+                report.checkNewThumbsReady(),
+                0,
+                "Ready thumbnails after a missing earlier thumbnail must "
+                "not advance the contiguous ready prefix.",
+            )
+
+            for relPath in (
+                "imgMicThumbs/mic001.jpg",
+                "imgPsdThumbs/psd001.jpg",
+            ):
+                absPath = os.path.join(tmpDir, relPath)
+                open(absPath, "w").close()
+
+            self.assertEqual(
+                report.checkNewThumbsReady(),
+                3,
+            )
+
+
+
 
     def testGetThumbPathsDropsPsdKeysWhenMicrographHasNoPsd(self):
         class Micrograph:
