@@ -377,10 +377,11 @@ class ReportInflux:
                 localNow = tnow + timedelta(seconds=counter)
                 pointsDict['time'] = localNow # .strftime('%Y-%m-%dT%H:%M:%SZ')
                 self.client.write_points([pointsDict])
+                counter += 1
                 last_id += 1
-            self.confParser.set("gain", "lastId", str(last_id))
-            with open(self.confFileName, 'w') as confFile:
-                self.confParser.write(confFile)
+                self.confParser.set("gain", "lastId", str(last_id))
+                with open(self.confFileName, 'w') as confFile:
+                    self.confParser.write(confFile)
 
         # SYSTEM data
         last_id = self.confParser.getint("system", "lastId")
@@ -407,8 +408,7 @@ class ReportInflux:
             self.confParser.set("system", "lastId", str(last_id))
             with open(self.confFileName, 'w') as confFile:
                 self.confParser.write(confFile)
-        self.transferFiles()
-        return last_id # reportFinished
+        return self.transferFiles()
 
 
     def transferFiles(self):
@@ -485,7 +485,8 @@ class ReportInflux:
 
             elapsed_time = time.time() - start_time
             if elapsed_time > self.refreshSecs:
-                break
+                connect.close()
+                return False
             elif len(result) == 0:
                 break
         connect.close()

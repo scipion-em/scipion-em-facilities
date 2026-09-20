@@ -33,6 +33,46 @@ from emfacilities.protocols.protocol_monitor_system import MonitorSystem
 
 
 class TestSystemMonitorResume(pwtests.BaseTest):
+
+    def testInfluxReadFailureDoesNotReuseCursorResults(self):
+        class FailingCursor:
+            def __init__(self):
+                self.fetchallCalled = False
+
+            def execute(self, command):
+                raise RuntimeError("simulated sqlite read failure")
+
+            def fetchall(self):
+                self.fetchallCalled = True
+                return [
+                    {
+                        "id": 99,
+                        "timestamp": "2026-09-20 10:00:00",
+                        "cpu": 10.0,
+                    }
+                ]
+
+        monitor = object.__new__(MonitorSystem)
+        monitor._tableName = "log"
+        monitor.workingDir = "/tmp"
+        monitor._dataBase = "system_log.sqlite"
+        monitor.timeZone = "UTC"
+        monitor.timeDelta = 0
+        monitor.cur = FailingCursor()
+
+        result = monitor.getDataInflux(lastId=7)
+
+        self.assertEqual(
+            result,
+            [],
+            "A failed system query must not return stale cursor rows.",
+        )
+        self.assertFalse(
+            monitor.cur.fetchallCalled,
+            "fetchall() must not run after the SELECT failed.",
+        )
+
+
     def testInitLoopRestoresAlertThresholdsFromExistingDatabase(self):
         with tempfile.TemporaryDirectory() as tmpDir:
             monitor = MonitorSystem(

@@ -415,6 +415,7 @@ class MonitorSystem(Monitor):
         except Exception as e:
             print("MonitorCTF, ERROR reading data from db: %s" %
                   os.path.join(self.workingDir, self._dataBase))
+            return []
         # As we are using a row factory, fetchall returns a list of
         # dictionaries, each item in list(each dictionary)
         # represents a row of the table

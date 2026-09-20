@@ -39,6 +39,127 @@ MICS = os.environ.get('SCIPION_TEST_MICS', 3)
 
 class TestCtfStream(pwtests.BaseTest):
 
+    def testInfluxReadFailureDoesNotReuseCursorResults(self):
+        class FailingCursor:
+            def __init__(self):
+                self.fetchallCalled = False
+
+            def execute(self, command):
+                raise RuntimeError("simulated sqlite read failure")
+
+            def fetchall(self):
+                self.fetchallCalled = True
+                return [
+                    {
+                        "id": 99,
+                        "timestamp": "2026-09-20 10:00:00",
+                    }
+                ]
+
+        monitor = object.__new__(monitorsProt.MonitorCTF)
+        monitor._tableName = "log"
+        monitor.workingDir = "/tmp"
+        monitor._dataBase = "ctf_log.sqlite"
+        monitor.timeZone = "UTC"
+        monitor.timeDelta = 0
+        monitor.cur = FailingCursor()
+
+        result = monitor.getDataInflux(lastId=7)
+
+        self.assertEqual(
+            result,
+            [],
+            "A failed CTF query must not return stale cursor rows.",
+        )
+        self.assertFalse(
+            monitor.cur.fetchallCalled,
+            "fetchall() must not run after the SELECT failed.",
+        )
+
+
+
+    def testFailedCtfInsertIsRetriedInsteadOfMarkedAsRead(self):
+        from unittest.mock import patch
+
+        class DummyMicrograph:
+            def getFileName(self):
+                return "/tmp/mic.mrc"
+
+        class DummyCtf:
+            def getDefocusU(self):
+                return 2000.0
+
+            def getDefocusV(self):
+                return 1500.0
+
+            def getDefocusAngle(self):
+                return 0.0
+
+            def getResolution(self):
+                return 3.0
+
+            def getFitQuality(self):
+                return 1.0
+
+            def hasPhaseShift(self):
+                return False
+
+            def getPsdFile(self):
+                return "/tmp/psd.psd"
+
+            def getMicrograph(self):
+                return DummyMicrograph()
+
+            def getObjCreation(self):
+                return "2026-09-20 10:00:00"
+
+        class DummyCtfSet:
+            def getIdSet(self):
+                return {7}
+
+            def __getitem__(self, objId):
+                return DummyCtf()
+
+        class DummyProtocol:
+            outputCTF = DummyCtfSet()
+
+            def getStatus(self):
+                return 0
+
+        class FailingCursor:
+            def execute(self, sql):
+                raise RuntimeError("simulated sqlite failure")
+
+        with tempfile.TemporaryDirectory() as tmpDir:
+            monitor = monitorsProt.MonitorCTF(
+                DummyProtocol(),
+                workingDir=tmpDir,
+                samplingInterval=1,
+                monitorTime=1,
+                minDefocus=1000,
+                maxDefocus=40000,
+                astigmatism=2000,
+            )
+            monitor.initLoop()
+            monitor.cur = FailingCursor()
+
+            try:
+                with patch(
+                    "emfacilities.protocols.protocol_monitor_ctf.getUpdatedProtocol",
+                    return_value=DummyProtocol(),
+                ):
+                    monitor.step()
+
+                self.assertNotIn(
+                    7,
+                    monitor.readCTFs,
+                    "A CTF whose log insert failed must remain pending for retry.",
+                )
+            finally:
+                monitor.conn.close()
+
+
+
     def testInitLoopRestoresReadCtfIdsFromExistingDatabase(self):
         class DummyProtocol:
             pass

@@ -247,6 +247,7 @@ class MonitorCTF(Monitor):
                    fitQuality, phaseShift,  micPath, psdPath, shiftPlotPath)
             try:
                 self.cur.execute(sql)
+                self.readCTFs.add(ctfID)
             except Exception as e:
                 print("ERROR: saving one data point (CTF monitor). I continue")
                 print(e)
@@ -266,7 +267,6 @@ class MonitorCTF(Monitor):
                              "minumum (%f)" % (defocusV, self.maxDefocus))
                 self.minDefocus = defocusV
 
-        self.readCTFs.update(diffSet)
         # Finish when protocol is not longer running
         return prot.getStatus() != STATUS_RUNNING
 
@@ -304,6 +304,7 @@ class MonitorCTF(Monitor):
         except Exception as e:
             print("MonitorCTF, ERROR reading data from db: %s" %
                   os.path.join(self.workingDir, self._dataBase))
+            return []
         # As we are using a row factory, fetchall returns a list of
         # dictionaries, each item in list(each dictionary)
         # represents a row of the table
