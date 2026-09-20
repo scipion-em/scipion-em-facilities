@@ -289,7 +289,7 @@ class ProtDataSampler(EMProtocol):
             self.sampleIds.update(sampledIds)
 
     def _getSamplingStateFile(self, newIds):
-        batchKey = hashlib.sha1(
+        batchKey = hashlib.sha256(
             json.dumps(
                 list(newIds),
                 separators=(",", ":"),
