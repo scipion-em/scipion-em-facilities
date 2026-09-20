@@ -30,7 +30,75 @@ import pyworkflow.tests as tests
 from emfacilities.protocols.protocol_data_sampler import ProtDataSampler
 
 
+
+class _SamplerValue:
+    def __init__(self, value):
+        self.value = value
+
+    def get(self):
+        return self.value
+
+    def hasValue(self):
+        return self.value not in (None, "")
+
+    def __eq__(self, other):
+        return self.value == other
+
+
+class _SamplerInputSet:
+    def getIdSet(self):
+        return {1, 2, 3, 4, 5, 6}
+
+    def isStreamClosed(self):
+        return False
+
+    def close(self):
+        pass
+
+
+class _FinishedSamplingStep:
+    funcName = _SamplerValue("samplingStep")
+    argsStr = _SamplerValue("[[1, 2, 3]]")
+
+    def __init__(self, resultFile=None):
+        if resultFile is not None:
+            self._resultFiles = _SamplerValue(
+                json.dumps([resultFile])
+            )
+
+    def isFinished(self):
+        return True
+
+
 class TestDataSampler(BaseTest):
+
+    def _prepareContinueProtocol(self, steps, doneIds):
+        insertedBatches = []
+
+        prot = self.newProtocol(
+            ProtDataSampler,
+            batchSize=3,
+            samplingProportion=0.5,
+        )
+        prot.inputFn = "input.sqlite"
+        prot.insertedIds = set()
+        prot.processedIds = set()
+        prot.sampleIds = set()
+        prot.isStreamClosed = False
+        prot._steps = steps
+        prot.isContinued = lambda: True
+        prot._loadInputSet = lambda _: _SamplerInputSet()
+        prot._getAllDoneIds = lambda: (list(doneIds), len(doneIds))
+        prot._getFirstJoinStep = lambda: None
+        prot.updateSteps = lambda: None
+
+        def insertNewImageSteps(newIds, batchSize):
+            insertedBatches.append(list(newIds))
+            return []
+
+        prot._insertNewImageSteps = insertNewImageSteps
+        return prot, insertedBatches
+
     """ Test data sampler protocol """
 
     @classmethod
@@ -144,41 +212,6 @@ class TestDataSampler(BaseTest):
 
 
     def testContinueRestoresSampleChosenBeforeOutputFlush(self):
-        class Value:
-            def __init__(self, value):
-                self.value = value
-
-            def get(self):
-                return self.value
-
-            def hasValue(self):
-                return self.value not in (None, "")
-
-            def __eq__(self, other):
-                return self.value == other
-
-        class FinishedSamplingStep:
-            funcName = Value("samplingStep")
-            argsStr = Value("[[1, 2, 3]]")
-
-            def __init__(self, resultFile):
-                self._resultFiles = Value(
-                    '["%s"]' % resultFile.replace("\\\\", "\\\\\\\\")
-                )
-
-            def isFinished(self):
-                return True
-
-        class InputSet:
-            def getIdSet(self):
-                return {1, 2, 3, 4, 5, 6}
-
-            def isStreamClosed(self):
-                return False
-
-            def close(self):
-                pass
-
         prot = self.newProtocol(
             ProtDataSampler,
             batchSize=3,
@@ -188,29 +221,18 @@ class TestDataSampler(BaseTest):
         os.makedirs(os.path.dirname(stateFile), exist_ok=True)
 
         with open(stateFile, "w", encoding="utf-8") as handle:
-            handle.write(
-                '{"processedIds": [1, 2, 3], "sampledIds": [2]}'
+            json.dump(
+                {
+                    "processedIds": [1, 2, 3],
+                    "sampledIds": [2],
+                },
+                handle,
             )
 
-        insertedBatches = []
-
-        prot.inputFn = "input.sqlite"
-        prot.insertedIds = set()
-        prot.processedIds = set()
-        prot.sampleIds = set()
-        prot.isStreamClosed = False
-        prot._steps = [FinishedSamplingStep(stateFile)]
-        prot.isContinued = lambda: True
-        prot._loadInputSet = lambda _: InputSet()
-        prot._getAllDoneIds = lambda: ([], 0)
-        prot._getFirstJoinStep = lambda: None
-        prot.updateSteps = lambda: None
-
-        def insertNewImageSteps(newIds, batchSize):
-            insertedBatches.append(list(newIds))
-            return []
-
-        prot._insertNewImageSteps = insertNewImageSteps
+        prot, insertedBatches = self._prepareContinueProtocol(
+            [_FinishedSamplingStep(stateFile)],
+            doneIds=[],
+        )
 
         with patch(
                 "emfacilities.protocols.protocol_data_sampler.os.path.getmtime",
@@ -225,57 +247,10 @@ class TestDataSampler(BaseTest):
 
 
     def testContinueRestoresFinishedSamplingBatches(self):
-        class Value:
-            def __init__(self, value):
-                self.value = value
-
-            def get(self):
-                return self.value
-
-            def __eq__(self, other):
-                return self.value == other
-
-        class FinishedSamplingStep:
-            funcName = Value("samplingStep")
-            argsStr = Value("[[1, 2, 3]]")
-
-            def isFinished(self):
-                return True
-
-        class InputSet:
-            def getIdSet(self):
-                return {1, 2, 3, 4, 5, 6}
-
-            def isStreamClosed(self):
-                return False
-
-            def close(self):
-                pass
-
-        insertedBatches = []
-
-        prot = self.newProtocol(
-            ProtDataSampler,
-            batchSize=3,
-            samplingProportion=0.5,
+        prot, insertedBatches = self._prepareContinueProtocol(
+            [_FinishedSamplingStep()],
+            doneIds=[2],
         )
-        prot.inputFn = "input.sqlite"
-        prot.insertedIds = set()
-        prot.processedIds = set()
-        prot.sampleIds = set()
-        prot.isStreamClosed = False
-        prot._steps = [FinishedSamplingStep()]
-        prot.isContinued = lambda: True
-        prot._loadInputSet = lambda _: InputSet()
-        prot._getAllDoneIds = lambda: ([2], 1)
-        prot._getFirstJoinStep = lambda: None
-        prot.updateSteps = lambda: None
-
-        def insertNewImageSteps(newIds, batchSize):
-            insertedBatches.append(list(newIds))
-            return []
-
-        prot._insertNewImageSteps = insertNewImageSteps
 
         with patch(
                 "emfacilities.protocols.protocol_data_sampler.os.path.getmtime",
