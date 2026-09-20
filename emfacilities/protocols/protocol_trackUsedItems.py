@@ -145,7 +145,7 @@ class UsedItemsTracker(EMProtocol):
     if self.trackClasses2D.get():
       allSteps.append(self._insertFunctionStep('trackClasses2DStep', prerequisites=[usedStep]))
 
-    if self.trackClasses2D.get():
+    if self.trackClasses3D.get():
       allSteps.append(self._insertFunctionStep('trackClasses3DStep', prerequisites=[usedStep]))
 
     if self.saveJPG.get():
@@ -221,7 +221,8 @@ class UsedItemsTracker(EMProtocol):
           #Picking noise particles as negative examples using xmipp software
           allCoordsSet = self.getAllCoordSet(coords, notCoords, downSamplingFactor, coordSets)
           allCoordsDir, noiseCoordsDir = self._getTmpPath('all_coords'), self._getExtraPath('noiseCoords')
-          os.mkdir(allCoordsDir), os.mkdir(noiseCoordsDir)
+          os.makedirs(allCoordsDir, exist_ok=True)
+          os.makedirs(noiseCoordsDir, exist_ok=True)
           writeSetOfCoordinates(allCoordsDir, allCoordsSet)
 
           self.getNoiseCoordinates(allCoordsDir, noiseCoordsDir, self.extractNoiseNumber.get())
@@ -412,7 +413,7 @@ class UsedItemsTracker(EMProtocol):
 
   def generatePSDs(self):
     outDir = self._getExtraPath('computedPSDs')
-    os.mkdir(outDir)
+    os.makedirs(outDir, exist_ok=True)
     psdDic, argsList = {}, []
     print('Computing micrographs PSD')
     for micId, micFile in self.micDic.items():
@@ -436,14 +437,13 @@ class UsedItemsTracker(EMProtocol):
         baseName, _ = os.path.splitext(os.path.basename(micPath))
         micsBaseToFullName[baseName] = micPath
 
-    I = ih().read(micPath)
-    xDim, yDim, _, _ = I.getDimensions()
-
     argsList = []
     for posName in os.listdir(coordsDir):
       if posName.endswith(".pos"):
         baseName, _ = os.path.splitext(os.path.basename(posName))
         micName = micsBaseToFullName[baseName]
+        I = ih().read(micName)
+        xDim, yDim, _, _ = I.getDimensions()
         posName = os.path.join(coordsDir, posName)
         argsList.append((baseName, micName, posName, (xDim, yDim), outDir,
                          noiseNumber, self.boxSize))
@@ -474,13 +474,13 @@ class UsedItemsTracker(EMProtocol):
           f.write('{}\t{}\n'.format('class2D_{}.jpg'.format(cl2dId), self.classes2DCountDic[cl2dId]))
 
   def savePSDsAsJPG(self, outDir):
-    os.mkdir(outDir)
+    os.makedirs(outDir, exist_ok=True)
     for micFile, psdFile in self.psdDic.items():
       jpgPath = outDir + '/' + os.path.basename(pwutils.replaceExt(psdFile, 'jpg'))
       self.exportAsJpg(psdFile, jpgPath)
 
   def saveSetAsJPG(self, scipionSet, outDir):
-    os.mkdir(outDir)
+    os.makedirs(outDir, exist_ok=True)
     for item in scipionSet:
       cItem = item.clone()
       if isinstance(cItem, Particle):
@@ -774,10 +774,13 @@ class UsedItemsTracker(EMProtocol):
         outDic[protId][key] = oValue
     return outDic
 
-  def generateOutputsGraphRec(self, curProtId, outGraph=nx.DiGraph(), prevCode=None):
+  def generateOutputsGraphRec(self, curProtId, outGraph=None, prevCode=None):
     '''Generates a directed graph from a project with the protocol outputs as nodes, starting from the
     current protocol Id (curProtId) and moving upwards. Therefore, the resulting outputs graphs contains
     only those outputs necessary for the generation of the input of this protocol (default volume)'''
+    if outGraph is None:
+      outGraph = nx.DiGraph()
+
     inpKeys = self.inpDic[curProtId].keys()
     if len(inpKeys) == 0:
       if not 'root' in outGraph:

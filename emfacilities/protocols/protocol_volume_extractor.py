@@ -154,6 +154,7 @@ class ProtVolumeExtractor(EMProtocol):
             - Volume
             - Both
         """
+        self.outputsToDefine = {}
         if outputParticles:
             self.outputsToDefine[OUTPUT_PARTICLES] = outputParticles
 
