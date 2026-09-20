@@ -252,9 +252,11 @@ class ReportHtml:
                         return None
 
                 psdPath = getMicPSDPath(mic)
-                psdThumb = None
-                if psdPath is None:
-                    psdThumb = join(PSD_THUMBS, pwutils.replaceExt(basename(str(psdPath)), ext))
+                if psdPath is not None:
+                    psdThumb = join(
+                        PSD_THUMBS,
+                        pwutils.replaceExt(basename(psdPath), ext)
+                    )
                     self.thumbPaths[PSD_THUMBS].append(psdThumb)
                     self.thumbPaths[PSD_PATH].append(psdPath)
                 else:
