@@ -64,8 +64,16 @@ class ProtDataCounter(EMProtocol):
 
     def _defineParams(self, form):
         form.addSection(label='Input')
-        form.addParam('inputImages', params.PointerParam, pointerClass='SetOfImages',
-                      label="Input images", important=True)
+        form.addParam('inputChose', params.EnumParam, default=0,
+                      choices=['Micrographs', 'Particles'],
+                      display=params.EnumParam.DISPLAY_HLIST,
+                      label='Select the input image type'),
+        form.addParam('inputMicrographs', params.PointerParam, pointerClass='SetOfMicrographs',
+                      condition='inputChose==0',
+                      label="Input micrographs", important=True)
+        form.addParam('inputParticles', params.PointerParam, pointerClass='SetOfMicrographs',
+                      condition='inputChose==1',
+                      label="Input particles", important=True)
         form.addParam('outputSize', params.IntParam, default=10000,
                       label='Output size',
                       help='How many images need to be on input to '
@@ -101,6 +109,7 @@ class ProtDataCounter(EMProtocol):
         # Important to have both:
         self.insertedIds = set() # Contains images that have been inserted in a Step (checkNewInput).
         self.processedIds = set() # Ids to be output
+        self.inputImages = self.inputMicrographs if self.inputChose.get() == 0 else self.setOfImages = self.inputParticles
         self.isStreamClosed = self.inputImages.get().isStreamClosed()
         # Contains images that have been processed in a Step (checkNewOutput).
         self.inputFn = self.inputImages.get().getFileName()
