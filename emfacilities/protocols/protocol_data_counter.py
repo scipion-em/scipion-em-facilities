@@ -109,7 +109,7 @@ class ProtDataCounter(EMProtocol):
         # Important to have both:
         self.insertedIds = set() # Contains images that have been inserted in a Step (checkNewInput).
         self.processedIds = set() # Ids to be output
-        self.inputImages = self.inputMicrographs if self.inputChose.get() == 0 else self.setOfImages = self.inputParticles
+        self.inputImages = (self.inputMicrographs if self.inputChose.get() == 0 else self.inputParticles)
         self.isStreamClosed = self.inputImages.get().isStreamClosed()
         # Contains images that have been processed in a Step (checkNewOutput).
         self.inputFn = self.inputImages.get().getFileName()
