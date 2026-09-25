@@ -174,11 +174,18 @@ class ProtGoodClassesExtractor(EMProtocol, ProtStreamingBase):
             - accepted particles
             - discarded particles
         """
-        output = self._loadOutputSet(OUTPUT_PARTICLES, "")
-        outputDiscarded = self._loadOutputSet(OUTPUT_DISCARDED_PARTICLES, "discarded")
-        persistedParticleIds = output.getIdSet() | outputDiscarded.getIdSet()
-
         with self._lock:
+            # _loadOutputSet decides whether to reuse the existing output or
+            # create a fresh one. This protocol runs under STEPS_PARALLEL
+            # with independent extractElements steps, so this whole
+            # decide-append-publish sequence must stay inside the lock -
+            # otherwise two concurrent steps could both see no output yet,
+            # each create their own fresh Set, and whichever publishes last
+            # would silently discard the other's already-appended particles.
+            output = self._loadOutputSet(OUTPUT_PARTICLES, "")
+            outputDiscarded = self._loadOutputSet(OUTPUT_DISCARDED_PARTICLES, "discarded")
+            persistedParticleIds = output.getIdSet() | outputDiscarded.getIdSet()
+
             # For each class (order by number of items)
             for clazz in inputClasses.iterItems(orderBy="_size", direction="DESC"):
                 # Make the query to load only the new particles
@@ -215,15 +222,16 @@ class ProtGoodClassesExtractor(EMProtocol, ProtStreamingBase):
                     if tmp_discarded is not None:
                         self.dictsTimes[str(clazz.getObjId())] = tmp_discarded  # Store the latest time
 
-        self.info('Size output %d and size discarded output %d' % (len(output), len(outputDiscarded)))
-        self.debug(str(self.dictsTimes))
+            self.info('Size output %d and size discarded output %d' % (len(output), len(outputDiscarded)))
+            self.debug(str(self.dictsTimes))
 
-        if len(output) > 0:
-            self._updateOutputSet(OUTPUT_PARTICLES, output, self.isStreamClosed)
-        if len(outputDiscarded) > 0:
-            self._updateOutputSet(OUTPUT_DISCARDED_PARTICLES, outputDiscarded, self.isStreamClosed)
+            if len(output) > 0:
+                self._updateOutputSet(OUTPUT_PARTICLES, output, self.isStreamClosed)
+            if len(outputDiscarded) > 0:
+                self._updateOutputSet(OUTPUT_DISCARDED_PARTICLES, outputDiscarded, self.isStreamClosed)
 
-        self._writeLastDone(self.dictsTimes)
+            self._writeLastDone(self.dictsTimes)
+
         self._createPlots()
 
     def selectGoodClasses(self):

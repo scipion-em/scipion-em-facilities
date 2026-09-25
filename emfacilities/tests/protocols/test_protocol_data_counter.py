@@ -26,7 +26,7 @@ from pyworkflow.tests import BaseTest, DataSet
 from pwem.protocols.protocol_import import ProtImportMicrographs
 from pyworkflow.object import Pointer
 import pyworkflow.tests as tests
-from emfacilities.protocols.protocol_data_counter import ProtDataCounter
+from emfacilities.protocols.protocol_data_counter import ProtDataCounter, OUTPUT
 
 
 class TestDataCounter(BaseTest):
@@ -200,3 +200,40 @@ class TestDataCounter(BaseTest):
         cls.launchProtocol(protDataSampler)
 
         return protDataSampler
+
+
+class TestDataCounterLoadOutputSet(tests.unittest.TestCase):
+    """Lightweight regression tests that need no real project/dataset."""
+
+    def testLoadOutputSetReusesLogicalOutputWithoutBackingFile(self):
+        # Regression test: an output that Scipion already knows about
+        # (protocol.outputSet) must be reused even when its backing file
+        # was never materialized on disk yet. Falling through to "no
+        # backing file -> build a fresh, empty Set" would silently discard
+        # whatever was already appended to the real logical output.
+        prot = ProtDataCounter()
+
+        class ExistingOutputSet:
+            def __init__(self):
+                self.enableAppendCalls = 0
+                self.copiedFrom = None
+
+            def enableAppend(self):
+                self.enableAppendCalls += 1
+
+            def copyInfo(self, inputs):
+                self.copiedFrom = inputs
+
+        existingOutputSet = ExistingOutputSet()
+        prot.outputSet = existingOutputSet
+
+        with patch(
+                "emfacilities.protocols.protocol_data_counter.os.path.exists",
+                return_value=False,
+        ):
+            outputSet = prot._loadOutputSet(
+                object, "images.sqlite", outputName=OUTPUT
+            )
+
+        self.assertIs(existingOutputSet, outputSet)
+        self.assertEqual(1, existingOutputSet.enableAppendCalls)

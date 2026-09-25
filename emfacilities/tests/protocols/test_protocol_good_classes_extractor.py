@@ -23,6 +23,8 @@
 from pyworkflow.tests import BaseTest, setupTestProject, DataSet
 from datetime import datetime
 import os
+import threading
+import unittest
 from unittest.mock import patch
 from pwem.protocols.protocol_import import ProtImportParticles
 import pwem.protocols as emprot
@@ -414,7 +416,60 @@ class TestGoodClassesExtractor(BaseTest):
         self.assertEqual(content, str(previous))
 
 
+class TestGoodClassesExtractorLockScope(unittest.TestCase):
+    """Lightweight regression tests that need no real project/dataset."""
 
+    def testLoadOutputSetIsCalledUnderTheProtocolLock(self):
+        # Regression test: this protocol runs under STEPS_PARALLEL with
+        # independent extractElements steps (no dependency between them
+        # beyond the shared selectStep), so several can run concurrently.
+        # _loadOutputSet decides whether to reuse the existing output or
+        # create a fresh one; if that decision happens outside the
+        # protocol lock, two concurrent steps could both see no output
+        # yet, each create their own fresh Set, and whichever publishes
+        # last would silently discard the other's already-appended
+        # particles.
+        prot = ProtGoodClassesExtractor()
+        prot._lock = threading.Lock()
+        prot.dictsTimes = {}
+        prot.goodClassesIDs = []
+        prot.goodParticles = []
+        prot.badParticles = []
+        prot.isStreamClosed = Set.STREAM_OPEN
 
+        lockHeldDuringLoad = []
+
+        class _FakeOutputSet:
+            def getIdSet(self):
+                return set()
+
+            def __len__(self):
+                return 0
+
+        def fakeLoadOutputSet(outputName, suffix):
+            lockHeldDuringLoad.append(prot._lock.locked())
+            return _FakeOutputSet()
+
+        class _EmptyClasses:
+            def iterItems(self, orderBy=None, direction=None):
+                return iter([])
+
+        prot._loadOutputSet = fakeLoadOutputSet
+        prot._updateOutputSet = lambda *args, **kwargs: None
+        prot._writeLastDone = lambda value: None
+        prot._createPlots = lambda: None
+
+        prot.extractElements(_EmptyClasses())
+
+        self.assertEqual(2, len(lockHeldDuringLoad),
+                         "_loadOutputSet must be called exactly twice "
+                         "(accepted + discarded outputs).")
+        self.assertTrue(
+            all(lockHeldDuringLoad),
+            "_loadOutputSet must run while the protocol lock is held, "
+            "otherwise concurrent extraction steps can each create "
+            "their own fresh output Set and silently drop one "
+            "another's results.",
+        )
 
 

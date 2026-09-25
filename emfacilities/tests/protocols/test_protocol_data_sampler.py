@@ -27,7 +27,7 @@ from pyworkflow.tests import BaseTest, DataSet
 from pwem.protocols.protocol_import import ProtImportMicrographs
 from pyworkflow.object import Pointer
 import pyworkflow.tests as tests
-from emfacilities.protocols.protocol_data_sampler import ProtDataSampler
+from emfacilities.protocols.protocol_data_sampler import ProtDataSampler, OUTPUT
 
 
 
@@ -285,7 +285,7 @@ class TestDataSampler(BaseTest):
         prot._baseName = 'images.sqlite'
         prot._getAllDoneIds = lambda: ([1, 4], 2)
         prot._loadInputSet = lambda _: InputSet()
-        prot._loadOutputSet = lambda *args: object()
+        prot._loadOutputSet = lambda *args, **kwargs: object()
         prot._updateOutputSet = lambda *args, **kwargs: None
         prot._getFirstJoinStep = lambda: None
         prot._store = lambda: None
@@ -293,6 +293,43 @@ class TestDataSampler(BaseTest):
         prot._checkNewOutput()
 
         self.assertTrue(prot.finished)
+
+
+class TestDataSamplerLoadOutputSet(tests.unittest.TestCase):
+    """Lightweight regression tests that need no real project/dataset."""
+
+    def testLoadOutputSetReusesLogicalOutputWithoutBackingFile(self):
+        # Regression test: an output that Scipion already knows about
+        # (protocol.outputSet) must be reused even when its backing file
+        # was never materialized on disk yet. Falling through to "no
+        # backing file -> build a fresh, empty Set" would silently discard
+        # whatever was already appended to the real logical output.
+        prot = ProtDataSampler()
+
+        class ExistingOutputSet:
+            def __init__(self):
+                self.enableAppendCalls = 0
+                self.copiedFrom = None
+
+            def enableAppend(self):
+                self.enableAppendCalls += 1
+
+            def copyInfo(self, inputs):
+                self.copiedFrom = inputs
+
+        existingOutputSet = ExistingOutputSet()
+        prot.outputSet = existingOutputSet
+
+        with patch(
+                "emfacilities.protocols.protocol_data_sampler.os.path.exists",
+                return_value=False,
+        ):
+            outputSet = prot._loadOutputSet(
+                object, "images.sqlite", outputName=OUTPUT
+            )
+
+        self.assertIs(existingOutputSet, outputSet)
+        self.assertEqual(1, existingOutputSet.enableAppendCalls)
 
 
     def _runDataSampler(cls, label, batch, proportion):
