@@ -174,3 +174,117 @@ class TestStress(pwtests.BaseTest):
 
         # not sure what to test here
         self.assertTrue(os.path.isfile(baseFn))
+
+class TestSystemMonitorSamplingFailureRegression(pwtests.BaseTest):
+    def testNetworkSamplingFailureDoesNotCrashMonitor(self):
+        from unittest.mock import patch
+
+        class Memory:
+            percent = 20.0
+
+        with tempfile.TemporaryDirectory() as tmpDir:
+            monitor = MonitorSystem(
+                [],
+                workingDir=tmpDir,
+                samplingInterval=1,
+                monitorTime=1,
+                cpuAlert=101,
+                memAlert=101,
+                swapAlert=101,
+                doGpu=False,
+                doNetwork=True,
+                doDiskIO=False,
+                gpusToUse="0",
+                nif="eth0",
+            )
+
+            try:
+                with patch(
+                    "emfacilities.protocols.protocol_monitor_system."
+                    "psutil.cpu_percent",
+                    return_value=10.0,
+                ), patch(
+                    "emfacilities.protocols.protocol_monitor_system."
+                    "psutil.virtual_memory",
+                    return_value=Memory(),
+                ), patch(
+                    "emfacilities.protocols.protocol_monitor_system."
+                    "psutil.swap_memory",
+                    return_value=Memory(),
+                ), patch(
+                    "emfacilities.protocols.protocol_monitor_system."
+                    "psutil.net_io_counters",
+                    side_effect=KeyError("eth0"),
+                ):
+                    monitor.initLoop()
+                    finished = monitor.step()
+
+                self.assertTrue(finished)
+
+                monitor.cur.execute(
+                    "SELECT cpu, mem, swap, eth0_send, eth0_recv FROM log"
+                )
+                rows = monitor.cur.fetchall()
+
+                self.assertEqual(len(rows), 1)
+                self.assertEqual(rows[0][0:3], (10.0, 20.0, 20.0))
+                self.assertEqual(rows[0][3:5], (0.0, 0.0))
+            finally:
+                monitor.conn.close()
+
+class TestSystemMonitorDiskSamplingFailureRegression(pwtests.BaseTest):
+    def testDiskSamplingFailureDoesNotCrashMonitor(self):
+        from unittest.mock import patch
+
+        class Memory:
+            percent = 20.0
+
+        with tempfile.TemporaryDirectory() as tmpDir:
+            monitor = MonitorSystem(
+                [],
+                workingDir=tmpDir,
+                samplingInterval=1,
+                monitorTime=1,
+                cpuAlert=101,
+                memAlert=101,
+                swapAlert=101,
+                doGpu=False,
+                doNetwork=False,
+                doDiskIO=True,
+                gpusToUse="0",
+                nif=None,
+            )
+
+            try:
+                with patch(
+                    "emfacilities.protocols.protocol_monitor_system."
+                    "psutil.cpu_percent",
+                    return_value=10.0,
+                ), patch(
+                    "emfacilities.protocols.protocol_monitor_system."
+                    "psutil.virtual_memory",
+                    return_value=Memory(),
+                ), patch(
+                    "emfacilities.protocols.protocol_monitor_system."
+                    "psutil.swap_memory",
+                    return_value=Memory(),
+                ), patch(
+                    "emfacilities.protocols.protocol_monitor_system."
+                    "psutil.disk_io_counters",
+                    side_effect=RuntimeError("disk counters unavailable"),
+                ):
+                    monitor.initLoop()
+                    finished = monitor.step()
+
+                self.assertTrue(finished)
+
+                monitor.cur.execute(
+                    "SELECT cpu, mem, swap, disk_read, disk_write FROM log"
+                )
+                rows = monitor.cur.fetchall()
+
+                self.assertEqual(len(rows), 1)
+                self.assertEqual(rows[0][0:3], (10.0, 20.0, 20.0))
+                self.assertEqual(rows[0][3:5], (0.0, 0.0))
+            finally:
+                monitor.conn.close()

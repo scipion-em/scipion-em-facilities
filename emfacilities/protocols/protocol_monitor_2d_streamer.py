@@ -293,32 +293,27 @@ class ProtMonitor2dStreamer(ProtMonitor):
             micId = particle.getMicId()
             partId = particle.getObjId()
 
-            # For a particle-count limit, stop at the micrograph boundary
-            # before adding the first particle beyond the requested maximum.
-            if (micId != self._lastMicId
-                    and self.maximumOption == self.NUMBER_PARTICLES
-                    and self.classificationStop()):
-                self._streamClosed = True
-                if self._counterNewParticles > 0:
-                    self._writeSubset(subset)
-                self.info(
-                    "The limit for launching classification jobs has been "
-                    "reached, stopping protocol"
-                )
-                return
-
-            subset.append(particle)
-            self.debug("micId: %03d, particle: %05s, size: %s"
-                      % (micId, partId, subset.getSize()))
-
-            # Check the following after finding particles of a new micrograph
             if micId != self._lastMicId:
+                # For a particle-count limit, stop at the micrograph boundary
+                # before adding the first particle beyond the requested maximum.
+                if (self.maximumOption == self.NUMBER_PARTICLES
+                        and self.classificationStop()):
+                    self._streamClosed = True
+                    if self._counterNewParticles > 0:
+                        self._writeSubset(subset)
+                    self.info(
+                        "The limit for launching classification jobs has been "
+                        "reached, stopping protocol"
+                    )
+                    return
+
                 if self.classificationStop():
                     self._streamClosed = True
                     self.info("The limit for launching classification jobs has been reached, stopping protocol")
                     return  # roll back to the monitorStep and finish
 
-                if self._lastMicId is not None and self._counterNewParticles > self.batchSize:  # New particles
+                if (self._lastMicId is not None
+                        and self._counterNewParticles >= self.batchSize):
                     self._writeSubset(subset)
                     subsetTmp = subset  # save the previous so we can have the cumulative functionality
                     subset = self._createSubset()
@@ -329,6 +324,10 @@ class ProtMonitor2dStreamer(ProtMonitor):
                         subset.appendFromImages(subsetTmp)
 
                 self._lastMicId = micId
+
+            subset.append(particle)
+            self.debug("micId: %03d, particle: %05s, size: %s"
+                      % (micId, partId, subset.getSize()))
 
             self._lastPartId = partId
             self._counterNewParticles += 1

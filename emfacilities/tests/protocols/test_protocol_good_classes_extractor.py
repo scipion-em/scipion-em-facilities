@@ -346,6 +346,8 @@ class TestGoodClassesExtractor(BaseTest):
         discardedOutput = OutputSet(set())
 
         prot = self.newProtocol(ProtGoodClassesExtractor)
+        prot.outputParticles = goodOutput
+        prot.outputParticlesDiscarded = discardedOutput
         prot.dictsTimes = {"1": "2026-09-19 08:00:00"}
         prot.goodClassesIDs = [1]
         prot.goodParticles = [101]
@@ -472,4 +474,22 @@ class TestGoodClassesExtractorLockScope(unittest.TestCase):
             "another's results.",
         )
 
+class TestGoodClassesExtractorContinueCheckpointRegression(unittest.TestCase):
+    def testContinueFallsBackWhenLastDoneCheckpointIsInvalid(self):
+        class _Harness:
+            def isContinued(self):
+                return True
 
+            def _getLastDone(self):
+                raise SyntaxError("truncated checkpoint")
+
+            def info(self, message):
+                pass
+
+        protocol = _Harness()
+
+        ProtGoodClassesExtractor.initialStep(protocol)
+
+        self.assertEqual(protocol.dictsTimes, {})
+        self.assertEqual(protocol.goodParticles, [])
+        self.assertEqual(protocol.badParticles, [])

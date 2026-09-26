@@ -237,3 +237,46 @@ class TestDataCounterLoadOutputSet(tests.unittest.TestCase):
 
         self.assertIs(existingOutputSet, outputSet)
         self.assertEqual(1, existingOutputSet.enableAppendCalls)
+
+class TestDataCounterInputSetLifecycleRegression(tests.unittest.TestCase):
+    def testCheckNewOutputClosesInputSetWhenThereIsNoNewOutput(self):
+        class _Value:
+            def get(self):
+                return 100
+
+        class _InputSet:
+            def __init__(self):
+                self.closed = False
+
+            def getSize(self):
+                return 3
+
+            def close(self):
+                self.closed = True
+
+        class _Harness:
+            finished = False
+            processedIds = set()
+            isStreamClosed = False
+            timerOut = False
+            outputSize = _Value()
+
+            def __init__(self):
+                self.inputFn = "input.sqlite"
+                self.inputSet = _InputSet()
+
+            def _getAllDoneIds(self):
+                return [], 0
+
+            def _loadInputSet(self, inputFn):
+                return self.inputSet
+
+        protocol = _Harness()
+
+        ProtDataCounter._checkNewOutput(protocol)
+
+        self.assertTrue(
+            protocol.inputSet.closed,
+            "The input Set opened by _checkNewOutput must be closed "
+            "even when there is no new output to publish.",
+        )

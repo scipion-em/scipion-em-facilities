@@ -188,12 +188,21 @@ class MonitorMovieGain(Monitor):
             return prot.getStatus() != STATUS_RUNNING
 
         warningMode = "a" if os.path.exists(fnWarning) else "w"
+        hasPendingPartialLine = False
         with open(fnWarning, warningMode) as fhWarning:
-            for line in newLines:
+            for index, line in enumerate(newLines):
+                # The producer may be writing the last summary record while
+                # the monitor reads the file. Leave an unterminated trailing
+                # record pending so it can be retried on the next iteration.
+                if index == len(newLines) - 1 and not line.endswith("\n"):
+                    hasPendingPartialLine = True
+                    break
+
+                fields = line.split()
                 stddev, perc25, perc975, maxVal = map(
-                    float, line.split()[1:]
+                    float, fields[1:]
                 )
-                movieName = line.split()[0]
+                movieName = fields[0]
 
                 if stddev > self.stddevValue:
                     self.warning(
@@ -229,6 +238,9 @@ class MonitorMovieGain(Monitor):
 
                 self._lastSummaryLine += 1
                 self._writeLastSummaryLine()
+
+        if hasPendingPartialLine:
+            return False
 
         return prot.getStatus() != STATUS_RUNNING
 

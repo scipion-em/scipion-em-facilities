@@ -106,12 +106,15 @@ class ProtDataSampler(EMProtocol):
         return None
 
     def _stepsCheck(self):
+        if getattr(self, 'finished', False):
+            return
+
         self._checkNewInput()
         self._checkNewOutput()
 
     def _checkNewInput(self):
-        # Always inspect the logical input set. File mtimes are not a valid
-        # change detector when the set is backed by PostgreSQL.
+        # Always inspect the logical input set. Backing-file mtimes are not
+        # a reliable change detector for streamed logical Set contents.
         inputSet = self._loadInputSet(self.inputFn)
         inputSetIds = inputSet.getIdSet()
 

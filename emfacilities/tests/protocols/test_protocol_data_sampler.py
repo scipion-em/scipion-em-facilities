@@ -22,7 +22,7 @@
 # ***************************************************************************/
 import os
 import json
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 from pyworkflow.tests import BaseTest, DataSet
 from pwem.protocols.protocol_import import ProtImportMicrographs
 from pyworkflow.object import Pointer
@@ -295,6 +295,20 @@ class TestDataSampler(BaseTest):
         self.assertTrue(prot.finished)
 
 
+
+
+    def _runDataSampler(cls, label, batch, proportion):
+        protDataSampler = cls.newProtocol(ProtDataSampler,
+                                          batchSize=batch,
+                                          samplingProportion=proportion,
+                                          delay=3)
+        protDataSampler.inputImages = Pointer(cls.protImport, extended='outputMicrographs')
+        protDataSampler.setObjLabel(label)
+        cls.launchProtocol(protDataSampler)
+
+        return protDataSampler
+
+
 class TestDataSamplerLoadOutputSet(tests.unittest.TestCase):
     """Lightweight regression tests that need no real project/dataset."""
 
@@ -331,14 +345,18 @@ class TestDataSamplerLoadOutputSet(tests.unittest.TestCase):
         self.assertIs(existingOutputSet, outputSet)
         self.assertEqual(1, existingOutputSet.enableAppendCalls)
 
+class TestDataSamplerFinalizationRegression(tests.unittest.TestCase):
+    def testFinishedStepsCheckDoesNotTouchInputOrOutput(self):
+        class _Harness:
+            finished = True
 
-    def _runDataSampler(cls, label, batch, proportion):
-        protDataSampler = cls.newProtocol(ProtDataSampler,
-                                          batchSize=batch,
-                                          samplingProportion=proportion,
-                                          delay=3)
-        protDataSampler.inputImages = Pointer(cls.protImport, extended='outputMicrographs')
-        protDataSampler.setObjLabel(label)
-        cls.launchProtocol(protDataSampler)
+            def __init__(self):
+                self._checkNewInput = Mock()
+                self._checkNewOutput = Mock()
 
-        return protDataSampler
+        protocol = _Harness()
+
+        ProtDataSampler._stepsCheck(protocol)
+
+        protocol._checkNewInput.assert_not_called()
+        protocol._checkNewOutput.assert_not_called()

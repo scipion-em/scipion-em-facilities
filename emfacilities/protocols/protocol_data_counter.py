@@ -139,8 +139,8 @@ class ProtDataCounter(EMProtocol):
         if self.finished:
             return
 
-        # Always inspect the logical input set. File mtimes are not a valid
-        # change detector when the set is backed by PostgreSQL.
+        # Always inspect the logical input set. Backing-file mtimes are not
+        # a reliable change detector for streamed logical Set contents.
         if self.lastRound:
             self.info("Last round sleeping for 10 seconds to allow all the input to be loaded")
             time.sleep(10) # Needs to make sure that eventhough the stream is closed all the data in the inputset is loaded
@@ -180,35 +180,39 @@ class ProtDataCounter(EMProtocol):
         newDone = self.processedIds - doneSet
         allDone = len(doneListIds) + len(newDone)
         limitOutputSize = self.outputSize.get()
-        maxSize = self._loadInputSet(self.inputFn).getSize()
-        self.limitReach = allDone >= limitOutputSize
-
-        # We have finished when there is not more input images
-        # (stream closed) or when the limit of output size is met
-        self.finished = (self.isStreamClosed and allDone == maxSize) or (self.limitReach or self.timerOut)
-
-        if not self.finished and not newDone:
-            # If we are not finished and no new output have been produced
-            # it does not make sense to proceed and updated the outputs
-            # so we exit from the function here
-            return
 
         inputSet = self._loadInputSet(self.inputFn)
-        outputSet = self._loadOutputSet(self._inputClass, self._baseName,
-                                        outputName=OUTPUT)
+        try:
+            maxSize = inputSet.getSize()
+            self.limitReach = allDone >= limitOutputSize
 
-        if currentOutputSize < limitOutputSize:
-            for imageId in newDone:
-                image = inputSet.getItem("id", imageId).clone()
-                outputSet.append(image)
-                currentOutputSize += 1
-                if currentOutputSize == limitOutputSize:
-                    self.finished = True
-                    break # We have reach the limit for the outputSize
+            # We have finished when there is not more input images
+            # (stream closed) or when the limit of output size is met
+            self.finished = (self.isStreamClosed and allDone == maxSize) or (self.limitReach or self.timerOut)
 
-            streamMode = Set.STREAM_CLOSED if self.finished else Set.STREAM_OPEN
+            if not self.finished and not newDone:
+                # If we are not finished and no new output have been produced
+                # it does not make sense to proceed and updated the outputs
+                # so we exit from the function here
+                return
 
-            self._updateOutputSet(OUTPUT, outputSet, streamMode)
+            outputSet = self._loadOutputSet(self._inputClass, self._baseName,
+                                            outputName=OUTPUT)
+
+            if currentOutputSize < limitOutputSize:
+                for imageId in newDone:
+                    image = inputSet.getItem("id", imageId).clone()
+                    outputSet.append(image)
+                    currentOutputSize += 1
+                    if currentOutputSize == limitOutputSize:
+                        self.finished = True
+                        break # We have reach the limit for the outputSize
+
+                streamMode = Set.STREAM_CLOSED if self.finished else Set.STREAM_OPEN
+
+                self._updateOutputSet(OUTPUT, outputSet, streamMode)
+        finally:
+            inputSet.close()
 
         if self.finished:  # Unlock createOutputStep if finished all jobs
             outputStep = self._getFirstJoinStep()

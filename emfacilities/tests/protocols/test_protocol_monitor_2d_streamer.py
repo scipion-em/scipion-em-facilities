@@ -530,13 +530,71 @@ class TestMonitor2dStreamer(BaseTest):
         self.assertEqual(prot._lastPartId, 2)
         self.assertEqual(prot._counterParticlesProcessed, 2)
 
+    def testBatchBoundaryDoesNotSplitNextMicrograph(self):
+        class Particle:
+            def __init__(self, objId, micId):
+                self._objId = objId
+                self._micId = micId
 
+            def getObjId(self):
+                return self._objId
 
+            def getMicId(self):
+                return self._micId
 
+        class Subset:
+            def __init__(self):
+                self.ids = []
 
+            def append(self, particle):
+                self.ids.append(particle.getObjId())
 
+            def getSize(self):
+                return len(self.ids)
 
+        prot = self.newProtocol(
+            ProtMonitor2dStreamer,
+            batchSize=2,
+        )
+        prot._subset = Subset()
+        prot._lastMicId = None
+        prot._lastPartId = 0
+        prot._counterNewParticles = 0
+        prot._counterParticlesProcessed = 0
+        prot._streamClosed = False
+        prot.maximumOption.set(ProtMonitor2dStreamer.NONE_OPTION)
 
+        particles = [
+            Particle(1, 1),
+            Particle(2, 1),
+            Particle(3, 1),
+            Particle(4, 2),
+            Particle(5, 2),
+        ]
 
+        prot._iterParticles = lambda: iter(particles)
 
+        written = []
 
+        def writeSubset(subset):
+            written.append(list(subset.ids))
+
+        def createSubset():
+            return Subset()
+
+        prot._writeSubset = writeSubset
+        prot._createSubset = createSubset
+
+        prot._checkNewInput()
+
+        self.assertEqual(
+            written,
+            [[1, 2, 3]],
+            "The first particle from the next micrograph must not be "
+            "written into the previous batch.",
+        )
+        self.assertEqual(
+            prot._subset.ids,
+            [4, 5],
+            "The next micrograph must remain intact in the new subset.",
+        )

@@ -143,9 +143,9 @@ class ProtGoodClassesExtractor(EMProtocol, ProtStreamingBase):
                     'Restored last processed creation times for %d classes'
                     % len(self.dictsTimes)
                 )
-            except FileNotFoundError:
+            except (FileNotFoundError, SyntaxError, ValueError):
                 self.info(
-                    'No previous last-done checkpoint found; '
+                    'No valid previous last-done checkpoint found; '
                     'starting without restored class times.'
                 )
 
@@ -182,9 +182,21 @@ class ProtGoodClassesExtractor(EMProtocol, ProtStreamingBase):
             # otherwise two concurrent steps could both see no output yet,
             # each create their own fresh Set, and whichever publishes last
             # would silently discard the other's already-appended particles.
+            existingOutput = getattr(self, OUTPUT_PARTICLES, None)
+            existingDiscardedOutput = getattr(
+                self, OUTPUT_DISCARDED_PARTICLES, None
+            )
+
             output = self._loadOutputSet(OUTPUT_PARTICLES, "")
-            outputDiscarded = self._loadOutputSet(OUTPUT_DISCARDED_PARTICLES, "discarded")
-            persistedParticleIds = output.getIdSet() | outputDiscarded.getIdSet()
+            outputDiscarded = self._loadOutputSet(
+                OUTPUT_DISCARDED_PARTICLES, "discarded"
+            )
+
+            persistedParticleIds = set()
+            if existingOutput is not None:
+                persistedParticleIds.update(output.getIdSet())
+            if existingDiscardedOutput is not None:
+                persistedParticleIds.update(outputDiscarded.getIdSet())
 
             # For each class (order by number of items)
             for clazz in inputClasses.iterItems(orderBy="_size", direction="DESC"):

@@ -329,6 +329,8 @@ class MonitorSystem(Monitor):
             except Exception as ex:
                 msg = "cannot get information of network interface %s" % \
                       self.nif
+                valuesDict["%s_send" % self.nif] = 0.0
+                valuesDict["%s_recv" % self.nif] = 0.0
 
         if self.doDiskIO:
             try:
@@ -344,6 +346,8 @@ class MonitorSystem(Monitor):
                     self.samplingTime * bytes_write / self.mega
             except Exception as ex:
                 msg = "cannot get information of disk usage "
+                valuesDict["disk_read"] = 0.0
+                valuesDict["disk_write"] = 0.0
 
         if self.cpuAlert < 100 and cpu > self.cpuAlert:
             self.warning("CPU allocation =%f." % cpu)

@@ -173,7 +173,7 @@ class MonitorCTF(Monitor):
         if hasattr(prot, 'outputCTF'):
             CTFset = prot.outputCTF.getIdSet()
         else:
-            return False
+            return prot.getStatus() != STATUS_RUNNING
         # find difference
         sys.stdout.flush()
         diffSet = CTFset - self.readCTFs

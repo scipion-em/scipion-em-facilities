@@ -305,3 +305,26 @@ class TestCtfStream(pwtests.BaseTest):
 
         baseFn = protMonitor._getPath(monitorsProt.CTF_LOG_SQLITE)
         self.assertTrue(os.path.isfile(baseFn))
+
+    def testFinishedProducerWithoutOutputStopsMonitor(self):
+        from unittest.mock import patch
+
+        class FinishedProtocol:
+            def getStatus(self):
+                return 999999
+
+        protocol = FinishedProtocol()
+        monitor = object.__new__(monitorsProt.MonitorCTF)
+        monitor.protocol = protocol
+
+        with patch(
+            "emfacilities.protocols.protocol_monitor_ctf.getUpdatedProtocol",
+            return_value=protocol,
+        ):
+            finished = monitor.step()
+
+        self.assertTrue(
+            finished,
+            "A monitor must stop when its producer has already finished, "
+            "even if outputCTF was never created.",
+        )
