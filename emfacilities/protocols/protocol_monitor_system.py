@@ -129,7 +129,7 @@ class ProtMonitorSystem(ProtMonitor):
     # --------------------------- STEPS functions ----------------------------
 
     def monitorStep(self):
-        self.createMonitor().loop()
+        self.createMonitor().loop(startTime=self.initTime.datetime())
 
     def createMonitor(self):
         protocols = []
@@ -275,6 +275,17 @@ class MonitorSystem(Monitor):
 
     def initLoop(self):
         self._createTable()
+        self.cur.execute(
+            "SELECT MAX(cpu), MAX(mem), MAX(swap) FROM %s" % self._tableName
+        )
+        cpuAlert, memAlert, swapAlert = self.cur.fetchone()
+        if cpuAlert is not None:
+            self.cpuAlert = max(self.cpuAlert, cpuAlert)
+        if memAlert is not None:
+            self.memAlert = max(self.memAlert, memAlert)
+        if swapAlert is not None:
+            self.swapAlert = max(self.swapAlert, swapAlert)
+
         psutil.cpu_percent(True)
         psutil.virtual_memory()
 
@@ -318,6 +329,8 @@ class MonitorSystem(Monitor):
             except Exception as ex:
                 msg = "cannot get information of network interface %s" % \
                       self.nif
+                valuesDict["%s_send" % self.nif] = 0.0
+                valuesDict["%s_recv" % self.nif] = 0.0
 
         if self.doDiskIO:
             try:
@@ -333,6 +346,8 @@ class MonitorSystem(Monitor):
                     self.samplingTime * bytes_write / self.mega
             except Exception as ex:
                 msg = "cannot get information of disk usage "
+                valuesDict["disk_read"] = 0.0
+                valuesDict["disk_write"] = 0.0
 
         if self.cpuAlert < 100 and cpu > self.cpuAlert:
             self.warning("CPU allocation =%f." % cpu)
@@ -404,6 +419,7 @@ class MonitorSystem(Monitor):
         except Exception as e:
             print("MonitorCTF, ERROR reading data from db: %s" %
                   os.path.join(self.workingDir, self._dataBase))
+            return []
         # As we are using a row factory, fetchall returns a list of
         # dictionaries, each item in list(each dictionary)
         # represents a row of the table

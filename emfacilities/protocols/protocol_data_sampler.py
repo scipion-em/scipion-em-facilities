@@ -24,7 +24,8 @@
 # *
 # **************************************************************************
 import os
-from datetime import datetime
+import hashlib
+import json
 import time
 import copy
 import random
@@ -32,7 +33,6 @@ import random
 from pyworkflow import VERSION_3_0
 from pwem.objects import SetOfImages, Set
 import pyworkflow.protocol.params as params
-import pyworkflow.utils as pwutils
 
 from pwem.protocols import EMProtocol
 from pyworkflow import UPDATED, NEW
@@ -106,44 +106,39 @@ class ProtDataSampler(EMProtocol):
         return None
 
     def _stepsCheck(self):
+        if getattr(self, 'finished', False):
+            return
+
         self._checkNewInput()
         self._checkNewOutput()
 
     def _checkNewInput(self):
-        # Check if there are new images to process from the input set
-        self.lastCheck = getattr(self, 'lastCheck', datetime.now())
-        mTime = datetime.fromtimestamp(os.path.getmtime(self.inputFn))
-        self.debug('Last check: %s, modification: %s'
-                    % (pwutils.prettyTime(self.lastCheck),
-                        pwutils.prettyTime(mTime)))
-        # If the input.sqlite have not changed since our last check,
-        # it does not make sense to check for new input data
-        if self.lastCheck > mTime and self.insertedIds:  # If this is empty it is dut to a static "continue" action or it is the first round
-            return None
-
+        # Always inspect the logical input set. Backing-file mtimes are not
+        # a reliable change detector for streamed logical Set contents.
         inputSet = self._loadInputSet(self.inputFn)
         inputSetIds = inputSet.getIdSet()
-        newIds = [idImage for idImage in inputSetIds if idImage not in self.insertedIds]
 
-        self.lastCheck = datetime.now()
         self.isStreamClosed = inputSet.isStreamClosed()
         inputSet.close()
 
         outputStep = self._getFirstJoinStep()
 
-        if self.isContinued() and not self.insertedIds:  # For "Continue" action and the first round
+        if self.isContinued() and not self.insertedIds:
             doneIds, _ = self._getAllDoneIds()
-            doneIdsSet = set(doneIds)
-            newIdsSet = set(newIds)
-            skipIds = list(newIdsSet & doneIdsSet)
-            newIds = list(newIdsSet - doneIdsSet)
+            self._restoreRuntimeStateFromFinishedSteps(doneIds)
+            skipIds = list(set(inputSetIds).intersection(self.insertedIds))
             self.info("Skipping Images with ID: %s, seems to be done" % skipIds)
-            self.insertedIds = set(doneIds)  # During the first round of "Continue" action it has to be filled
+
+        newIds = [
+            imageId
+            for imageId in inputSetIds
+            if imageId not in self.insertedIds
+        ]
 
         # Now handle the steps depending on the streaming batch size
         batchSize = self.batchSize.get()
         if len(newIds) < batchSize and not self.isStreamClosed:
-            return  # No register any step if the batch size is not reach unless is the lass iter
+            return
 
         if newIds:
             fDeps = self._insertNewImageSteps(newIds, batchSize)
@@ -151,39 +146,43 @@ class ProtDataSampler(EMProtocol):
                 outputStep.addPrerequisites(*fDeps)
             self.updateSteps()
 
+
     def _checkNewOutput(self):
         doneListIds, currentOutputSize = self._getAllDoneIds()
         doneIdSet = set(doneListIds)
         newDone = list(self.sampleIds - doneIdSet)
-        allDone = len(doneListIds) + len(newDone)
-        maxSize = int(self._loadInputSet(self.inputFn).getSize() * self.samplingProportion.get())
-
-        # We have finished when there is not more input images
-        # (stream closed) or when the limit of output size is met
-        self.finished = self.isStreamClosed and allDone == maxSize
-        streamMode = Set.STREAM_CLOSED if self.finished else Set.STREAM_OPEN
-
-        if not self.finished and not newDone:
-            # If we are not finished and no new output have been produced
-            # it does not make sense to proceed and updated the outputs
-            # so we exit from the function here
-            return
 
         inputSet = self._loadInputSet(self.inputFn)
-        outputSet = self._loadOutputSet(self._inputClass, self._baseName)
+        try:
+            inputSetIds = set(inputSet.getIdSet())
+            self.finished = (
+                self.isStreamClosed
+                and inputSetIds.issubset(self.processedIds)
+            )
 
-        for imageId in newDone:
-            image = inputSet.getItem("id", imageId).clone()
-            outputSet.append(image)
+            streamMode = Set.STREAM_CLOSED if self.finished else Set.STREAM_OPEN
 
-        self._updateOutputSet(OUTPUT, outputSet, streamMode)
+            if not self.finished and not newDone:
+                return
 
-        if self.finished:  # Unlock createOutputStep if finished all jobs
+            outputSet = self._loadOutputSet(self._inputClass, self._baseName,
+                                            outputName=OUTPUT)
+
+            for imageId in newDone:
+                image = inputSet.getItem("id", imageId).clone()
+                outputSet.append(image)
+
+            self._updateOutputSet(OUTPUT, outputSet, streamMode)
+        finally:
+            inputSet.close()
+
+        if self.finished:
             outputStep = self._getFirstJoinStep()
             if outputStep and outputStep.isWaiting():
                 outputStep.setStatus(STATUS_NEW)
 
         self._store()
+
 
     def _loadInputSet(self, inputFn):
         self.debug("Loading input db: %s" % inputFn)
@@ -191,16 +190,24 @@ class ProtDataSampler(EMProtocol):
         inputSet.loadAllProperties()
         return inputSet
 
-    def _loadOutputSet(self, SetClass, baseName):
-        setFile = self._getPath(baseName)
-
-        if os.path.exists(setFile):
-            outputSet = SetClass(filename=setFile)
-            outputSet.loadAllProperties()
+    def _loadOutputSet(self, SetClass, baseName, outputName=None):
+        # Reuse the logical output Scipion already knows about before
+        # falling back to the on-disk backing file, otherwise an output
+        # still awaiting its backing file to materialize would be silently
+        # discarded and replaced with an empty fresh Set.
+        outputSet = getattr(self, outputName, None) if outputName else None
+        if outputSet is not None:
             outputSet.enableAppend()
         else:
-            outputSet = SetClass(filename=setFile)
-            outputSet.setStreamState(outputSet.STREAM_OPEN)
+            setFile = self._getPath(baseName)
+
+            if os.path.exists(setFile):
+                outputSet = SetClass(filename=setFile)
+                outputSet.loadAllProperties()
+                outputSet.enableAppend()
+            else:
+                outputSet = SetClass(filename=setFile)
+                outputSet.setStreamState(outputSet.STREAM_OPEN)
 
         inputs = self.inputImages.get()
         outputSet.copyInfo(inputs)
@@ -224,14 +231,119 @@ class ProtDataSampler(EMProtocol):
 
         return deps
 
+    def _restoreRuntimeStateFromFinishedSteps(self, doneIds):
+        doneIds = set(doneIds)
+        self.sampleIds.update(doneIds)
+        self.insertedIds.update(doneIds)
+        self.processedIds.update(doneIds)
+
+        for step in self._steps:
+            isFinished = getattr(step, "isFinished", None)
+            if not callable(isFinished) or not isFinished():
+                continue
+
+            funcName = getattr(step, "funcName", None)
+            if callable(getattr(funcName, "get", None)):
+                funcName = funcName.get()
+
+            if funcName != "samplingStep":
+                continue
+
+            processedIds = set()
+            sampledIds = set()
+
+            argsStr = getattr(step, "argsStr", None)
+            if callable(getattr(argsStr, "get", None)):
+                argsStr = argsStr.get()
+
+            if argsStr:
+                try:
+                    stepArgs = json.loads(argsStr)
+                    if stepArgs:
+                        processedIds.update(stepArgs[0])
+                except (TypeError, ValueError):
+                    pass
+
+            resultFiles = getattr(step, "_resultFiles", None)
+            if callable(getattr(resultFiles, "hasValue", None)):
+                if not resultFiles.hasValue():
+                    resultFiles = None
+
+            if callable(getattr(resultFiles, "get", None)):
+                resultFiles = resultFiles.get()
+
+            if resultFiles:
+                try:
+                    resultFiles = json.loads(resultFiles)
+                except (TypeError, ValueError):
+                    resultFiles = []
+
+                for stateFile in resultFiles:
+                    if not stateFile or not os.path.exists(stateFile):
+                        continue
+
+                    try:
+                        with open(stateFile, "r", encoding="utf-8") as handle:
+                            state = json.load(handle)
+                    except (OSError, TypeError, ValueError):
+                        continue
+
+                    processedIds.update(state.get("processedIds", []))
+                    sampledIds.update(state.get("sampledIds", []))
+                    break
+
+            # Old runs did not persist the pending random selection.
+            # Samples already published are still recoverable from the output.
+            sampledIds.update(processedIds.intersection(doneIds))
+
+            self.insertedIds.update(processedIds)
+            self.processedIds.update(processedIds)
+            self.sampleIds.update(sampledIds)
+
+    def _getSamplingStateFile(self, newIds):
+        batchKey = hashlib.sha256(
+            json.dumps(
+                list(newIds),
+                separators=(",", ":"),
+            ).encode("utf-8")
+        ).hexdigest()
+
+        return self._getExtraPath(
+            "data_sampler_%s.json" % batchKey
+        )
+
     def samplingStep(self, newIds):
         proportion = self.samplingProportion.get()
         sampledIds = sample_proportion(newIds, proportion)
+        stateFile = self._getSamplingStateFile(newIds)
+        tmpStateFile = stateFile + ".tmp"
+
+        os.makedirs(
+            os.path.dirname(stateFile),
+            exist_ok=True,
+        )
+
+        state = {
+            "processedIds": sorted(newIds),
+            "sampledIds": sorted(sampledIds),
+        }
+
+        try:
+            with open(tmpStateFile, "w", encoding="utf-8") as handle:
+                json.dump(state, handle)
+            os.replace(tmpStateFile, stateFile)
+        finally:
+            if os.path.exists(tmpStateFile):
+                os.remove(tmpStateFile)
+
         self.processedIds.update(newIds)
         self.sampleIds.update(sampledIds)
 
         self.info('From %d new images, %d were random sampled with a proportion of %.2f'
-                  %(len(newIds), len(sampledIds), proportion))
+                  % (len(newIds), len(sampledIds), proportion))
+
+        return stateFile
+
 
     # ------------------------- UTILS functions --------------------------------
     def _getAllDoneIds(self):

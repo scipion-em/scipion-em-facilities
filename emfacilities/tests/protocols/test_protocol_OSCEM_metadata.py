@@ -1,4 +1,8 @@
+import os
 import json
+import tempfile
+import unittest
+from unittest.mock import patch
 from collections.abc import Mapping, Sequence
 from os.path import exists, abspath
 
@@ -23,6 +27,103 @@ from ...protocols.protocol_OSCEM_metadata import INPUT_MOVIES, INPUT_MICS
 
 
 box_size = 300
+
+class TestOscemMetadataPostgresqlCompatibility(unittest.TestCase):
+
+    def testVolumeParticleCountDoesNotRequireParticlesSqlite(self):
+        class ParticleSet:
+            def getSize(self):
+                return 42
+
+        class ParentProtocol:
+            outputParticles = ParticleSet()
+
+        class Node:
+            run = ParentProtocol()
+
+        class RunsGraph:
+            def getNode(self, nodeId):
+                self.lastNodeId = nodeId
+                return Node()
+
+        class Project:
+            def __init__(self):
+                self.graph = RunsGraph()
+
+            def getRunsGraph(self, refresh=False):
+                self.refresh = refresh
+                return self.graph
+
+        class Volume:
+            def __init__(self, fileName):
+                self.fileName = fileName
+
+            def getDim(self):
+                return (64, 64, 64)
+
+            def getHalfMaps(self):
+                return "half1.mrc,half2.mrc"
+
+            def getFileName(self):
+                return self.fileName
+
+            def getObjParentId(self):
+                return 77
+
+        with tempfile.TemporaryDirectory() as tmpDir:
+            volumePath = os.path.join(
+                tmpDir,
+                "Runs",
+                "000077_Refine",
+                "extra",
+                "volume.mrc",
+            )
+
+            prot = object.__new__(ProtOSCEM)
+            project = Project()
+
+            object.__setattr__(
+                prot,
+                "_getExtraPath",
+                lambda *args: os.path.join(tmpDir, "metadata"),
+            )
+            object.__setattr__(
+                prot,
+                "orthogonalSlices",
+                lambda **kwargs: None,
+            )
+            object.__setattr__(
+                prot,
+                "generate_isosurfaces",
+                lambda *args, **kwargs: None,
+            )
+            object.__setattr__(
+                prot,
+                "getProject",
+                lambda: project,
+            )
+
+            with patch(
+                    "emfacilities.protocols.protocol_OSCEM_metadata.program_fso",
+                    None,
+            ):
+                metadata = prot.volume_generation(
+                    "final volume",
+                    "Final_volume",
+                    Volume(volumePath),
+                    -1,
+                )
+
+            self.assertEqual(
+                metadata.get("vol_number_particles"),
+                42,
+                "Volume particle count must come from the logical parent "
+                "protocol output, not from a sibling particles.sqlite file.",
+            )
+            self.assertEqual(project.graph.lastNodeId, "77")
+            self.assertTrue(project.refresh)
+
+
 class TestOscemMetadata(BaseTest):
     """
     """

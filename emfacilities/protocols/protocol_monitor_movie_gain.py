@@ -25,12 +25,15 @@
 # **************************************************************************
 
 import os
+import tempfile
 
 import pyworkflow.protocol.params as params
 from pyworkflow.protocol.constants import STATUS_RUNNING
 from pyworkflow import VERSION_1_1
 
 from .protocol_monitor import ProtMonitor, Monitor
+
+MOVIE_GAIN_LAST_LINE = 'movie_gain_monitor.last_line'
 
 
 class ProtMonitorMovieGain(ProtMonitor):
@@ -78,7 +81,7 @@ class ProtMonitorMovieGain(ProtMonitor):
 
     # -------------------------- STEPS functions ------------------------------
     def monitorStep(self):
-        self.createMonitor().loop()
+        self.createMonitor().loop(startTime=self.initTime.datetime())
 
     def createMonitor(self):
 
@@ -135,49 +138,112 @@ class MonitorMovieGain(Monitor):
         self.notify("Scipion Movie Gain Monitor WARNING", msg)
 
     def initLoop(self):
-        pass
+        self._lastSummaryLine = 0
+        checkpoint = os.path.join(self.workingDir, MOVIE_GAIN_LAST_LINE)
+
+        if os.path.exists(checkpoint):
+            try:
+                with open(checkpoint, "r") as handle:
+                    self._lastSummaryLine = int(handle.read().strip() or 0)
+            except (OSError, ValueError):
+                self._lastSummaryLine = 0
+
+
+    def _writeLastSummaryLine(self):
+        checkpoint = os.path.join(self.workingDir, MOVIE_GAIN_LAST_LINE)
+        fd, tmpPath = tempfile.mkstemp(
+            prefix=os.path.basename(checkpoint) + ".",
+            suffix=".tmp",
+            dir=self.workingDir,
+        )
+        try:
+            with os.fdopen(fd, "w") as handle:
+                handle.write(str(self._lastSummaryLine))
+            os.replace(tmpPath, checkpoint)
+        except Exception:
+            try:
+                os.unlink(tmpPath)
+            except FileNotFoundError:
+                pass
+            raise
 
     def step(self):
         prot = self.protocol
         fnSummary = prot._getPath("summaryForMonitor.txt")
         fnWarning = prot._getPath("warningsMonitor.txt")
+
         if not os.path.exists(fnSummary) or os.path.getsize(fnSummary) < 1:
             return False
-        fhSummary = open(fnSummary, "r")
-        if not os.path.exists(fnWarning):
-            fhWarning = open(fnWarning, "w")
-        else:
-            fhWarning = open(fnWarning, "a")
 
-        line = fhSummary.readlines()[-1]
-        stddev, perc25, perc975, maxVal = map(float, line.split()[1:])
-        movie_name = map(str, line.split()[0])
-        values = line.split()
+        with open(fnSummary, "r") as fhSummary:
+            summaryLines = fhSummary.readlines()
 
-        if float(values[1]) > self.stddevValue:
-            self.warning("Residual gain standard deviation is %f."
-                         % stddev)
-            fhWarning.write("%s: Residual gain standard deviation is %f.\n"
-                            % (movie_name, stddev))
+        # If the producer recreated/truncated the summary file, restart from
+        # the beginning of the new file instead of skipping valid entries.
+        if self._lastSummaryLine > len(summaryLines):
+            self._lastSummaryLine = 0
 
-        if (perc975 / perc25) > self.ratio1Value:
-            self.warning("The ratio between the 97.5 and 2.5 "
-                         "percentiles is %f."
-                         % (perc975 / perc25))
-            fhWarning.write("%s: The ratio between the 97.5 and 2.5 "
-                            "percentiles is %f.\n"
-                            % (movie_name, (perc975 / perc25)))
+        newLines = summaryLines[self._lastSummaryLine:]
+        if not newLines:
+            return prot.getStatus() != STATUS_RUNNING
 
-        if (maxVal / perc975) > self.ratio2Value:
-            self.warning("The ratio between the maximum gain value "
-                         "and the 97.5 percentile is %f."
-                         % (maxVal / perc975))
-            fhWarning.write("%s: The ratio between the maximum gain value "
-                            "and the 97.5 percentile is %f.\n"
-                            % (movie_name, (maxVal / perc975)))
-        fhSummary.close()
-        fhWarning.close()
+        warningMode = "a" if os.path.exists(fnWarning) else "w"
+        hasPendingPartialLine = False
+        with open(fnWarning, warningMode) as fhWarning:
+            for index, line in enumerate(newLines):
+                # The producer may be writing the last summary record while
+                # the monitor reads the file. Leave an unterminated trailing
+                # record pending so it can be retried on the next iteration.
+                if index == len(newLines) - 1 and not line.endswith("\n"):
+                    hasPendingPartialLine = True
+                    break
+
+                fields = line.split()
+                stddev, perc25, perc975, maxVal = map(
+                    float, fields[1:]
+                )
+                movieName = fields[0]
+
+                if stddev > self.stddevValue:
+                    self.warning(
+                        "Residual gain standard deviation is %f." % stddev
+                    )
+                    fhWarning.write(
+                        "%s: Residual gain standard deviation is %f.\n"
+                        % (movieName, stddev)
+                    )
+
+                if (perc975 / perc25) > self.ratio1Value:
+                    self.warning(
+                        "The ratio between the 97.5 and 2.5 "
+                        "percentiles is %f." % (perc975 / perc25)
+                    )
+                    fhWarning.write(
+                        "%s: The ratio between the 97.5 and 2.5 "
+                        "percentiles is %f.\n"
+                        % (movieName, (perc975 / perc25))
+                    )
+
+                if (maxVal / perc975) > self.ratio2Value:
+                    self.warning(
+                        "The ratio between the maximum gain value "
+                        "and the 97.5 percentile is %f."
+                        % (maxVal / perc975)
+                    )
+                    fhWarning.write(
+                        "%s: The ratio between the maximum gain value "
+                        "and the 97.5 percentile is %f.\n"
+                        % (movieName, (maxVal / perc975))
+                    )
+
+                self._lastSummaryLine += 1
+                self._writeLastSummaryLine()
+
+        if hasPendingPartialLine:
+            return False
+
         return prot.getStatus() != STATUS_RUNNING
+
 
     def getData(self, lastId=-1):
         if self.influx:

@@ -20,11 +20,57 @@
 # *  All comments concerning this program package may be sent to the
 # *  e-mail address 'scipion@cnb.csic.es'
 # ***************************************************************************/
+import unittest
 from pyworkflow.tests import BaseTest, setupTestProject, DataSet
 from pwem.protocols.protocol_import import ProtImportParticles
 import pwem.protocols as emprot
 from pyworkflow.object import Pointer
 from emfacilities.protocols.protocol_volume_extractor import ProtVolumeExtractor
+
+
+
+class TestVolumeExtractorInstanceState(unittest.TestCase):
+
+    def testOutputsToDefineAreNotSharedAcrossProtocolInstances(self):
+        class OutputParticles:
+            def write(self):
+                pass
+
+        class OutputVolume:
+            pass
+
+        def newProtocolRecorder():
+            protocol = object.__new__(ProtVolumeExtractor)
+            recordedOutputs = {}
+            object.__setattr__(
+                protocol,
+                "_defineOutputs",
+                lambda **kwargs: recordedOutputs.update(kwargs),
+            )
+            object.__setattr__(
+                protocol,
+                "_store",
+                lambda output: None,
+            )
+            return protocol, recordedOutputs
+
+        ProtVolumeExtractor.outputsToDefine.clear()
+
+        first, firstOutputs = newProtocolRecorder()
+        first.createOutput(OutputParticles(), None)
+
+        second, secondOutputs = newProtocolRecorder()
+        second.createOutput(None, OutputVolume())
+
+        self.assertEqual(
+            set(firstOutputs),
+            {"outputParticles"},
+        )
+        self.assertEqual(
+            set(secondOutputs),
+            {"bestVolume"},
+            "Each protocol instance must define only its own outputs.",
+        )
 
 
 class TestVolumeExtractor(BaseTest):

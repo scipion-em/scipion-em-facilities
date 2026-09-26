@@ -23,13 +23,13 @@
 # *  e-mail address 'scipion@cnb.csic.es'
 # *
 # **************************************************************************
-from datetime import datetime
+import ast
 import os
+import tempfile
 import time
 import sys
 import matplotlib.pyplot as plt
 
-from pyworkflow.utils import prettyTime
 import pyworkflow.protocol.params as params
 from pyworkflow.object import Set
 from pyworkflow.protocol import ProtStreamingBase, STEPS_PARALLEL
@@ -136,16 +136,68 @@ class ProtGoodClassesExtractor(EMProtocol, ProtStreamingBase):
         self.goodClassesIDs = []
         self.dictsTimes = {}
 
+        if self.isContinued():
+            try:
+                self.dictsTimes = self._getLastDone()
+                self.info(
+                    'Restored last processed creation times for %d classes'
+                    % len(self.dictsTimes)
+                )
+            except (FileNotFoundError, SyntaxError, ValueError):
+                self.info(
+                    'No valid previous last-done checkpoint found; '
+                    'starting without restored class times.'
+                )
+
+            goodOutput = getattr(self, OUTPUT_PARTICLES, None)
+            badOutput = getattr(self, OUTPUT_DISCARDED_PARTICLES, None)
+
+            if goodOutput is not None:
+                self.goodParticles = list(goodOutput.getIdSet())
+            if badOutput is not None:
+                self.badParticles = list(badOutput.getIdSet())
+
+            if goodOutput is not None or badOutput is not None:
+                self.particlesDistribution = {
+                    'good': [len(self.goodParticles)],
+                    'bad': [len(self.badParticles)],
+                }
+                self.info(
+                    'Restored particle counters: %d good, %d discarded'
+                    % (len(self.goodParticles), len(self.badParticles))
+                )
+
+
     def extractElements(self, inputClasses):
         """
         Method to extract the particles from the selected classes, this method generates two output sets:
             - accepted particles
             - discarded particles
         """
-        output = self._loadOutputSet(OUTPUT_PARTICLES, "")
-        outputDiscarded = self._loadOutputSet(OUTPUT_DISCARDED_PARTICLES, "discarded")
-
         with self._lock:
+            # _loadOutputSet decides whether to reuse the existing output or
+            # create a fresh one. This protocol runs under STEPS_PARALLEL
+            # with independent extractElements steps, so this whole
+            # decide-append-publish sequence must stay inside the lock -
+            # otherwise two concurrent steps could both see no output yet,
+            # each create their own fresh Set, and whichever publishes last
+            # would silently discard the other's already-appended particles.
+            existingOutput = getattr(self, OUTPUT_PARTICLES, None)
+            existingDiscardedOutput = getattr(
+                self, OUTPUT_DISCARDED_PARTICLES, None
+            )
+
+            output = self._loadOutputSet(OUTPUT_PARTICLES, "")
+            outputDiscarded = self._loadOutputSet(
+                OUTPUT_DISCARDED_PARTICLES, "discarded"
+            )
+
+            persistedParticleIds = set()
+            if existingOutput is not None:
+                persistedParticleIds.update(output.getIdSet())
+            if existingDiscardedOutput is not None:
+                persistedParticleIds.update(outputDiscarded.getIdSet())
+
             # For each class (order by number of items)
             for clazz in inputClasses.iterItems(orderBy="_size", direction="DESC"):
                 # Make the query to load only the new particles
@@ -158,29 +210,40 @@ class ProtGoodClassesExtractor(EMProtocol, ProtStreamingBase):
 
                 # Two sets of particles:
                 if clazz.getObjId() in self.goodClassesIDs:  # Accepted particles
+                    tmp_accepted = None
                     for image in clazz.iterItems(orderBy='creation', direction='ASC', where=where):
                         tmp_accepted = image.getObjCreation()
+                        if image.getObjId() in persistedParticleIds:
+                            continue
                         newImage = image.clone()
                         output.append(newImage)
                         self.goodParticles.append(image.getObjId())
-                    self.dictsTimes[str(clazz.getObjId())] = tmp_accepted  # Store the latest time
+                        persistedParticleIds.add(image.getObjId())
+                    if tmp_accepted is not None:
+                        self.dictsTimes[str(clazz.getObjId())] = tmp_accepted  # Store the latest time
                 else:  # Discarded particles
+                    tmp_discarded = None
                     for image in clazz.iterItems(orderBy='creation', direction='ASC', where=where):
                         tmp_discarded = image.getObjCreation()
+                        if image.getObjId() in persistedParticleIds:
+                            continue
                         newImageDiscarded = image.clone()
                         outputDiscarded.append(newImageDiscarded)
                         self.badParticles.append(image.getObjId())
-                    self.dictsTimes[str(clazz.getObjId())] = tmp_discarded  # Store the latest time
+                        persistedParticleIds.add(image.getObjId())
+                    if tmp_discarded is not None:
+                        self.dictsTimes[str(clazz.getObjId())] = tmp_discarded  # Store the latest time
 
-        self.info('Size output %d and size discarded output %d' % (len(output), len(outputDiscarded)))
-        self.debug(str(self.dictsTimes))
+            self.info('Size output %d and size discarded output %d' % (len(output), len(outputDiscarded)))
+            self.debug(str(self.dictsTimes))
 
-        if len(output) > 0:
-            self._updateOutputSet(OUTPUT_PARTICLES, output, self.isStreamClosed)
-        if len(outputDiscarded) > 0:
-            self._updateOutputSet(OUTPUT_DISCARDED_PARTICLES, outputDiscarded, self.isStreamClosed)
+            if len(output) > 0:
+                self._updateOutputSet(OUTPUT_PARTICLES, output, self.isStreamClosed)
+            if len(outputDiscarded) > 0:
+                self._updateOutputSet(OUTPUT_DISCARDED_PARTICLES, outputDiscarded, self.isStreamClosed)
 
-        self._writeLastDone(self.dictsTimes)
+            self._writeLastDone(self.dictsTimes)
+
         self._createPlots()
 
     def selectGoodClasses(self):
@@ -222,22 +285,32 @@ class ProtGoodClassesExtractor(EMProtocol, ProtStreamingBase):
         return outputSet
 
     def _newParticlesToProcess(self):
-        classesFile = self.inputClasses.get().getFileName()
-        now = datetime.now()
-        self.lastCheck = getattr(self, 'lastCheck', now)
-        mTime = datetime.fromtimestamp(os.path.getmtime(classesFile))
-        self.debug('Last check: %s, modification: %s'
-                   % (prettyTime(self.lastCheck),
-                      prettyTime(mTime)))
-        # If the input have not changed since our last check,
-        # it does not make sense to check for new input data
-        if self.lastCheck > mTime and self.dictsTimes:
-            newParticlesBool = False
-        else:
-            newParticlesBool = True
+        classSet = self._loadInputClassesSet()
+        try:
+            self.isStreamClosed = classSet.getStreamState()
 
-        self.lastCheck = now
-        return newParticlesBool
+            # First pass must process the current contents, independently of
+            # the storage backend used by the input set.
+            if not self.dictsTimes:
+                return True
+
+            for clazz in classSet.iterItems():
+                lastTime = self.dictsTimes.get(str(clazz.getObjId()))
+                where = None
+                if lastTime is not None:
+                    where = 'creation>"%s"' % lastTime
+
+                if next(clazz.iterItems(
+                        orderBy='creation',
+                        direction='ASC',
+                        where=where,
+                ), None) is not None:
+                    return True
+
+            return False
+        finally:
+            classSet.close()
+
 
     def _loadInputClassesSet(self):
         """ Returns te input set of particles"""
@@ -252,18 +325,36 @@ class ProtGoodClassesExtractor(EMProtocol, ProtStreamingBase):
         return listIDs
 
     def _writeLastDone(self, creationTimeDict):
-        """ Write to a text file the last item creation time done. """
-        dictStr = str(creationTimeDict)
+        """Write the last processed creation times atomically."""
+        checkpoint = self._getExtraPath(LAST_DONE_FILE)
+        directory = os.path.dirname(checkpoint)
+        fd, tmpPath = tempfile.mkstemp(
+            prefix=os.path.basename(checkpoint) + ".",
+            suffix=".tmp",
+            dir=directory,
+        )
 
-        with open(self._getExtraPath(LAST_DONE_FILE), 'w') as f:
-            f.write(dictStr)
+        try:
+            with os.fdopen(fd, "w") as handle:
+                handle.write(repr(creationTimeDict))
+            os.replace(tmpPath, checkpoint)
+        except Exception:
+            try:
+                os.unlink(tmpPath)
+            except FileNotFoundError:
+                pass
+            raise
 
     def _getLastDone(self):
-        """ Read from a text file the last item creation time done. """
-        # Open the file in read mode and read the number
+        """Read the last processed creation times safely."""
         with open(self._getExtraPath(LAST_DONE_FILE), "r") as file:
             content = file.read()
-        dictTimes = eval(content)
+
+        dictTimes = ast.literal_eval(content)
+        if not isinstance(dictTimes, dict):
+            raise ValueError(
+                "Invalid last-done checkpoint: expected a dictionary."
+            )
 
         return dictTimes
 

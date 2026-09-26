@@ -96,7 +96,8 @@ class ReportInflux:
         # but it certainly  be used by hte standard html
         # for example to decide which files need to be tranfered
         self.confFileName = self.protocol._getTmpPath(CONFILE)
-        if not os.path.isfile(self.confFileName):
+        newReport = not os.path.isfile(self.confFileName)
+        if newReport:
             # Create the configuration file as it doesn't exist yet
             self.confParser = ConfigParser()
             self.confParser.add_section("project")
@@ -175,7 +176,8 @@ class ReportInflux:
             # project names may contain forbiden character
             # IF this is a problem we will need to slugify the projName
             # self.client.drop_measurement(self.projectName)
-            self.client.delete_series(measurement=self.projectName)
+            if newReport:
+                self.client.delete_series(measurement=self.projectName)
             print("dropping meassurement:", self.projectName) 
             # replication -> number of copies of the DB stored in the cluster
             # 12w -> delete data after 12 weeks
@@ -198,7 +200,7 @@ class ReportInflux:
         # Project Properties Section
         # Do not delete this variables. We are using them
         # in an eval command
-        self.projectName = project.getShortName()
+        self.projectName = slugify(project.getShortName())
         startTime = pwutils.dateStr(project.getCreationTime(), secs=True),
         tnow = datetime.now()
         _now = project.getCreationTime()
@@ -375,10 +377,11 @@ class ReportInflux:
                 localNow = tnow + timedelta(seconds=counter)
                 pointsDict['time'] = localNow # .strftime('%Y-%m-%dT%H:%M:%SZ')
                 self.client.write_points([pointsDict])
+                counter += 1
                 last_id += 1
-            self.confParser.set("gain", "lastId", str(last_id))
-            with open(self.confFileName, 'w') as confFile:
-                self.confParser.write(confFile)
+                self.confParser.set("gain", "lastId", str(last_id))
+                with open(self.confFileName, 'w') as confFile:
+                    self.confParser.write(confFile)
 
         # SYSTEM data
         last_id = self.confParser.getint("system", "lastId")
@@ -405,8 +408,7 @@ class ReportInflux:
             self.confParser.set("system", "lastId", str(last_id))
             with open(self.confFileName, 'w') as confFile:
                 self.confParser.write(confFile)
-        self.transferFiles()
-        return last_id # reportFinished
+        return self.transferFiles()
 
 
     def transferFiles(self):
@@ -483,7 +485,8 @@ class ReportInflux:
 
             elapsed_time = time.time() - start_time
             if elapsed_time > self.refreshSecs:
-                break
+                connect.close()
+                return False
             elif len(result) == 0:
                 break
         connect.close()

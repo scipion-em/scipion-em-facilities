@@ -83,7 +83,7 @@ class ProtMonitorCTF(ProtMonitor):
     # -------------------------- STEPS functions ------------------------------
     def monitorStep(self):
 
-        self.createMonitor().loop()
+        self.createMonitor().loop(startTime=self.initTime.datetime())
 
     def createMonitor(self):
 
@@ -152,6 +152,20 @@ class MonitorCTF(Monitor):
 
     def initLoop(self):
         self._createTable()
+        self.cur.execute(
+            "SELECT ctfID FROM %s WHERE ctfID IS NOT NULL" % self._tableName
+        )
+        self.readCTFs = {row[0] for row in self.cur.fetchall()}
+
+        self.cur.execute(
+            "SELECT MAX(defocusU), MIN(defocusV) FROM %s" % self._tableName
+        )
+        maxDefocus, minDefocus = self.cur.fetchone()
+        if maxDefocus is not None:
+            self.maxDefocus = max(self.maxDefocus, maxDefocus)
+        if minDefocus is not None:
+            self.minDefocus = min(self.minDefocus, minDefocus)
+
 
     def step(self):
         prot = getUpdatedProtocol(self.protocol)
@@ -159,7 +173,7 @@ class MonitorCTF(Monitor):
         if hasattr(prot, 'outputCTF'):
             CTFset = prot.outputCTF.getIdSet()
         else:
-            return False
+            return prot.getStatus() != STATUS_RUNNING
         # find difference
         sys.stdout.flush()
         diffSet = CTFset - self.readCTFs
@@ -233,6 +247,7 @@ class MonitorCTF(Monitor):
                    fitQuality, phaseShift,  micPath, psdPath, shiftPlotPath)
             try:
                 self.cur.execute(sql)
+                self.readCTFs.add(ctfID)
             except Exception as e:
                 print("ERROR: saving one data point (CTF monitor). I continue")
                 print(e)
@@ -252,7 +267,6 @@ class MonitorCTF(Monitor):
                              "minumum (%f)" % (defocusV, self.maxDefocus))
                 self.minDefocus = defocusV
 
-        self.readCTFs.update(diffSet)
         # Finish when protocol is not longer running
         return prot.getStatus() != STATUS_RUNNING
 
@@ -290,6 +304,7 @@ class MonitorCTF(Monitor):
         except Exception as e:
             print("MonitorCTF, ERROR reading data from db: %s" %
                   os.path.join(self.workingDir, self._dataBase))
+            return []
         # As we are using a row factory, fetchall returns a list of
         # dictionaries, each item in list(each dictionary)
         # represents a row of the table

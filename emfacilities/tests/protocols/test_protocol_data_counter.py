@@ -20,11 +20,13 @@
 # *  All comments concerning this program package may be sent to the
 # *  e-mail address 'scipion@cnb.csic.es'
 # ***************************************************************************/
+from datetime import datetime, timedelta
+from unittest.mock import patch
 from pyworkflow.tests import BaseTest, DataSet
 from pwem.protocols.protocol_import import ProtImportMicrographs
 from pyworkflow.object import Pointer
 import pyworkflow.tests as tests
-from emfacilities.protocols.protocol_data_counter import ProtDataCounter
+from emfacilities.protocols.protocol_data_counter import ProtDataCounter, OUTPUT
 
 
 class TestDataCounter(BaseTest):
@@ -52,6 +54,134 @@ class TestDataCounter(BaseTest):
         return protImport
 
 
+
+
+
+
+    def testDetectsNewInputWhenMtimeDoesNotChange(self):
+        class InputSet:
+            def getIdSet(self):
+                return {1, 2, 3, 4, 5, 6}
+
+            def isStreamClosed(self):
+                return False
+
+            def close(self):
+                pass
+
+        insertedBatches = []
+
+        prot = self.newProtocol(
+            ProtDataCounter,
+            outputSize=100,
+            boolTimer=False,
+        )
+        prot.finished = False
+        prot.inputFn = "input.sqlite"
+        prot.insertedIds = {1, 2, 3}
+        prot.processedIds = {1, 2, 3}
+        prot.isStreamClosed = False
+        prot.lastRound = False
+        prot.limitReach = False
+        prot.timerOut = False
+        prot.isContinued = lambda: False
+        prot._loadInputSet = lambda _: InputSet()
+        prot._getFirstJoinStep = lambda: None
+        prot.updateSteps = lambda: None
+
+        def insertNewImageSteps(newIds):
+            insertedBatches.append(list(newIds))
+            return []
+
+        prot._insertNewImageSteps = insertNewImageSteps
+
+        with patch(
+                "emfacilities.protocols.protocol_data_counter.os.path.getmtime",
+                return_value=0,
+        ):
+            prot._checkNewInput()
+
+        self.assertEqual(
+            insertedBatches,
+            [[4, 5, 6]],
+            "New logical Set items must be detected even when the sqlite "
+            "mtime does not change.",
+        )
+
+
+    def testTimeoutDaysUse24Hours(self):
+        prot = self.newProtocol(ProtDataCounter)
+
+        self.assertEqual(prot.getTimeOutInSeconds("1d"), 86400)
+        self.assertEqual(
+            prot.getTimeOutInSeconds("1d 2h 20m 15s"),
+            86400 + 2 * 3600 + 20 * 60 + 15,
+        )
+
+
+    def testTimerUsesPreservedProtocolStartOnContinue(self):
+        class SummaryVar:
+            def __init__(self):
+                self.value = None
+
+            def set(self, value):
+                self.value = value
+
+        prot = self.newProtocol(
+            ProtDataCounter,
+            outputSize=100,
+            boolTimer=True,
+            timeout="10s",
+        )
+        prot.finished = False
+        prot.timerOut = False
+        prot.timeoutSecs = 10
+        prot.lastTimeCheckTimer = datetime.now()
+        prot.summaryVar = SummaryVar()
+        prot.initTime.set(datetime.now() - timedelta(seconds=7))
+
+        prot.timerStep()
+
+        self.assertFalse(prot.timerOut)
+        self.assertLessEqual(
+            prot.timeoutSecs,
+            3,
+            "Continue must preserve the elapsed timer budget from the original run.",
+        )
+
+
+    def testTimerExpiresWithoutNewInput(self):
+        class SummaryVar:
+            def __init__(self):
+                self.value = None
+
+            def set(self, value):
+                self.value = value
+
+        prot = self.newProtocol(
+            ProtDataCounter,
+            outputSize=100,
+            boolTimer=True,
+            timeout="10s",
+        )
+        prot.finished = False
+        prot.timerOut = False
+        prot.timeoutSecs = 10
+        prot.lastTimeCheckTimer = datetime.now() - timedelta(seconds=11)
+        prot.summaryVar = SummaryVar()
+
+        # Simulate an idle streaming round: no new input and no new output.
+        prot._checkNewInput = lambda: None
+        prot._checkNewOutput = lambda: None
+
+        prot._stepsCheck()
+
+        self.assertTrue(
+            prot.timerOut,
+            "The timer must expire even when no new input batch arrives.",
+        )
+
+
     def testDataCounter2000(self):
         prot = self._runDataCounter("Counter images till 1", outputSize=1)
         self.assertSetSize(prot.outputSet, size=1)
@@ -70,3 +200,83 @@ class TestDataCounter(BaseTest):
         cls.launchProtocol(protDataSampler)
 
         return protDataSampler
+
+
+class TestDataCounterLoadOutputSet(tests.unittest.TestCase):
+    """Lightweight regression tests that need no real project/dataset."""
+
+    def testLoadOutputSetReusesLogicalOutputWithoutBackingFile(self):
+        # Regression test: an output that Scipion already knows about
+        # (protocol.outputSet) must be reused even when its backing file
+        # was never materialized on disk yet. Falling through to "no
+        # backing file -> build a fresh, empty Set" would silently discard
+        # whatever was already appended to the real logical output.
+        prot = ProtDataCounter()
+
+        class ExistingOutputSet:
+            def __init__(self):
+                self.enableAppendCalls = 0
+                self.copiedFrom = None
+
+            def enableAppend(self):
+                self.enableAppendCalls += 1
+
+            def copyInfo(self, inputs):
+                self.copiedFrom = inputs
+
+        existingOutputSet = ExistingOutputSet()
+        prot.outputSet = existingOutputSet
+
+        with patch(
+                "emfacilities.protocols.protocol_data_counter.os.path.exists",
+                return_value=False,
+        ):
+            outputSet = prot._loadOutputSet(
+                object, "images.sqlite", outputName=OUTPUT
+            )
+
+        self.assertIs(existingOutputSet, outputSet)
+        self.assertEqual(1, existingOutputSet.enableAppendCalls)
+
+class TestDataCounterInputSetLifecycleRegression(tests.unittest.TestCase):
+    def testCheckNewOutputClosesInputSetWhenThereIsNoNewOutput(self):
+        class _Value:
+            def get(self):
+                return 100
+
+        class _InputSet:
+            def __init__(self):
+                self.closed = False
+
+            def getSize(self):
+                return 3
+
+            def close(self):
+                self.closed = True
+
+        class _Harness:
+            finished = False
+            processedIds = set()
+            isStreamClosed = False
+            timerOut = False
+            outputSize = _Value()
+
+            def __init__(self):
+                self.inputFn = "input.sqlite"
+                self.inputSet = _InputSet()
+
+            def _getAllDoneIds(self):
+                return [], 0
+
+            def _loadInputSet(self, inputFn):
+                return self.inputSet
+
+        protocol = _Harness()
+
+        ProtDataCounter._checkNewOutput(protocol)
+
+        self.assertTrue(
+            protocol.inputSet.closed,
+            "The input Set opened by _checkNewOutput must be closed "
+            "even when there is no new output to publish.",
+        )
