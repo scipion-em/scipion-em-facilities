@@ -1,3 +1,4 @@
+from .protocol_streaming_base import ProtFacilitiesStreamingBase
 
 from .protocol_OSCEM_metadata import ProtOSCEM
 from .protocol_data_counter import ProtDataCounter

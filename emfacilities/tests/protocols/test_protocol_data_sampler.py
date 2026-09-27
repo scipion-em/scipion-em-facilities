@@ -46,8 +46,10 @@ class _SamplerValue:
 
 
 class _SamplerInputSet:
-    def getIdSet(self):
-        return {1, 2, 3, 4, 5, 6}
+    def getUniqueValues(self, attributes, where=None):
+        # Continue starts discovery again from watermark 0 and reconciles
+        # these discovered IDs with persisted/runtime state.
+        return [1, 2, 3, 4, 5, 6]
 
     def isStreamClosed(self):
         return False
@@ -84,6 +86,8 @@ class TestDataSampler(BaseTest):
         prot.insertedIds = set()
         prot.processedIds = set()
         prot.sampleIds = set()
+        prot._lastInputId = 0
+        prot._pendingInputIds = []
         prot.isStreamClosed = False
         prot._steps = steps
         prot.isContinued = lambda: True
@@ -165,8 +169,9 @@ class TestDataSampler(BaseTest):
 
     def testDetectsNewInputWhenMtimeDoesNotChange(self):
         class InputSet:
-            def getIdSet(self):
-                return {1, 2, 3, 4, 5, 6}
+            def getUniqueValues(self, attributes, where=None):
+                self.query = (attributes, where)
+                return [4, 5, 6]
 
             def isStreamClosed(self):
                 return False
@@ -185,6 +190,8 @@ class TestDataSampler(BaseTest):
         prot.insertedIds = {1, 2, 3}
         prot.processedIds = {1, 2, 3}
         prot.sampleIds = {2}
+        prot._lastInputId = 3
+        prot._pendingInputIds = []
         prot.isStreamClosed = False
         prot.isContinued = lambda: False
         prot._loadInputSet = lambda _: InputSet()
@@ -360,3 +367,224 @@ class TestDataSamplerFinalizationRegression(tests.unittest.TestCase):
 
         protocol._checkNewInput.assert_not_called()
         protocol._checkNewOutput.assert_not_called()
+
+
+class TestDataSamplerBackendIndependence(tests.unittest.TestCase):
+    def testInputSetAccessUsesLogicalPointerWithoutBackingFilename(self):
+        class _ForbiddenSetConstructor:
+            def __init__(self, *args, **kwargs):
+                raise AssertionError(
+                    "DataSampler must not reconstruct the input Set from a backing filename."
+                )
+
+        class _LogicalInputSet:
+            def __init__(self):
+                self.loadCalls = 0
+
+            def isStreamClosed(self):
+                return False
+
+            def getClass(self):
+                return _ForbiddenSetConstructor
+
+            def getClassName(self):
+                return "SetOfMicrographs"
+
+            def getFileName(self):
+                raise AssertionError(
+                    "DataSampler must not require a backing filename for the logical input Set."
+                )
+
+            def loadAllProperties(self):
+                self.loadCalls += 1
+
+        class _Pointer:
+            def __init__(self, value):
+                self.value = value
+
+            def get(self):
+                return self.value
+
+        logicalInput = _LogicalInputSet()
+        protocol = ProtDataSampler()
+        protocol.inputImages = _Pointer(logicalInput)
+
+        protocol.initializeParams()
+
+        loadedInput = protocol._loadInputSet("must-not-be-used.sqlite")
+
+        self.assertIs(logicalInput, loadedInput)
+        self.assertEqual(1, logicalInput.loadCalls)
+
+
+class TestDataSamplerStreamingScalability(tests.unittest.TestCase):
+    def testIncrementalDiscoveryKeepsPartialBatchAcrossPolls(self):
+        class _Value:
+            def __init__(self, value):
+                self.value = value
+
+            def get(self):
+                return self.value
+
+        class _InputSet:
+            def __init__(self):
+                self.poll = 0
+                self.uniqueCalls = []
+                self.closed = 0
+
+            def getIdSet(self):
+                raise AssertionError(
+                    "DataSampler must not fetch the complete input ID set on every poll."
+                )
+
+            def getUniqueValues(self, attributes, where=None):
+                self.uniqueCalls.append((attributes, where))
+                self.poll += 1
+                if self.poll == 1:
+                    return [4, 5]
+                if self.poll == 2:
+                    return [6]
+                return []
+
+            def isStreamClosed(self):
+                return False
+
+            def close(self):
+                self.closed += 1
+
+        class _Harness:
+            insertedIds = {1, 2, 3}
+            processedIds = {1, 2, 3}
+            sampleIds = {2}
+            isStreamClosed = False
+            _lastInputId = 3
+            _pendingInputIds = []
+            batchSize = _Value(3)
+
+            def __init__(self):
+                self.inputSet = _InputSet()
+                self.insertedBatches = []
+
+            def _loadInputSet(self, _):
+                return self.inputSet
+
+            def _getFirstJoinStep(self):
+                return None
+
+            def isContinued(self):
+                return False
+
+            def _insertNewImageSteps(self, newIds, batchSize):
+                self.insertedBatches.append(list(newIds))
+                self.insertedIds.update(newIds)
+                return []
+
+            def updateSteps(self):
+                pass
+
+        protocol = _Harness()
+
+        ProtDataSampler._checkNewInput(protocol)
+
+        self.assertEqual([], protocol.insertedBatches)
+        self.assertEqual([4, 5], protocol._pendingInputIds)
+        self.assertEqual(5, protocol._lastInputId)
+
+        ProtDataSampler._checkNewInput(protocol)
+
+        self.assertEqual([[4, 5, 6]], protocol.insertedBatches)
+        self.assertEqual([], protocol._pendingInputIds)
+        self.assertEqual(6, protocol._lastInputId)
+        self.assertEqual(
+            [("id", "id > 3"), ("id", "id > 5")],
+            protocol.inputSet.uniqueCalls,
+        )
+        self.assertEqual(2, protocol.inputSet.closed)
+
+
+class TestDataSamplerOutputPollingScalability(tests.unittest.TestCase):
+    def testOutputPollingUsesSizesAndPendingSamples(self):
+        class _Image:
+            def __init__(self, objId):
+                self.objId = objId
+
+            def clone(self):
+                return _Image(self.objId)
+
+        class _InputSet:
+            def __init__(self):
+                self.closed = False
+
+            def getSize(self):
+                return 5
+
+            def getIdSet(self):
+                raise AssertionError(
+                    "_checkNewOutput must not materialize every input ID."
+                )
+
+            def getItem(self, field, value):
+                return _Image(value)
+
+            def close(self):
+                self.closed = True
+
+        class _OutputSet:
+            STREAM_OPEN = 1
+            STREAM_CLOSED = 2
+
+            def __init__(self):
+                self.ids = [2]
+
+            def getSize(self):
+                return len(self.ids)
+
+            def getIdSet(self):
+                raise AssertionError(
+                    "_checkNewOutput must not rescan every persisted output ID."
+                )
+
+            def append(self, image):
+                self.ids.append(image.objId)
+
+        class _Harness:
+            finished = False
+            isStreamClosed = True
+            processedIds = {1, 2, 3, 4, 5}
+            # Pending sampled IDs only: ID 2 is already persisted.
+            sampleIds = {4, 5}
+            _inputClass = object
+            _baseName = "images.sqlite"
+
+            def __init__(self):
+                self.inputSet = _InputSet()
+                self.outputSet = _OutputSet()
+                self.updatedMode = None
+
+            def _getAllDoneIds(self):
+                return ProtDataSampler._getAllDoneIds(self)
+
+            def _loadInputSet(self, _):
+                return self.inputSet
+
+            def _loadOutputSet(self, SetClass, baseName, outputName=None):
+                return self.outputSet
+
+            def _updateOutputSet(self, outputName, outputSet, streamMode):
+                self.updatedMode = streamMode
+
+            def _getFirstJoinStep(self):
+                return None
+
+            def _store(self):
+                pass
+
+        protocol = _Harness()
+
+        ProtDataSampler._checkNewOutput(protocol)
+
+        self.assertTrue(protocol.finished)
+        self.assertEqual([2, 4, 5], protocol.outputSet.ids)
+        self.assertEqual(set(), protocol.sampleIds)
+        self.assertEqual(protocol.outputSet.STREAM_CLOSED, protocol.updatedMode)
+        self.assertTrue(protocol.inputSet.closed)

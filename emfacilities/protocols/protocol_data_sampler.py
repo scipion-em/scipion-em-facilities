@@ -85,9 +85,13 @@ class ProtDataSampler(EMProtocol):
         self.insertedIds = set()   # Contains images that have been inserted in a Step (checkNewInput).
         self.processedIds = set() # Ids to be register to output
         self.sampleIds = set() # Ids to be output
+        # Discovery state is independent from completion state. The watermark
+        # only says which input IDs have already been inspected; a partial
+        # batch must remain pending until enough items arrive.
+        self._lastInputId = 0
+        self._pendingInputIds = []
         self.isStreamClosed = self.inputImages.get().isStreamClosed()
         # Contains images that have been processed in a Step (checkNewOutput).
-        self.inputFn = self.inputImages.get().getFileName()
         self._inputClass = self.inputImages.get().getClass()
         self._inputType = self.inputImages.get().getClassName().split('SetOf')[1]
         self._baseName = '%s.sqlite' % self._inputType.lower()
@@ -113,35 +117,58 @@ class ProtDataSampler(EMProtocol):
         self._checkNewOutput()
 
     def _checkNewInput(self):
-        # Always inspect the logical input set. Backing-file mtimes are not
-        # a reliable change detector for streamed logical Set contents.
-        inputSet = self._loadInputSet(self.inputFn)
-        inputSetIds = inputSet.getIdSet()
+        # Discover only IDs newer than the current watermark. The watermark is
+        # not completion state: IDs that do not yet fill a batch are retained
+        # separately in _pendingInputIds.
+        inputSet = self._loadInputSet(None)
+        try:
+            where = 'id > %d' % self._lastInputId
+            discoveredIds = list(inputSet.getUniqueValues('id', where=where))
+            if discoveredIds:
+                self._lastInputId = max(discoveredIds)
 
-        self.isStreamClosed = inputSet.isStreamClosed()
-        inputSet.close()
+            self.isStreamClosed = inputSet.isStreamClosed()
+        finally:
+            inputSet.close()
 
         outputStep = self._getFirstJoinStep()
 
         if self.isContinued() and not self.insertedIds:
             doneIds, _ = self._getAllDoneIds()
             self._restoreRuntimeStateFromFinishedSteps(doneIds)
-            skipIds = list(set(inputSetIds).intersection(self.insertedIds))
+            skipIds = list(set(discoveredIds).intersection(self.insertedIds))
             self.info("Skipping Images with ID: %s, seems to be done" % skipIds)
 
-        newIds = [
+        pendingIds = [
             imageId
-            for imageId in inputSetIds
+            for imageId in self._pendingInputIds
             if imageId not in self.insertedIds
         ]
+        pendingSet = set(pendingIds)
+        for imageId in discoveredIds:
+            if imageId not in self.insertedIds and imageId not in pendingSet:
+                pendingIds.append(imageId)
+                pendingSet.add(imageId)
 
-        # Now handle the steps depending on the streaming batch size
+        self._pendingInputIds = pendingIds
+
+        # Now handle the steps depending on the streaming batch size.
         batchSize = self.batchSize.get()
-        if len(newIds) < batchSize and not self.isStreamClosed:
+        if len(self._pendingInputIds) < batchSize and not self.isStreamClosed:
             return
 
-        if newIds:
-            fDeps = self._insertNewImageSteps(newIds, batchSize)
+        if self._pendingInputIds:
+            fDeps = self._insertNewImageSteps(
+                list(self._pendingInputIds),
+                batchSize,
+            )
+            # _insertNewImageSteps updates insertedIds only for batches that
+            # were actually scheduled. Keep any incomplete remainder pending.
+            self._pendingInputIds = [
+                imageId
+                for imageId in self._pendingInputIds
+                if imageId not in self.insertedIds
+            ]
             if outputStep is not None:
                 outputStep.addPrerequisites(*fDeps)
             self.updateSteps()
@@ -152,7 +179,7 @@ class ProtDataSampler(EMProtocol):
         doneIdSet = set(doneListIds)
         newDone = list(self.sampleIds - doneIdSet)
 
-        inputSet = self._loadInputSet(self.inputFn)
+        inputSet = self._loadInputSet(None)
         try:
             inputSetIds = set(inputSet.getIdSet())
             self.finished = (
@@ -184,9 +211,10 @@ class ProtDataSampler(EMProtocol):
         self._store()
 
 
-    def _loadInputSet(self, inputFn):
-        self.debug("Loading input db: %s" % inputFn)
-        inputSet = self._inputClass(filename=inputFn)
+    def _loadInputSet(self, inputFn=None):
+        # Refresh the logical input Set instead of reconstructing it from
+        # a backend-specific backing filename.
+        inputSet = self.inputImages.get()
         inputSet.loadAllProperties()
         return inputSet
 

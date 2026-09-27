@@ -29,20 +29,19 @@ import time
 import copy
 import re
 
-from pwem.protocols import EMProtocol
+from .protocol_streaming_base import ProtFacilitiesStreamingBase
 from pwem.objects import SetOfImages, Set
 
 from pyworkflow import VERSION_3_0
 import pyworkflow.protocol.params as params
 import pyworkflow.utils as pwutils
 from pyworkflow import UPDATED, NEW
-from pyworkflow.protocol.constants import STATUS_NEW
-
 
 
 OUTPUT = "outputSet"
 
-class ProtDataCounter(EMProtocol):
+
+class ProtDataCounter(ProtFacilitiesStreamingBase):
     """
     Protocol to make a subset of images from the original one. Waits until certain number of images is prepared and then send them to output.
     It can works in 2 ways:
@@ -58,9 +57,8 @@ class ProtDataCounter(EMProtocol):
     _lastUpdateVersion = VERSION_3_0
     _possibleOutputs = {OUTPUT: SetOfImages}
 
-
     def __init__(self, **args):
-        EMProtocol.__init__(self, **args)
+        ProtFacilitiesStreamingBase.__init__(self, **args)
 
     def _defineParams(self, form):
         form.addSection(label='Input')
@@ -86,14 +84,23 @@ class ProtDataCounter(EMProtocol):
                            '{minutes}m {seconds}s separated by spaces '
                            'e.g: 1d 2h 20m 15s,  10m 3s, 1h, 20s or 25.')
 
+        self._defineStreamingParams(form)
+        form.addParallelSection(threads=3, mpi=1)
 
 # --------------------------- INSERT steps functions -------------------------
-    def _insertAllSteps(self):
+    def stepsGeneratorStep(self):
         self.initializeParams()
-        self._insertFunctionStep(self.createOutputStep,
-                                 prerequisites=[], wait=True, needsGPU=False)
 
-    def createOutputStep(self):
+        while not self.finished:
+            if self.boolTimer.get() and not self.timerOut:
+                self.timerStep()
+
+            self._checkNewInput()
+            self._checkNewOutput()
+
+            if not self.finished:
+                self._streamingSleepOnWait()
+
         self._closeOutputSet()
 
     def initializeParams(self):
@@ -101,9 +108,11 @@ class ProtDataCounter(EMProtocol):
         # Important to have both:
         self.insertedIds = set() # Contains images that have been inserted in a Step (checkNewInput).
         self.processedIds = set() # Ids to be output
+        # Discovery watermark only. It is intentionally rebuilt from zero on
+        # Continue; persisted outputs remain the source of truth for completion.
+        self._lastInputId = 0
         self.isStreamClosed = self.inputImages.get().isStreamClosed()
         # Contains images that have been processed in a Step (checkNewOutput).
-        self.inputFn = self.inputImages.get().getFileName()
         self._inputClass = self.inputImages.get().getClass()
         self._inputType = self.inputImages.get().getClassName().split('SetOf')[1]
         self._baseName = '%s.sqlite' % self._inputType.lower()
@@ -112,27 +121,6 @@ class ProtDataCounter(EMProtocol):
         self.timeoutSecs = self.getTimeOutInSeconds(self.timeout.get())
         self.lastTimeCheckTimer = datetime.now() # Timer
         self.lastRound = False
-
-    def _getFirstJoinStepName(self):
-        # This function will be used for streaming, to check which is
-        # the first function that need to wait for all ctfs
-        # to have completed, this can be overriden in subclasses
-        # (e.g., in Xmipp 'sortPSDStep')
-        return 'createOutputStep'
-
-    def _getFirstJoinStep(self):
-        for s in self._steps:
-            if s.funcName == self._getFirstJoinStepName():
-                return s
-        return None
-
-    def _stepsCheck(self):
-        if self.boolTimer.get() and not self.finished and not self.timerOut:
-            self.timerStep()
-
-        self._checkNewInput()
-        self._checkNewOutput()
-
 
     def _checkNewInput(self):
         # Check if there are new images to process from the input set
@@ -145,17 +133,15 @@ class ProtDataCounter(EMProtocol):
             self.info("Last round sleeping for 10 seconds to allow all the input to be loaded")
             time.sleep(10) # Needs to make sure that eventhough the stream is closed all the data in the inputset is loaded
 
-        inputSet = self._loadInputSet(self.inputFn)
-        inputSetIds = inputSet.getIdSet()
-        newIds = [idImage for idImage in inputSetIds if idImage not in self.insertedIds]
+        inputSet = self._loadInputSet(None)
+        try:
+            newIds, self._lastInputId = self._discoverIdsAfter(inputSet, self._lastInputId)
 
-        self.lastCheck = datetime.now()
-        self.isStreamClosed = inputSet.isStreamClosed()
-        self.lastRound = self.isStreamClosed
-
-        inputSet.close()
-
-        outputStep = self._getFirstJoinStep()
+            self.lastCheck = datetime.now()
+            self.isStreamClosed = inputSet.isStreamClosed()
+            self.lastRound = self.isStreamClosed
+        finally:
+            inputSet.close()
 
         if self.isContinued() and not self.insertedIds:  # For "Continue" action and the first round
             doneIds, _ = self._getAllDoneIds()
@@ -165,23 +151,24 @@ class ProtDataCounter(EMProtocol):
             self.insertedIds = set(doneIds) # During the first round of "Continue" action it has to be filled
 
         if newIds and not self.limitReach and not self.timerOut:
-            fDeps = self._insertNewImageSteps(newIds)
-            if outputStep is not None:
-                outputStep.addPrerequisites(*fDeps)
-            self.updateSteps()
+            self._insertNewImageSteps(newIds)
 
     def _checkNewOutput(self):
         if self.finished:
             return
 
-        doneListIds, currentOutputSize = self._getAllDoneIds()
-        # Make doneListIds a set for fast lookups
-        doneSet = set(doneListIds)
-        newDone = self.processedIds - doneSet
-        allDone = len(doneListIds) + len(newDone)
+        # During normal polling processedIds is only the in-memory queue of
+        # items whose processing step finished but whose output has not yet
+        # been committed. Avoid rebuilding the complete persisted ID set here:
+        # Continue performs that reconciliation separately in _checkNewInput.
+        currentOutputSize = (
+            self.outputSet.getSize() if hasattr(self, OUTPUT) else 0
+        )
+        newDone = set(self.processedIds)
+        allDone = currentOutputSize + len(newDone)
         limitOutputSize = self.outputSize.get()
 
-        inputSet = self._loadInputSet(self.inputFn)
+        inputSet = self._loadInputSet(None)
         try:
             maxSize = inputSet.getSize()
             self.limitReach = allDone >= limitOutputSize
@@ -200,9 +187,11 @@ class ProtDataCounter(EMProtocol):
                                             outputName=OUTPUT)
 
             if currentOutputSize < limitOutputSize:
+                persistedNow = set()
                 for imageId in newDone:
                     image = inputSet.getItem("id", imageId).clone()
                     outputSet.append(image)
+                    persistedNow.add(imageId)
                     currentOutputSize += 1
                     if currentOutputSize == limitOutputSize:
                         self.finished = True
@@ -211,21 +200,16 @@ class ProtDataCounter(EMProtocol):
                 streamMode = Set.STREAM_CLOSED if self.finished else Set.STREAM_OPEN
 
                 self._updateOutputSet(OUTPUT, outputSet, streamMode)
+                # Only forget pending IDs after the output update succeeds.
+                # If persistence raises, they remain queued for retry.
+                self.processedIds.difference_update(persistedNow)
         finally:
             inputSet.close()
 
-        if self.finished:  # Unlock createOutputStep if finished all jobs
-            outputStep = self._getFirstJoinStep()
-            if outputStep and outputStep.isWaiting():
-                outputStep.setStatus(STATUS_NEW)
-
         self._store()
 
-    def _loadInputSet(self, inputFn):
-        self.debug("Loading input db: %s" % inputFn)
-        inputSet = self._inputClass(filename=inputFn)
-        inputSet.loadAllProperties()
-        return inputSet
+    def _loadInputSet(self, inputFn=None):
+        return self._loadLogicalSet(self.inputImages)
 
     def _loadOutputSet(self, SetClass, baseName, outputName=None):
         # Reuse the logical output Scipion already knows about before
