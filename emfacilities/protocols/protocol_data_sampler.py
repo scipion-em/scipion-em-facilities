@@ -34,15 +34,14 @@ from pyworkflow import VERSION_3_0
 from pwem.objects import SetOfImages, Set
 import pyworkflow.protocol.params as params
 
-from pwem.protocols import EMProtocol
+from .protocol_streaming_base import ProtFacilitiesStreamingBase
 from pyworkflow import UPDATED, NEW
-from pyworkflow.protocol.constants import STATUS_NEW
-
 
 
 OUTPUT = "outputSet"
 
-class ProtDataSampler(EMProtocol):
+
+class ProtDataSampler(ProtFacilitiesStreamingBase):
     """
     Protocol to make a subset of images from the original one.
     Waits until certain batch of images is prepared, then it samples a percentage of it and send them to output.
@@ -55,7 +54,7 @@ class ProtDataSampler(EMProtocol):
 
 
     def __init__(self, **args):
-        EMProtocol.__init__(self, **args)
+        ProtFacilitiesStreamingBase.__init__(self, **args)
 
     def _defineParams(self, form):
         form.addSection(label='Input')
@@ -69,14 +68,20 @@ class ProtDataSampler(EMProtocol):
                       label='Sampling proportion',
                       help='What proportion of images need to be output from '
                            'the random sampling (1 means all images and 0 means none).')
+        self._defineStreamingParams(form)
+        form.addParallelSection(threads=3, mpi=1)
 
 # --------------------------- INSERT steps functions -------------------------
-    def _insertAllSteps(self):
+    def stepsGeneratorStep(self):
         self.initializeParams()
-        self._insertFunctionStep(self.createOutputStep,
-                                 prerequisites=[], wait=True, needsGPU=False)
 
-    def createOutputStep(self):
+        while not self.finished:
+            self._checkNewInput()
+            self._checkNewOutput()
+
+            if not self.finished:
+                self._streamingSleepOnWait()
+
         self._closeOutputSet()
 
     def initializeParams(self):
@@ -96,42 +101,17 @@ class ProtDataSampler(EMProtocol):
         self._inputType = self.inputImages.get().getClassName().split('SetOf')[1]
         self._baseName = '%s.sqlite' % self._inputType.lower()
 
-    def _getFirstJoinStepName(self):
-        # This function will be used for streaming, to check which is
-        # the first function that need to wait for all ctfs
-        # to have completed, this can be overriden in subclasses
-        # (e.g., in Xmipp 'sortPSDStep')
-        return 'createOutputStep'
-
-    def _getFirstJoinStep(self):
-        for s in self._steps:
-            if s.funcName == self._getFirstJoinStepName():
-                return s
-        return None
-
-    def _stepsCheck(self):
-        if getattr(self, 'finished', False):
-            return
-
-        self._checkNewInput()
-        self._checkNewOutput()
-
     def _checkNewInput(self):
         # Discover only IDs newer than the current watermark. The watermark is
         # not completion state: IDs that do not yet fill a batch are retained
         # separately in _pendingInputIds.
         inputSet = self._loadInputSet(None)
         try:
-            where = 'id > %d' % self._lastInputId
-            discoveredIds = list(inputSet.getUniqueValues('id', where=where))
-            if discoveredIds:
-                self._lastInputId = max(discoveredIds)
+            discoveredIds, self._lastInputId = self._discoverIdsAfter(inputSet, self._lastInputId)
 
             self.isStreamClosed = inputSet.isStreamClosed()
         finally:
             inputSet.close()
-
-        outputStep = self._getFirstJoinStep()
 
         if self.isContinued() and not self.insertedIds:
             doneIds, _ = self._getAllDoneIds()
@@ -158,7 +138,7 @@ class ProtDataSampler(EMProtocol):
             return
 
         if self._pendingInputIds:
-            fDeps = self._insertNewImageSteps(
+            self._insertNewImageSteps(
                 list(self._pendingInputIds),
                 batchSize,
             )
@@ -169,54 +149,57 @@ class ProtDataSampler(EMProtocol):
                 for imageId in self._pendingInputIds
                 if imageId not in self.insertedIds
             ]
-            if outputStep is not None:
-                outputStep.addPrerequisites(*fDeps)
-            self.updateSteps()
-
 
     def _checkNewOutput(self):
-        doneListIds, currentOutputSize = self._getAllDoneIds()
-        doneIdSet = set(doneListIds)
-        newDone = list(self.sampleIds - doneIdSet)
+        # samplingStep publishes sampleIds before processedIds. Snapshot the
+        # completion state first and the pending samples second, so one polling
+        # round cannot combine newer completion with older sampling state.
+        processedIds = set(self.processedIds)
+        pendingSampleIds = set(self.sampleIds)
 
         inputSet = self._loadInputSet(None)
         try:
-            inputSetIds = set(inputSet.getIdSet())
+            inputSize = inputSet.getSize()
             self.finished = (
                 self.isStreamClosed
-                and inputSetIds.issubset(self.processedIds)
+                and len(processedIds) == inputSize
             )
 
-            streamMode = Set.STREAM_CLOSED if self.finished else Set.STREAM_OPEN
-
-            if not self.finished and not newDone:
+            if not self.finished and not pendingSampleIds:
                 return
 
-            outputSet = self._loadOutputSet(self._inputClass, self._baseName,
-                                            outputName=OUTPUT)
+            streamMode = (
+                Set.STREAM_CLOSED
+                if self.finished
+                else Set.STREAM_OPEN
+            )
 
-            for imageId in newDone:
+            outputSet = self._loadOutputSet(
+                self._inputClass,
+                self._baseName,
+                outputName=OUTPUT,
+            )
+
+            for imageId in pendingSampleIds:
                 image = inputSet.getItem("id", imageId).clone()
                 outputSet.append(image)
 
-            self._updateOutputSet(OUTPUT, outputSet, streamMode)
+            # sampleIds means "sampled but not yet persisted". Drain it only
+            # after Scipion has successfully persisted the updated output.
+            self._updateOutputSet(
+                OUTPUT,
+                outputSet,
+                streamMode,
+            )
+            self.sampleIds.difference_update(pendingSampleIds)
         finally:
             inputSet.close()
-
-        if self.finished:
-            outputStep = self._getFirstJoinStep()
-            if outputStep and outputStep.isWaiting():
-                outputStep.setStatus(STATUS_NEW)
 
         self._store()
 
 
     def _loadInputSet(self, inputFn=None):
-        # Refresh the logical input Set instead of reconstructing it from
-        # a backend-specific backing filename.
-        inputSet = self.inputImages.get()
-        inputSet.loadAllProperties()
-        return inputSet
+        return self._loadLogicalSet(self.inputImages)
 
     def _loadOutputSet(self, SetClass, baseName, outputName=None):
         # Reuse the logical output Scipion already knows about before
@@ -261,7 +244,6 @@ class ProtDataSampler(EMProtocol):
 
     def _restoreRuntimeStateFromFinishedSteps(self, doneIds):
         doneIds = set(doneIds)
-        self.sampleIds.update(doneIds)
         self.insertedIds.update(doneIds)
         self.processedIds.update(doneIds)
 
@@ -320,13 +302,13 @@ class ProtDataSampler(EMProtocol):
                     sampledIds.update(state.get("sampledIds", []))
                     break
 
-            # Old runs did not persist the pending random selection.
-            # Samples already published are still recoverable from the output.
-            sampledIds.update(processedIds.intersection(doneIds))
+            # sampleIds is a pending-persistence queue. Anything already in
+            # doneIds is durable output and must not be queued again.
+            pendingSampleIds = sampledIds.difference(doneIds)
 
             self.insertedIds.update(processedIds)
             self.processedIds.update(processedIds)
-            self.sampleIds.update(sampledIds)
+            self.sampleIds.update(pendingSampleIds)
 
     def _getSamplingStateFile(self, newIds):
         batchKey = hashlib.sha256(
@@ -364,14 +346,16 @@ class ProtDataSampler(EMProtocol):
             if os.path.exists(tmpStateFile):
                 os.remove(tmpStateFile)
 
-        self.processedIds.update(newIds)
+        # Publish the sampled selection before marking the batch complete.
+        # The streaming generator may observe processedIds concurrently and
+        # use it as the completion signal for output persistence.
         self.sampleIds.update(sampledIds)
+        self.processedIds.update(newIds)
 
         self.info('From %d new images, %d were random sampled with a proportion of %.2f'
                   % (len(newIds), len(sampledIds), proportion))
 
         return stateFile
-
 
     # ------------------------- UTILS functions --------------------------------
     def _getAllDoneIds(self):

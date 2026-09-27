@@ -268,7 +268,11 @@ class TestDataSampler(BaseTest):
         self.assertEqual(insertedBatches, [[4, 5, 6]])
         self.assertEqual(prot.insertedIds, {1, 2, 3})
         self.assertEqual(prot.processedIds, {1, 2, 3})
-        self.assertEqual(prot.sampleIds, {2})
+        self.assertEqual(
+            prot.sampleIds,
+            set(),
+            "Persisted doneIds must not be restored as pending samples.",
+        )
 
 
     def testClosedStreamFinishesAfterAllInputWasProcessed(self):
@@ -286,11 +290,12 @@ class TestDataSampler(BaseTest):
         prot.finished = False
         prot.isStreamClosed = True
         prot.processedIds = {1, 2, 3, 4, 5, 6}
-        prot.sampleIds = {1, 4}
+        # IDs 1 and 4 are already persisted output; sampleIds contains only
+        # samples still pending persistence.
+        prot.sampleIds = set()
         prot.inputFn = 'input.sqlite'
         prot._inputClass = object
         prot._baseName = 'images.sqlite'
-        prot._getAllDoneIds = lambda: ([1, 4], 2)
         prot._loadInputSet = lambda _: InputSet()
         prot._loadOutputSet = lambda *args, **kwargs: object()
         prot._updateOutputSet = lambda *args, **kwargs: None
@@ -314,6 +319,45 @@ class TestDataSampler(BaseTest):
         cls.launchProtocol(protDataSampler)
 
         return protDataSampler
+
+
+    def testSamplingStepPublishesCompletionAfterSampleState(self):
+        prot = self.newProtocol(
+            ProtDataSampler,
+            batchSize=3,
+            samplingProportion=0.5,
+        )
+        prot.sampleIds = set()
+
+        stateFile = prot._getSamplingStateFile([1, 2, 3])
+        if os.path.exists(stateFile):
+            os.remove(stateFile)
+
+        class _ProcessedIds(set):
+            def update(innerSelf, values):
+                self.assertEqual(
+                    {2},
+                    prot.sampleIds,
+                    "sampleIds must be published before processedIds marks "
+                    "the batch complete.",
+                )
+                self.assertTrue(
+                    os.path.exists(stateFile),
+                    "The sampling state must be durable before processedIds "
+                    "marks the batch complete.",
+                )
+                super(_ProcessedIds, innerSelf).update(values)
+
+        prot.processedIds = _ProcessedIds()
+
+        with patch(
+                "emfacilities.protocols.protocol_data_sampler.sample_proportion",
+                return_value=[2],
+        ):
+            prot.samplingStep([1, 2, 3])
+
+        self.assertEqual({1, 2, 3}, prot.processedIds)
+        self.assertEqual({2}, prot.sampleIds)
 
 
 class TestDataSamplerLoadOutputSet(tests.unittest.TestCase):
@@ -353,20 +397,24 @@ class TestDataSamplerLoadOutputSet(tests.unittest.TestCase):
         self.assertEqual(1, existingOutputSet.enableAppendCalls)
 
 class TestDataSamplerFinalizationRegression(tests.unittest.TestCase):
-    def testFinishedStepsCheckDoesNotTouchInputOrOutput(self):
+    def testFinishedGeneratorDoesNotPollInputOrOutput(self):
         class _Harness:
-            finished = True
-
             def __init__(self):
+                self.finished = False
                 self._checkNewInput = Mock()
                 self._checkNewOutput = Mock()
+                self._closeOutputSet = Mock()
+
+            def initializeParams(self):
+                self.finished = True
 
         protocol = _Harness()
 
-        ProtDataSampler._stepsCheck(protocol)
+        ProtDataSampler.stepsGeneratorStep(protocol)
 
         protocol._checkNewInput.assert_not_called()
         protocol._checkNewOutput.assert_not_called()
+        protocol._closeOutputSet.assert_called_once_with()
 
 
 class TestDataSamplerBackendIndependence(tests.unittest.TestCase):
@@ -467,6 +515,13 @@ class TestDataSamplerStreamingScalability(tests.unittest.TestCase):
 
             def _loadInputSet(self, _):
                 return self.inputSet
+
+            def _discoverIdsAfter(self, inputSet, lastId):
+                return ProtDataSampler._discoverIdsAfter(
+                    self,
+                    inputSet,
+                    lastId,
+                )
 
             def _getFirstJoinStep(self):
                 return None
@@ -588,3 +643,75 @@ class TestDataSamplerOutputPollingScalability(tests.unittest.TestCase):
         self.assertEqual(set(), protocol.sampleIds)
         self.assertEqual(protocol.outputSet.STREAM_CLOSED, protocol.updatedMode)
         self.assertTrue(protocol.inputSet.closed)
+
+
+class TestDataSamplerStreamingArchitecture(tests.unittest.TestCase):
+    def testUsesFacilitiesStreamingBaseAndCoreGeneratorInsertion(self):
+        from pyworkflow.protocol import ProtStreamingBase, STEPS_PARALLEL
+        from emfacilities.protocols.protocol_streaming_base import (
+            ProtFacilitiesStreamingBase,
+        )
+
+        self.assertTrue(
+            issubclass(ProtDataSampler, ProtFacilitiesStreamingBase)
+        )
+        self.assertTrue(
+            issubclass(ProtFacilitiesStreamingBase, ProtStreamingBase)
+        )
+        self.assertIs(
+            ProtDataSampler._insertAllSteps,
+            ProtStreamingBase._insertAllSteps,
+        )
+        self.assertEqual(
+            STEPS_PARALLEL,
+            ProtDataSampler.stepsExecutionMode,
+        )
+
+
+    def testGeneratorWaitsForPersistedCompletionAfterInputCloses(self):
+        class _Harness:
+            def __init__(self):
+                self.finished = False
+                self.isStreamClosed = False
+                self.iteration = 0
+                self.events = []
+
+            def initializeParams(self):
+                self.finished = False
+                self.events.append("initialize")
+
+            def _checkNewInput(self):
+                self.iteration += 1
+                self.isStreamClosed = True
+                self.events.append("input-%d-closed" % self.iteration)
+
+            def _checkNewOutput(self):
+                self.events.append("output-%d" % self.iteration)
+
+                # Input being closed is not enough. Simulate one extra round
+                # before output persistence/completion is confirmed.
+                if self.iteration == 2:
+                    self.finished = True
+
+            def _streamingSleepOnWait(self):
+                self.events.append("sleep-%d" % self.iteration)
+
+            def _closeOutputSet(self):
+                self.events.append("close")
+
+        protocol = _Harness()
+
+        ProtDataSampler.stepsGeneratorStep(protocol)
+
+        self.assertEqual(
+            [
+                "initialize",
+                "input-1-closed",
+                "output-1",
+                "sleep-1",
+                "input-2-closed",
+                "output-2",
+                "close",
+            ],
+            protocol.events,
+        )
