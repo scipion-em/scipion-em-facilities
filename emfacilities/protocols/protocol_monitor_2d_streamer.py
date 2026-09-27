@@ -154,31 +154,59 @@ class ProtMonitor2dStreamer(ProtMonitor):
             if not finished:
                 time.sleep(interval)
 
-
     # -------------------------- UTILS functions ------------------------------
     def _restoreContinueState(self):
-        processedIds = set()
         outputNames = set()
         lastSubsetNumber = 0
+        lastPartId = 0
+        processedCount = 0
+        cumulativeProcessedCount = 0
 
         for outputName, outputSet in self.iterOutputAttributes():
             if not outputName.startswith('outputParticles_'):
                 continue
 
             try:
-                subsetNumber = int(outputName.rsplit('_', 1)[1])
+                subsetNumber = int(
+                    outputName.rsplit('_', 1)[1]
+                )
             except (IndexError, ValueError):
                 continue
 
             outputNames.add(outputName)
-            lastSubsetNumber = max(lastSubsetNumber, subsetNumber)
-            processedIds.update(outputSet.getIdSet())
+            lastSubsetNumber = max(
+                lastSubsetNumber,
+                subsetNumber,
+            )
+
+            subsetSize = outputSet.getSize()
+            processedCount += subsetSize
+            cumulativeProcessedCount = max(
+                cumulativeProcessedCount,
+                subsetSize,
+            )
+
+            maxRows = outputSet.aggregate(
+                ["MAX"],
+                "_objId",
+            )
+            if maxRows:
+                maxId = maxRows[0].get("MAX")
+                if maxId is not None:
+                    lastPartId = max(
+                        lastPartId,
+                        int(maxId),
+                    )
 
         self._restoreScheduledRuns(outputNames)
 
         self._counter = lastSubsetNumber
-        self._counterParticlesProcessed = len(processedIds)
-        self._lastPartId = max(processedIds) if processedIds else 0
+        self._counterParticlesProcessed = (
+            cumulativeProcessedCount
+            if self.cumulativeBatch.get()
+            else processedCount
+        )
+        self._lastPartId = lastPartId
 
         self.info(
             'Restored monitor progress: %d particles, last particle %d, '
@@ -189,6 +217,7 @@ class ProtMonitor2dStreamer(ProtMonitor):
                 self._counter,
             )
         )
+
 
     def _restoreScheduledRuns(self, outputNames):
         if not outputNames:

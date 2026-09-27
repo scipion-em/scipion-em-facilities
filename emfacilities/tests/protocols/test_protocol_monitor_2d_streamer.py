@@ -36,6 +36,16 @@ class _OutputSet:
     def __init__(self, ids=()):
         self._ids = set(ids)
 
+    def getSize(self):
+        return len(self._ids)
+
+    def aggregate(self, operations, field):
+        if operations != ["MAX"] or field != "_objId":
+            raise AssertionError(
+                "Unexpected aggregate query in monitor Continue fixture."
+            )
+        return [{"MAX": max(self._ids) if self._ids else None}]
+
     def getIdSet(self):
         return set(self._ids)
 
@@ -116,6 +126,18 @@ class TestMonitor2dStreamer(BaseTest):
         class OutputSet:
             def __init__(self, ids):
                 self._ids = set(ids)
+
+            def getSize(self):
+                return len(self._ids)
+
+            def aggregate(self, operations, field):
+                if operations != ["MAX"] or field != "_objId":
+                    raise AssertionError(
+                        "Unexpected aggregate query in monitor Continue fixture."
+                    )
+                return [{
+                    "MAX": max(self._ids) if self._ids else None
+                }]
 
             def getIdSet(self):
                 return set(self._ids)
@@ -598,3 +620,89 @@ class TestMonitor2dStreamer(BaseTest):
             [4, 5],
             "The next micrograph must remain intact in the new subset.",
         )
+
+
+class TestMonitor2dStreamerResumeScalability(BaseTest):
+    @classmethod
+    def setUpClass(cls):
+        setupTestProject(cls)
+
+    class _OutputSet:
+        def __init__(self, size, maxId):
+            self._size = size
+            self._maxId = maxId
+
+        def getSize(self):
+            return self._size
+
+        def aggregate(self, operations, field):
+            if operations != ["MAX"]:
+                raise AssertionError(
+                    "Resume should only request MAX."
+                )
+            if field != "_objId":
+                raise AssertionError(
+                    "Resume should aggregate the logical object id."
+                )
+            return [{"MAX": self._maxId}]
+
+        def getIdSet(self):
+            raise AssertionError(
+                "Continue must not materialize every persisted particle ID."
+            )
+
+    def _makeProtocol(self, cumulativeBatch, outputs):
+        prot = self.newProtocol(
+            ProtMonitor2dStreamer,
+            cumulativeBatch=cumulativeBatch,
+        )
+        prot._runIds.set([])
+        prot.iterOutputAttributes = lambda: list(outputs)
+        prot._restoreScheduledRuns = lambda outputNames: None
+        return prot
+
+    def testContinueRestoresNonCumulativeProgressWithoutIdScan(self):
+        prot = self._makeProtocol(
+            False,
+            [
+                (
+                    "outputParticles_001",
+                    self._OutputSet(3, 3),
+                ),
+                (
+                    "outputParticles_002",
+                    self._OutputSet(3, 6),
+                ),
+            ],
+        )
+
+        prot._restoreContinueState()
+
+        self.assertEqual(prot._counter, 2)
+        self.assertEqual(prot._counterParticlesProcessed, 6)
+        self.assertEqual(prot._lastPartId, 6)
+
+    def testContinueRestoresCumulativeProgressWithoutDoubleCounting(self):
+        prot = self._makeProtocol(
+            True,
+            [
+                (
+                    "outputParticles_001",
+                    self._OutputSet(3, 3),
+                ),
+                (
+                    "outputParticles_002",
+                    self._OutputSet(6, 6),
+                ),
+            ],
+        )
+
+        prot._restoreContinueState()
+
+        self.assertEqual(prot._counter, 2)
+        self.assertEqual(
+            prot._counterParticlesProcessed,
+            6,
+            "Cumulative subsets must not be summed during Continue.",
+        )
+        self.assertEqual(prot._lastPartId, 6)
