@@ -114,8 +114,17 @@ class TestCtfStream(pwtests.BaseTest):
                 return "2026-09-20 10:00:00"
 
         class DummyCtfSet:
-            def getIdSet(self):
-                return {7}
+            def getUniqueValues(self, field, where=None):
+                if field != "id":
+                    raise AssertionError(
+                        "Unexpected field requested from CTF fixture."
+                    )
+
+                if where is None:
+                    return [7]
+
+                lastId = int(where.split(">")[1].strip())
+                return [7] if 7 > lastId else []
 
             def __getitem__(self, objId):
                 return DummyCtf()
@@ -241,6 +250,117 @@ class TestCtfStream(pwtests.BaseTest):
             finally:
                 resumed.conn.close()
 
+
+    def testStepUsesIncrementalDiscoveryAfterInitialReconciliation(self):
+        from unittest.mock import patch
+
+        class DummyMicrograph:
+            def getFileName(self):
+                return "/tmp/mic.mrc"
+
+        class DummyCtf:
+            def __init__(self, objId):
+                self._objId = objId
+
+            def getDefocusU(self):
+                return 2000.0
+
+            def getDefocusV(self):
+                return 1500.0
+
+            def getDefocusAngle(self):
+                return 0.0
+
+            def getResolution(self):
+                return 3.0
+
+            def getFitQuality(self):
+                return 1.0
+
+            def hasPhaseShift(self):
+                return False
+
+            def getPsdFile(self):
+                return "/tmp/psd.psd"
+
+            def getMicrograph(self):
+                return DummyMicrograph()
+
+            def getObjCreation(self):
+                return "2026-09-27 18:00:00"
+
+        class DummyCtfSet:
+            def __init__(self):
+                self.ids = [1, 2]
+                self.queries = []
+
+            def getIdSet(self):
+                raise AssertionError(
+                    "CTF monitor must not rescan the full output ID set "
+                    "on every poll."
+                )
+
+            def getUniqueValues(self, field, where=None):
+                self.queries.append((field, where))
+                if where is None:
+                    return list(self.ids)
+
+                lastId = int(where.split(">")[1].strip())
+                return [
+                    objId
+                    for objId in self.ids
+                    if objId > lastId
+                ]
+
+            def __getitem__(self, objId):
+                return DummyCtf(objId)
+
+        class DummyProtocol:
+            def __init__(self, output):
+                self.outputCTF = output
+
+            def getStatus(self):
+                return 0
+
+        with tempfile.TemporaryDirectory() as tmpDir:
+            output = DummyCtfSet()
+            protocol = DummyProtocol(output)
+
+            monitor = monitorsProt.MonitorCTF(
+                protocol,
+                workingDir=tmpDir,
+                samplingInterval=1,
+                monitorTime=1,
+                minDefocus=1000,
+                maxDefocus=40000,
+                astigmatism=2000,
+            )
+            monitor.initLoop()
+
+            try:
+                with patch(
+                    "emfacilities.protocols.protocol_monitor_ctf."
+                    "getUpdatedProtocol",
+                    return_value=protocol,
+                ):
+                    monitor.step()
+
+                    output.ids.append(3)
+                    monitor.step()
+
+                self.assertEqual(
+                    output.queries,
+                    [
+                        ("id", None),
+                        ("id", "id > 2"),
+                    ],
+                )
+                self.assertEqual(
+                    monitor.readCTFs,
+                    {1, 2, 3},
+                )
+            finally:
+                monitor.conn.close()
 
     @classmethod
     def setUpClass(cls):

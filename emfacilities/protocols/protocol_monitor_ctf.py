@@ -166,21 +166,50 @@ class MonitorCTF(Monitor):
         if minDefocus is not None:
             self.minDefocus = min(self.minDefocus, minDefocus)
 
+        # Discovery watermark is independent from persistence state.
+        # The first step reconciles the current logical output once; after
+        # that, only IDs newer than this watermark are discovered.
+        self._lastCtfId = 0
+        self._pendingCtfIds = set()
+
 
     def step(self):
         prot = getUpdatedProtocol(self.protocol)
-        # Create set of processed CTF from CTF protocol
-        if hasattr(prot, 'outputCTF'):
-            CTFset = prot.outputCTF.getIdSet()
-        else:
+
+        if not hasattr(prot, 'outputCTF'):
             return prot.getStatus() != STATUS_RUNNING
-        # find difference
-        sys.stdout.flush()
-        diffSet = CTFset - self.readCTFs
+
         setOfCTFs = prot.outputCTF
+
+        # The first polling round performs one full reconciliation against the
+        # monitor log. Subsequent rounds discover only IDs newer than the
+        # watermark. Failed inserts remain in _pendingCtfIds and are retried
+        # independently of the discovery watermark.
+        where = None
+        if self._lastCtfId > 0:
+            where = 'id > %d' % self._lastCtfId
+
+        discoveredIds = set(
+            setOfCTFs.getUniqueValues(
+                'id',
+                where=where,
+            )
+        )
+
+        if discoveredIds:
+            self._lastCtfId = max(
+                self._lastCtfId,
+                max(discoveredIds),
+            )
+
+        self._pendingCtfIds.update(
+            discoveredIds.difference(self.readCTFs)
+        )
+
+        sys.stdout.flush()
         astigmatism = self.astigmatism
 
-        for ctfID in diffSet:
+        for ctfID in sorted(self._pendingCtfIds):
             ctf = setOfCTFs[ctfID]
             defocusU = ctf.getDefocusU()
             defocusV = ctf.getDefocusV()
@@ -197,10 +226,10 @@ class MonitorCTF(Monitor):
             resolution = ctf.getResolution()
             if isinf(resolution):
                 resolution = 0.
-            
+
             # Fit quality
             fitQuality = ctf.getFitQuality()
-            if fitQuality is None or isinf(fitQuality): 
+            if fitQuality is None or isinf(fitQuality):
                 fitQuality = 0.
 
             # PhaseShift
@@ -208,8 +237,10 @@ class MonitorCTF(Monitor):
 
             psdPath = os.path.abspath(ctf.getPsdFile())
             micPath = os.path.abspath(ctf.getMicrograph().getFileName())
-            shiftPlot = (getattr(ctf.getMicrograph(), 'plotCart', None)
-                         or getattr(ctf.getMicrograph(), 'plotGlobal', None))
+            shiftPlot = (
+                getattr(ctf.getMicrograph(), 'plotCart', None)
+                or getattr(ctf.getMicrograph(), 'plotGlobal', None)
+            )
             if shiftPlot is not None:
                 shiftPlotPath = os.path.abspath(shiftPlot.getFileName())
             else:
@@ -225,9 +256,9 @@ class MonitorCTF(Monitor):
 
             ctfCreationTime = ctf.getObjCreation()
 
-            # get CTFs with this ids a fill table
-            # do not forget to compute astigmatism
-            defocus = math.sqrt(defocusV*defocusV + defocusU * defocusU)
+            defocus = math.sqrt(
+                defocusV * defocusV + defocusU * defocusU
+            )
             sql = """INSERT INTO %s(timestamp
                                     , ctfID
                                     , defocusU
@@ -244,31 +275,39 @@ class MonitorCTF(Monitor):
                      VALUES("%s",%d,%f,%f,%f,%f,%f,%f,%f,%f,"%s","%s","%s");""" %\
                   (self._tableName, ctfCreationTime, ctfID, defocusU,
                    defocusV, defocus, astig, defocusU / defocusV, resolution,
-                   fitQuality, phaseShift,  micPath, psdPath, shiftPlotPath)
+                   fitQuality, phaseShift, micPath, psdPath, shiftPlotPath)
             try:
                 self.cur.execute(sql)
                 self.readCTFs.add(ctfID)
+                self._pendingCtfIds.discard(ctfID)
             except Exception as e:
                 print("ERROR: saving one data point (CTF monitor). I continue")
                 print(e)
                 print(sql)
+                continue
 
             if abs(defocusU - defocusV) > astigmatism:
-                self.warning("Astigmatism (defocusU - defocusV)  = %f."
-                             % abs(defocusU - defocusV))
+                self.warning(
+                    "Astigmatism (defocusU - defocusV)  = %f."
+                    % abs(defocusU - defocusV)
+                )
 
             if defocusU > self.maxDefocus:
-                self.warning("DefocusU (%f) is larger than defocus "
-                             "maximum (%f)" % (defocusU, self.maxDefocus))
+                self.warning(
+                    "DefocusU (%f) is larger than defocus maximum (%f)"
+                    % (defocusU, self.maxDefocus)
+                )
                 self.maxDefocus = defocusU
 
             if defocusV < self.minDefocus:
-                self.warning("DefocusV (%f) is smaller than defocus "
-                             "minumum (%f)" % (defocusV, self.maxDefocus))
+                self.warning(
+                    "DefocusV (%f) is smaller than defocus minumum (%f)"
+                    % (defocusV, self.maxDefocus)
+                )
                 self.minDefocus = defocusV
 
-        # Finish when protocol is not longer running
         return prot.getStatus() != STATUS_RUNNING
+
 
     def _createTable(self):
         self.cur.execute("""CREATE TABLE IF NOT EXISTS  %s(
