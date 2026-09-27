@@ -72,6 +72,95 @@ class TestMonitorMovieGain(TestCase):
 
             self.assertEqual(len(lines), 1)
 
+    def testStepReadsOnlyNewSummaryTailAfterFirstPoll(self):
+        from unittest.mock import patch
+
+        with tempfile.TemporaryDirectory() as tmpDir:
+            summary = os.path.join(tmpDir, "summaryForMonitor.txt")
+            with open(summary, "w") as handle:
+                handle.write(
+                    "movie_000001_residual: 0.010000 1.0 1.0 1.0\n"
+                )
+                handle.write(
+                    "movie_000002_residual: 0.010000 1.0 1.0 1.0\n"
+                )
+
+            monitor = self._newMonitor(tmpDir)
+            monitor.initLoop()
+            monitor.step()
+
+            with open(summary, "a") as handle:
+                handle.write(
+                    "movie_000003_residual: 0.010000 1.0 1.0 1.0\n"
+                )
+
+            realOpen = open
+            seekPositions = []
+            readlineCalls = []
+
+            class _IncrementalReader:
+                def __init__(self, handle):
+                    self._handle = handle
+
+                def __enter__(self):
+                    self._handle.__enter__()
+                    return self
+
+                def __exit__(self, *args):
+                    return self._handle.__exit__(*args)
+
+                def seek(self, offset, whence=0):
+                    seekPositions.append((offset, whence))
+                    return self._handle.seek(offset, whence)
+
+                def tell(self):
+                    return self._handle.tell()
+
+                def readline(self, *args, **kwargs):
+                    readlineCalls.append(True)
+                    return self._handle.readline(*args, **kwargs)
+
+                def readlines(self, *args, **kwargs):
+                    raise AssertionError(
+                        "Movie gain polling must not reread the full "
+                        "summary file on every step."
+                    )
+
+                def read(self, *args, **kwargs):
+                    raise AssertionError(
+                        "Movie gain polling must read incrementally by line."
+                    )
+
+                def __iter__(self):
+                    raise AssertionError(
+                        "Movie gain polling must seek to the saved offset "
+                        "instead of iterating from the beginning."
+                    )
+
+            def incrementalOpen(path, mode="r", *args, **kwargs):
+                handle = realOpen(path, mode, *args, **kwargs)
+                if (
+                    os.path.abspath(path) == os.path.abspath(summary)
+                    and "r" in mode
+                ):
+                    return _IncrementalReader(handle)
+                return handle
+
+            with patch("builtins.open", side_effect=incrementalOpen):
+                monitor.step()
+
+            self.assertTrue(
+                any(offset > 0 for offset, _ in seekPositions),
+                "The second poll must seek to the previously consumed "
+                "summary offset.",
+            )
+            self.assertLessEqual(
+                len(readlineCalls),
+                2,
+                "Only the newly appended line and EOF should be read.",
+            )
+
+
 class TestMonitorMovieGainPartialSummaryRegression(TestCase):
     def testPartialLastSummaryLineIsRetriedWhenCompleted(self):
         with tempfile.TemporaryDirectory() as tmpDir:

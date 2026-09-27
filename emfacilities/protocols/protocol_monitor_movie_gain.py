@@ -139,14 +139,46 @@ class MonitorMovieGain(Monitor):
 
     def initLoop(self):
         self._lastSummaryLine = 0
+        self._summaryOffset = 0
         checkpoint = os.path.join(self.workingDir, MOVIE_GAIN_LAST_LINE)
 
         if os.path.exists(checkpoint):
             try:
                 with open(checkpoint, "r") as handle:
-                    self._lastSummaryLine = int(handle.read().strip() or 0)
+                    self._lastSummaryLine = int(
+                        handle.read().strip() or 0
+                    )
             except (OSError, ValueError):
                 self._lastSummaryLine = 0
+
+        # Keep the existing line-count checkpoint for compatibility, but
+        # translate it to a byte/file offset only once at startup. After this,
+        # every polling round can seek directly to the unread tail instead of
+        # rereading the complete summary file.
+        fnSummary = self.protocol._getPath("summaryForMonitor.txt")
+        if self._lastSummaryLine <= 0:
+            return
+
+        if not os.path.exists(fnSummary):
+            self._lastSummaryLine = 0
+            return
+
+        restoredLines = 0
+        with open(fnSummary, "r") as handle:
+            while restoredLines < self._lastSummaryLine:
+                line = handle.readline()
+
+                if not line or not line.endswith("\n"):
+                    # The producer recreated/truncated the summary or the
+                    # checkpoint points beyond the complete records currently
+                    # available. Reconcile again from the beginning.
+                    self._lastSummaryLine = 0
+                    self._summaryOffset = 0
+                    return
+
+                restoredLines += 1
+                self._summaryOffset = handle.tell()
+
 
 
     def _writeLastSummaryLine(self):
@@ -175,74 +207,86 @@ class MonitorMovieGain(Monitor):
         if not os.path.exists(fnSummary) or os.path.getsize(fnSummary) < 1:
             return False
 
-        with open(fnSummary, "r") as fhSummary:
-            summaryLines = fhSummary.readlines()
-
         # If the producer recreated/truncated the summary file, restart from
-        # the beginning of the new file instead of skipping valid entries.
-        if self._lastSummaryLine > len(summaryLines):
+        # the beginning instead of keeping an offset beyond the current EOF.
+        if os.path.getsize(fnSummary) < self._summaryOffset:
             self._lastSummaryLine = 0
-
-        newLines = summaryLines[self._lastSummaryLine:]
-        if not newLines:
-            return prot.getStatus() != STATUS_RUNNING
+            self._summaryOffset = 0
 
         warningMode = "a" if os.path.exists(fnWarning) else "w"
         hasPendingPartialLine = False
-        with open(fnWarning, warningMode) as fhWarning:
-            for index, line in enumerate(newLines):
-                # The producer may be writing the last summary record while
-                # the monitor reads the file. Leave an unterminated trailing
-                # record pending so it can be retried on the next iteration.
-                if index == len(newLines) - 1 and not line.endswith("\n"):
-                    hasPendingPartialLine = True
-                    break
+        processedAnyLine = False
 
-                fields = line.split()
-                stddev, perc25, perc975, maxVal = map(
-                    float, fields[1:]
-                )
-                movieName = fields[0]
+        with open(fnSummary, "r") as fhSummary:
+            fhSummary.seek(self._summaryOffset)
 
-                if stddev > self.stddevValue:
-                    self.warning(
-                        "Residual gain standard deviation is %f." % stddev
-                    )
-                    fhWarning.write(
-                        "%s: Residual gain standard deviation is %f.\n"
-                        % (movieName, stddev)
-                    )
+            with open(fnWarning, warningMode) as fhWarning:
+                while True:
+                    line = fhSummary.readline()
 
-                if (perc975 / perc25) > self.ratio1Value:
-                    self.warning(
-                        "The ratio between the 97.5 and 2.5 "
-                        "percentiles is %f." % (perc975 / perc25)
-                    )
-                    fhWarning.write(
-                        "%s: The ratio between the 97.5 and 2.5 "
-                        "percentiles is %f.\n"
-                        % (movieName, (perc975 / perc25))
-                    )
+                    if not line:
+                        break
 
-                if (maxVal / perc975) > self.ratio2Value:
-                    self.warning(
-                        "The ratio between the maximum gain value "
-                        "and the 97.5 percentile is %f."
-                        % (maxVal / perc975)
-                    )
-                    fhWarning.write(
-                        "%s: The ratio between the maximum gain value "
-                        "and the 97.5 percentile is %f.\n"
-                        % (movieName, (maxVal / perc975))
-                    )
+                    # The producer may be writing the last summary record while
+                    # the monitor reads the file. Keep the offset at the start
+                    # of that partial record so it is retried next time.
+                    if not line.endswith("\n"):
+                        hasPendingPartialLine = True
+                        break
 
-                self._lastSummaryLine += 1
-                self._writeLastSummaryLine()
+                    fields = line.split()
+                    stddev, perc25, perc975, maxVal = map(
+                        float, fields[1:]
+                    )
+                    movieName = fields[0]
+
+                    if stddev > self.stddevValue:
+                        self.warning(
+                            "Residual gain standard deviation is %f."
+                            % stddev
+                        )
+                        fhWarning.write(
+                            "%s: Residual gain standard deviation is %f.\n"
+                            % (movieName, stddev)
+                        )
+
+                    if (perc975 / perc25) > self.ratio1Value:
+                        self.warning(
+                            "The ratio between the 97.5 and 2.5 "
+                            "percentiles is %f."
+                            % (perc975 / perc25)
+                        )
+                        fhWarning.write(
+                            "%s: The ratio between the 97.5 and 2.5 "
+                            "percentiles is %f.\n"
+                            % (movieName, (perc975 / perc25))
+                        )
+
+                    if (maxVal / perc975) > self.ratio2Value:
+                        self.warning(
+                            "The ratio between the maximum gain value "
+                            "and the 97.5 percentile is %f."
+                            % (maxVal / perc975)
+                        )
+                        fhWarning.write(
+                            "%s: The ratio between the maximum gain value "
+                            "and the 97.5 percentile is %f.\n"
+                            % (movieName, (maxVal / perc975))
+                        )
+
+                    self._lastSummaryLine += 1
+                    self._summaryOffset = fhSummary.tell()
+                    self._writeLastSummaryLine()
+                    processedAnyLine = True
 
         if hasPendingPartialLine:
             return False
 
+        if not processedAnyLine:
+            return prot.getStatus() != STATUS_RUNNING
+
         return prot.getStatus() != STATUS_RUNNING
+
 
 
     def getData(self, lastId=-1):
