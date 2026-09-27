@@ -32,8 +32,8 @@ import matplotlib.pyplot as plt
 
 import pyworkflow.protocol.params as params
 from pyworkflow.object import Set
-from pyworkflow.protocol import ProtStreamingBase, STEPS_PARALLEL
-from pwem.protocols import EMProtocol
+from pyworkflow.protocol import STEPS_PARALLEL
+from .protocol_streaming_base import ProtFacilitiesStreamingBase
 from pwem.objects import SetOfParticles, SetOfAverages, SetOfClasses2D
 from pyworkflow import BETA, UPDATED, NEW, PROD
 
@@ -43,7 +43,7 @@ OUTPUT_DISCARDED_PARTICLES = "outputParticlesDiscarded"
 LAST_DONE_FILE = "last_done.txt"
 
 
-class ProtGoodClassesExtractor(EMProtocol, ProtStreamingBase):
+class ProtGoodClassesExtractor(ProtFacilitiesStreamingBase):
     """ Extracts items from a SetOfClasses based on a list of IDs or a set of given good averages/classes
     """
 
@@ -58,7 +58,7 @@ class ProtGoodClassesExtractor(EMProtocol, ProtStreamingBase):
     LIST_IDS = 1
 
     def __init__(self, **args):
-        EMProtocol.__init__(self, **args)
+        ProtFacilitiesStreamingBase.__init__(self, **args)
         self.stepsExecutionMode = STEPS_PARALLEL
 
     def _defineParams(self, form):
@@ -311,13 +311,9 @@ class ProtGoodClassesExtractor(EMProtocol, ProtStreamingBase):
         finally:
             classSet.close()
 
-
     def _loadInputClassesSet(self):
-        """ Returns te input set of particles"""
-        classSet = self.inputClasses.get()
-        classSet.loadAllProperties()
-
-        return classSet
+        """Return the logical input classes Set."""
+        return self._loadLogicalSet(self.inputClasses)
 
     def _getGoodIds(self):
         ids = self.inputGoodListIds.get().split(',')

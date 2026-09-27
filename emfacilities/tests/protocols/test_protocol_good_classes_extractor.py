@@ -493,3 +493,105 @@ class TestGoodClassesExtractorContinueCheckpointRegression(unittest.TestCase):
         self.assertEqual(protocol.dictsTimes, {})
         self.assertEqual(protocol.goodParticles, [])
         self.assertEqual(protocol.badParticles, [])
+
+
+class TestGoodClassesExtractorStreamingArchitecture(unittest.TestCase):
+    def testUsesFacilitiesStreamingBaseAndCoreGeneratorInsertion(self):
+        from pyworkflow.protocol import ProtStreamingBase, STEPS_PARALLEL
+        from emfacilities.protocols.protocol_streaming_base import (
+            ProtFacilitiesStreamingBase,
+        )
+
+        self.assertTrue(
+            issubclass(
+                ProtGoodClassesExtractor,
+                ProtFacilitiesStreamingBase,
+            )
+        )
+        self.assertTrue(
+            issubclass(
+                ProtFacilitiesStreamingBase,
+                ProtStreamingBase,
+            )
+        )
+        self.assertIs(
+            ProtGoodClassesExtractor._insertAllSteps,
+            ProtStreamingBase._insertAllSteps,
+        )
+        self.assertEqual(
+            STEPS_PARALLEL,
+            ProtGoodClassesExtractor.stepsExecutionMode,
+        )
+
+    def testKeepsCreationTimestampWatermarkInsteadOfIdCursor(self):
+        class _Particle:
+            pass
+
+        class _Class:
+            def __init__(self):
+                self.whereCalls = []
+
+            def getObjId(self):
+                return 7
+
+            def iterItems(
+                    self,
+                    orderBy=None,
+                    direction=None,
+                    where=None,
+            ):
+                self.whereCalls.append(
+                    (orderBy, direction, where)
+                )
+                return iter((_Particle(),))
+
+        class _ClassSet:
+            def __init__(self):
+                self.clazz = _Class()
+                self.closed = False
+
+            def getStreamState(self):
+                return Set.STREAM_OPEN
+
+            def iterItems(self, **kwargs):
+                return iter((self.clazz,))
+
+            def close(self):
+                self.closed = True
+
+        classSet = _ClassSet()
+
+        class _Harness:
+            dictsTimes = {
+                "7": "2026-09-19 08:00:00",
+            }
+            isStreamClosed = Set.STREAM_OPEN
+
+            def _loadInputClassesSet(self):
+                return classSet
+
+            def _discoverIdsAfter(self, *args, **kwargs):
+                raise AssertionError(
+                    "GoodClassesExtractor must keep its per-class "
+                    "creation timestamp cursor; an ID watermark is not "
+                    "valid for particles appended to an existing class."
+                )
+
+        protocol = _Harness()
+
+        hasNew = ProtGoodClassesExtractor._newParticlesToProcess(
+            protocol
+        )
+
+        self.assertTrue(hasNew)
+        self.assertEqual(
+            [
+                (
+                    "creation",
+                    "ASC",
+                    'creation>"2026-09-19 08:00:00"',
+                )
+            ],
+            classSet.clazz.whereCalls,
+        )
+        self.assertTrue(classSet.closed)
