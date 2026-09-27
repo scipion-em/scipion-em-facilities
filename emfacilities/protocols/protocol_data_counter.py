@@ -135,11 +135,31 @@ class ProtDataCounter(ProtFacilitiesStreamingBase):
 
         inputSet = self._loadInputSet(None)
         try:
-            newIds, self._lastInputId = self._discoverIdsAfter(inputSet, self._lastInputId)
+            newIds, self._lastInputId = self._discoverIdsAfter(
+                inputSet,
+                self._lastInputId,
+            )
 
             self.lastCheck = datetime.now()
-            self.isStreamClosed = inputSet.isStreamClosed()
-            self.lastRound = self.isStreamClosed
+            producerClosed = inputSet.isStreamClosed()
+
+            newIds, terminalConsistent = (
+                self._reconcileClosedStreamIds(
+                    inputSet,
+                    newIds,
+                    self.insertedIds,
+                    producerClosed,
+                )
+            )
+
+            # Keep the historical terminal wait while PostgreSQL catches up,
+            # but do not declare the consumer stream closed until every item
+            # advertised by getSize() is actually visible.
+            self.lastRound = producerClosed
+            self.isStreamClosed = (
+                producerClosed
+                and terminalConsistent
+            )
         finally:
             inputSet.close()
 

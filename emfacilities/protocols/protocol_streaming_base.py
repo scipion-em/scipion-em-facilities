@@ -45,6 +45,63 @@ class ProtFacilitiesStreamingBase(EMProtocol, ProtStreamingBase):
             lastId = max(ids)
         return ids, lastId
 
+    def _reconcileClosedStreamIds(
+            self,
+            inputSet,
+            discoveredIds,
+            knownIds,
+            producerClosed,
+    ):
+        """Reconcile IDs once a producer closes but rows lag behind metadata.
+
+        Normal streaming discovery remains monotonic (``id > watermark``).
+        PostgreSQL runtime Sets can transiently expose a closed Set whose
+        declared size is ahead of the rows visible to the consumer. In that
+        terminal mismatch only, scan the logical IDs again so late-visible
+        rows below the watermark are not lost forever.
+
+        Returns ``(newIds, terminalConsistent)``. ``terminalConsistent`` is
+        False only while a closed producer still declares more items than are
+        currently visible to this consumer.
+        """
+        discoveredIds = list(discoveredIds)
+
+        if not producerClosed:
+            return discoveredIds, True
+
+        expectedSize = inputSet.getSize()
+        knownIds = set(knownIds)
+        visibleKnownIds = knownIds.union(discoveredIds)
+
+        if len(visibleKnownIds) >= expectedSize:
+            return discoveredIds, True
+
+        reconciledIds = list(
+            inputSet.getUniqueValues('id')
+        )
+
+        if reconciledIds:
+            self._lastInputId = max(
+                self._lastInputId,
+                max(reconciledIds),
+            )
+
+        visibleIds = set(discoveredIds)
+        visibleIds.update(reconciledIds)
+
+        newIds = [
+            imageId
+            for imageId in sorted(visibleIds)
+            if imageId not in knownIds
+        ]
+
+        visibleKnownIds = knownIds.union(visibleIds)
+        terminalConsistent = (
+            len(visibleKnownIds) >= expectedSize
+        )
+
+        return newIds, terminalConsistent
+
     def _getPersistedOutputIds(self, outputName):
         outputSet = getattr(self, outputName, None)
         if outputSet is None:

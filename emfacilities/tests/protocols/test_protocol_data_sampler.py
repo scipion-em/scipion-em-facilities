@@ -523,6 +523,21 @@ class TestDataSamplerStreamingScalability(tests.unittest.TestCase):
                     lastId,
                 )
 
+            def _reconcileClosedStreamIds(
+                    self,
+                    inputSet,
+                    discoveredIds,
+                    knownIds,
+                    producerClosed,
+            ):
+                return ProtDataSampler._reconcileClosedStreamIds(
+                    self,
+                    inputSet,
+                    discoveredIds,
+                    knownIds,
+                    producerClosed,
+                )
+
             def _getFirstJoinStep(self):
                 return None
 
@@ -714,4 +729,111 @@ class TestDataSamplerStreamingArchitecture(tests.unittest.TestCase):
                 "close",
             ],
             protocol.events,
+        )
+
+class TestDataSamplerClosedStreamLateVisibilityRegression(
+        tests.unittest.TestCase):
+    def testClosedStreamReconcilesIdsBelowWatermark(self):
+        class _Value:
+            def __init__(self, value):
+                self.value = value
+
+            def get(self):
+                return self.value
+
+        class _InputSet:
+            def __init__(self):
+                self.uniqueCalls = []
+                self.closedCalls = 0
+
+            def getUniqueValues(self, attributes, where=None):
+                self.uniqueCalls.append((attributes, where))
+
+                if where is None:
+                    return list(range(1, 11))
+
+                if where == "id > 0":
+                    return [9, 10]
+
+                if where == "id > 10":
+                    return []
+
+                raise AssertionError(
+                    "Unexpected discovery query: %r" % (where,)
+                )
+
+            def getSize(self):
+                return 10
+
+            def isStreamClosed(self):
+                return True
+
+            def close(self):
+                self.closedCalls += 1
+
+        class _Harness:
+            insertedIds = set()
+            processedIds = set()
+            sampleIds = set()
+            _lastInputId = 0
+            _pendingInputIds = []
+            isStreamClosed = False
+            batchSize = _Value(10)
+
+            def __init__(self):
+                self.inputSet = _InputSet()
+                self.insertedBatches = []
+
+            def _loadInputSet(self, _):
+                return self.inputSet
+
+            def _discoverIdsAfter(self, inputSet, lastId):
+                return ProtDataSampler._discoverIdsAfter(
+                    self,
+                    inputSet,
+                    lastId,
+                )
+
+            def _reconcileClosedStreamIds(
+                    self,
+                    inputSet,
+                    discoveredIds,
+                    knownIds,
+                    producerClosed,
+            ):
+                return ProtDataSampler._reconcileClosedStreamIds(
+                    self,
+                    inputSet,
+                    discoveredIds,
+                    knownIds,
+                    producerClosed,
+                )
+
+            def isContinued(self):
+                return False
+
+            def _insertNewImageSteps(self, newIds, batchSize):
+                ids = list(newIds)
+                self.insertedBatches.append(ids)
+                self.insertedIds.update(ids)
+                return []
+
+            def info(self, message):
+                pass
+
+        protocol = _Harness()
+
+        ProtDataSampler._checkNewInput(protocol)
+        ProtDataSampler._checkNewInput(protocol)
+
+        self.assertEqual(
+            protocol.insertedIds,
+            set(range(1, 11)),
+            "A closed sampler input must reconcile IDs that became visible "
+            "below an already advanced watermark.",
+        )
+        self.assertIn(
+            ("id", None),
+            protocol.inputSet.uniqueCalls,
+            "The terminal mismatch must use a full ID reconciliation.",
         )

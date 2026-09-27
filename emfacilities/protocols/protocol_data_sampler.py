@@ -107,9 +107,33 @@ class ProtDataSampler(ProtFacilitiesStreamingBase):
         # separately in _pendingInputIds.
         inputSet = self._loadInputSet(None)
         try:
-            discoveredIds, self._lastInputId = self._discoverIdsAfter(inputSet, self._lastInputId)
+            discoveredIds, self._lastInputId = self._discoverIdsAfter(
+                inputSet,
+                self._lastInputId,
+            )
 
-            self.isStreamClosed = inputSet.isStreamClosed()
+            producerClosed = inputSet.isStreamClosed()
+
+            knownIds = set(self.insertedIds)
+            knownIds.update(self._pendingInputIds)
+
+            discoveredIds, terminalConsistent = (
+                self._reconcileClosedStreamIds(
+                    inputSet,
+                    discoveredIds,
+                    knownIds,
+                    producerClosed,
+                )
+            )
+
+            # A producer-side CLOSED flag is not enough while its declared
+            # size is ahead of the rows currently visible. Keeping this False
+            # also prevents an incomplete final sampling batch from being
+            # scheduled prematurely.
+            self.isStreamClosed = (
+                producerClosed
+                and terminalConsistent
+            )
         finally:
             inputSet.close()
 
