@@ -272,6 +272,9 @@ class TestDataCounterInputSetLifecycleRegression(tests.unittest.TestCase):
             def getSize(self):
                 return 5
 
+            def __contains__(self, objId):
+                return True
+
             def getItem(self, field, value):
                 return _Image(value)
 
@@ -704,3 +707,120 @@ class TestDataCounterClosedStreamLateVisibilityRegression(
             "The terminal mismatch must use a one-off full ID "
             "reconciliation instead of advancing the watermark forever.",
         )
+
+
+class TestDataCounterCheckNewOutputVisibilityRegression(tests.unittest.TestCase):
+
+    def testCheckNewOutputSkipsImageNotYetVisibleAndDoesNotFinishPrematurely(self):
+        # Regression test: an id discovered earlier (via _discoverIdsAfter
+        # in _checkNewInput) is not guaranteed to still be selectable via
+        # Set.getItem() on a freshly reloaded input Set later - e.g. under
+        # replication lag on a PostgreSQL-backed compatibility bridge.
+        # Set.getItem raises rather than returning None for a missing row,
+        # so a membership check is required before indexing. Skipping the
+        # invisible id must not let the protocol declare itself finished
+        # (and hence close the output) before that id is actually
+        # persisted.
+        class _Value:
+            def __init__(self, value):
+                self._value = value
+
+            def get(self):
+                return self._value
+
+        class _Image:
+            def __init__(self, objId):
+                self.objId = objId
+
+            def clone(self):
+                return _Image(self.objId)
+
+        class _InputSet:
+            def __init__(self, visibleIds, size):
+                self._visibleIds = set(visibleIds)
+                self._size = size
+                self.closed = False
+
+            def getSize(self):
+                return self._size
+
+            def __contains__(self, objId):
+                return objId in self._visibleIds
+
+            def getItem(self, field, value):
+                assert field == "id"
+                # Real Set.getItem raises (UnboundLocalError) rather than
+                # returning None for a row it cannot find - match that
+                # here so a missing membership guard is caught.
+                if value not in self._visibleIds:
+                    raise UnboundLocalError("row not found for id %r" % value)
+                return _Image(value)
+
+            def close(self):
+                self.closed = True
+
+        class _OutputSet:
+            STREAM_OPEN = 1
+            STREAM_CLOSED = 2
+
+            def __init__(self):
+                self.ids = []
+
+            def getSize(self):
+                return len(self.ids)
+
+            def append(self, image):
+                self.ids.append(image.objId)
+
+        class _Harness:
+            finished = False
+            processedIds = {4, 5}  # 5 is not yet visible
+            isStreamClosed = True
+            limitReach = False
+            timerOut = False
+            outputSize = _Value(100)  # far from the limit
+            _inputClass = object
+            _baseName = "images.sqlite"
+
+            def __init__(self):
+                # getSize() == 2 matches len(processedIds), so the
+                # pre-loop optimistic completion check would (incorrectly)
+                # already consider the round finished.
+                self.inputSet = _InputSet(visibleIds={4}, size=2)
+                self.outputSet = _OutputSet()
+                self.updated = False
+                self.streamMode = None
+                self.errors = []
+
+            def _loadInputSet(self, _):
+                return self.inputSet
+
+            def _loadOutputSet(self, SetClass, baseName, outputName=None):
+                return self.outputSet
+
+            def _updateOutputSet(self, outputName, outputSet, streamMode):
+                self.updated = True
+                self.streamMode = streamMode
+
+            def _getFirstJoinStep(self):
+                return None
+
+            def _store(self):
+                pass
+
+            def error(self, msg):
+                self.errors.append(msg)
+
+        protocol = _Harness()
+
+        ProtDataCounter._checkNewOutput(protocol)
+
+        self.assertEqual([4], protocol.outputSet.ids)
+        self.assertEqual({5}, protocol.processedIds)
+        self.assertEqual(1, len(protocol.errors))
+        self.assertFalse(
+            protocol.finished,
+            "A skipped (not-yet-visible) id must prevent the protocol "
+            "from declaring itself finished this round.",
+        )
+        self.assertEqual(protocol.outputSet.STREAM_OPEN, protocol.streamMode)

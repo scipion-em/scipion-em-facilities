@@ -192,21 +192,43 @@ class ProtDataSampler(ProtFacilitiesStreamingBase):
             if not self.finished and not pendingSampleIds:
                 return
 
-            streamMode = (
-                Set.STREAM_CLOSED
-                if self.finished
-                else Set.STREAM_OPEN
-            )
-
             outputSet = self._loadOutputSet(
                 self._inputClass,
                 self._baseName,
                 outputName=OUTPUT,
             )
 
+            persistedNow = set()
             for imageId in pendingSampleIds:
+                # Set.getItem raises rather than returning None for a row
+                # it cannot find. An id sampled earlier is not guaranteed
+                # to still be selectable on this freshly reloaded input
+                # Set (e.g. replication lag under a PostgreSQL-backed
+                # compatibility bridge) - check membership first and
+                # leave it pending for the next round instead of
+                # crashing the whole protocol.
+                if imageId not in inputSet:
+                    self.error(
+                        "Image with id %d is not yet visible in the "
+                        "input Set; leaving it pending for the next "
+                        "round." % imageId
+                    )
+                    continue
+
                 image = inputSet.getItem("id", imageId).clone()
                 outputSet.append(image)
+                persistedNow.add(imageId)
+
+            # A sampled item that could not be persisted yet must not let
+            # the protocol close the output before it is actually output.
+            if persistedNow != pendingSampleIds:
+                self.finished = False
+
+            streamMode = (
+                Set.STREAM_CLOSED
+                if self.finished
+                else Set.STREAM_OPEN
+            )
 
             # sampleIds means "sampled but not yet persisted". Drain it only
             # after Scipion has successfully persisted the updated output.
@@ -215,7 +237,7 @@ class ProtDataSampler(ProtFacilitiesStreamingBase):
                 outputSet,
                 streamMode,
             )
-            self.sampleIds.difference_update(pendingSampleIds)
+            self.sampleIds.difference_update(persistedNow)
         finally:
             inputSet.close()
 

@@ -209,13 +209,39 @@ class ProtDataCounter(ProtFacilitiesStreamingBase):
             if currentOutputSize < limitOutputSize:
                 persistedNow = set()
                 for imageId in newDone:
+                    # Set.getItem raises rather than returning None for a
+                    # row it cannot find. An id discovered earlier via
+                    # _discoverIdsAfter is not guaranteed to still be
+                    # selectable on this freshly reloaded input Set (e.g.
+                    # replication lag under a PostgreSQL-backed
+                    # compatibility bridge) - check membership first and
+                    # leave it pending for the next round instead of
+                    # crashing the whole protocol.
+                    if imageId not in inputSet:
+                        self.error(
+                            "Image with id %d is not yet visible in the "
+                            "input Set; leaving it pending for the next "
+                            "round." % imageId
+                        )
+                        continue
+
                     image = inputSet.getItem("id", imageId).clone()
                     outputSet.append(image)
                     persistedNow.add(imageId)
                     currentOutputSize += 1
                     if currentOutputSize == limitOutputSize:
-                        self.finished = True
                         break # We have reach the limit for the outputSize
+
+                # Recompute completion from what was ACTUALLY persisted this
+                # round, not the optimistic pre-loop count: an item that is
+                # not yet visible must not let the protocol close the
+                # output before it is actually persisted.
+                self.limitReach = currentOutputSize >= limitOutputSize
+                self.finished = (
+                    (self.isStreamClosed and currentOutputSize == maxSize)
+                    or self.limitReach
+                    or self.timerOut
+                )
 
                 streamMode = Set.STREAM_CLOSED if self.finished else Set.STREAM_OPEN
 

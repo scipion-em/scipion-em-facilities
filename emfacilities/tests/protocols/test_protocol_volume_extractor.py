@@ -73,6 +73,72 @@ class TestVolumeExtractorInstanceState(unittest.TestCase):
         )
 
 
+class TestVolumeExtractorValidateRegression(unittest.TestCase):
+    # Regression test: Set.getItem raises rather than returning None for a
+    # row it cannot find. A user-entered volume reference id that does not
+    # exist in the input classes must be caught by _validate() with a clear
+    # message, instead of crashing extractElements() with a confusing raw
+    # exception once the protocol is launched.
+
+    class _Value:
+        def __init__(self, value):
+            self._value = value
+
+        def get(self):
+            return self._value
+
+    class _InputClasses:
+        def __init__(self, ids):
+            self._ids = set(ids)
+
+        def __contains__(self, objId):
+            return objId in self._ids
+
+    def _newProtocol(self, selectBig, selectID, volumeID, inputClasses):
+        protocol = object.__new__(ProtVolumeExtractor)
+        object.__setattr__(protocol, "selectBig", self._Value(selectBig))
+        object.__setattr__(protocol, "selectID", self._Value(selectID))
+        object.__setattr__(protocol, "volumeID", self._Value(volumeID))
+        object.__setattr__(protocol, "inputClasses", self._Value(inputClasses))
+        return protocol
+
+    def testValidateRejectsReferenceIdNotInInputClasses(self):
+        protocol = self._newProtocol(
+            selectBig=False,
+            selectID=True,
+            volumeID=99,
+            inputClasses=self._InputClasses(ids=[1, 2, 3]),
+        )
+
+        errors = protocol._validate()
+
+        self.assertEqual(1, len(errors))
+
+    def testValidateAcceptsReferenceIdPresentInInputClasses(self):
+        protocol = self._newProtocol(
+            selectBig=False,
+            selectID=True,
+            volumeID=2,
+            inputClasses=self._InputClasses(ids=[1, 2, 3]),
+        )
+
+        errors = protocol._validate()
+
+        self.assertEqual([], errors)
+
+    def testValidateSkipsCheckWhenSelectingBiggestClass(self):
+        protocol = self._newProtocol(
+            selectBig=True,
+            selectID=False,
+            volumeID=99,
+            inputClasses=self._InputClasses(ids=[1, 2, 3]),
+        )
+
+        errors = protocol._validate()
+
+        self.assertEqual([], errors)
+
+
 class TestVolumeExtractor(BaseTest):
     """ Test good classes extractor protocol """
 

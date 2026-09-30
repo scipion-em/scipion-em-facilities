@@ -588,6 +588,9 @@ class TestDataSamplerOutputPollingScalability(tests.unittest.TestCase):
             def getSize(self):
                 return 5
 
+            def __contains__(self, objId):
+                return True
+
             def getIdSet(self):
                 raise AssertionError(
                     "_checkNewOutput must not materialize every input ID."
@@ -837,3 +840,108 @@ class TestDataSamplerClosedStreamLateVisibilityRegression(
             protocol.inputSet.uniqueCalls,
             "The terminal mismatch must use a full ID reconciliation.",
         )
+
+
+class TestDataSamplerCheckNewOutputVisibilityRegression(tests.unittest.TestCase):
+
+    def testCheckNewOutputSkipsSampleNotYetVisibleAndDoesNotFinishPrematurely(self):
+        # Regression test: a sampled id is not guaranteed to still be
+        # selectable via Set.getItem() on a freshly reloaded input Set
+        # later - e.g. under replication lag on a PostgreSQL-backed
+        # compatibility bridge. Set.getItem raises rather than returning
+        # None for a missing row, so a membership check is required
+        # before indexing. self.finished here is driven only by
+        # processedIds/inputSize (unrelated to whether the sample was
+        # actually persisted), so skipping the invisible id must force
+        # self.finished back to False - otherwise the outer generator
+        # loop would exit and close the output before that sample is
+        # ever persisted.
+        class _Image:
+            def __init__(self, objId):
+                self.objId = objId
+
+            def clone(self):
+                return _Image(self.objId)
+
+        class _InputSet:
+            def __init__(self, visibleIds, size):
+                self._visibleIds = set(visibleIds)
+                self._size = size
+                self.closed = False
+
+            def getSize(self):
+                return self._size
+
+            def __contains__(self, objId):
+                return objId in self._visibleIds
+
+            def getItem(self, field, value):
+                assert field == "id"
+                # Real Set.getItem raises (UnboundLocalError) rather than
+                # returning None for a row it cannot find - match that
+                # here so a missing membership guard is caught.
+                if value not in self._visibleIds:
+                    raise UnboundLocalError("row not found for id %r" % value)
+                return _Image(value)
+
+            def close(self):
+                self.closed = True
+
+        class _OutputSet:
+            STREAM_OPEN = 1
+            STREAM_CLOSED = 2
+
+            def __init__(self):
+                self.ids = []
+
+            def getSize(self):
+                return len(self.ids)
+
+            def append(self, image):
+                self.ids.append(image.objId)
+
+        class _Harness:
+            finished = False
+            isStreamClosed = True
+            processedIds = {1, 2, 3, 4, 5}  # all scanned -> optimistically done
+            sampleIds = {4, 5}  # 5 is not yet visible
+            _inputClass = object
+            _baseName = "images.sqlite"
+
+            def __init__(self):
+                self.inputSet = _InputSet(visibleIds={4}, size=5)
+                self.outputSet = _OutputSet()
+                self.updatedMode = None
+                self.errors = []
+
+            def _loadInputSet(self, _):
+                return self.inputSet
+
+            def _loadOutputSet(self, SetClass, baseName, outputName=None):
+                return self.outputSet
+
+            def _updateOutputSet(self, outputName, outputSet, streamMode):
+                self.updatedMode = streamMode
+
+            def _getFirstJoinStep(self):
+                return None
+
+            def _store(self):
+                pass
+
+            def error(self, msg):
+                self.errors.append(msg)
+
+        protocol = _Harness()
+
+        ProtDataSampler._checkNewOutput(protocol)
+
+        self.assertEqual([4], protocol.outputSet.ids)
+        self.assertEqual({5}, protocol.sampleIds)
+        self.assertEqual(1, len(protocol.errors))
+        self.assertFalse(
+            protocol.finished,
+            "A skipped (not-yet-visible) sample must prevent the "
+            "protocol from declaring itself finished this round.",
+        )
+        self.assertEqual(protocol.outputSet.STREAM_OPEN, protocol.updatedMode)
