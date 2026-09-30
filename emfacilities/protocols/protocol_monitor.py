@@ -169,15 +169,24 @@ class Monitor:
         """ To be defined in subclasses. """
         pass
 
-    def loop(self):
+    def loop(self, startTime=None):
         self.initLoop()
-        timeout = time.time() + 60. * self.monitorTime   # interval minutes from now
+
+        if startTime is None:
+            startTimestamp = time.time()
+        elif hasattr(startTime, 'timestamp'):
+            startTimestamp = startTime.timestamp()
+        else:
+            startTimestamp = float(startTime)
+
+        timeout = startTimestamp + 60. * self.monitorTime
 
         while True:
             finished = self.step()
             if (time.time() > timeout) or finished:
                 break
             time.sleep(self.samplingInterval)
+
 
     def step(self):
         """ To be defined in subclasses. """
