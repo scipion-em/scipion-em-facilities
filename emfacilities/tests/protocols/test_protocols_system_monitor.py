@@ -288,3 +288,63 @@ class TestSystemMonitorDiskSamplingFailureRegression(pwtests.BaseTest):
                 self.assertEqual(rows[0][3:5], (0.0, 0.0))
             finally:
                 monitor.conn.close()
+
+
+class TestSystemMonitorLifecycleRegression(pwtests.BaseTest):
+    def testScheduledProducerKeepsSystemMonitorAlive(self):
+        from unittest.mock import patch
+        from pyworkflow.protocol.constants import STATUS_SCHEDULED
+
+        class ScheduledProtocol:
+            def getStatus(self):
+                return STATUS_SCHEDULED
+
+        class Memory:
+            percent = 20.0
+
+        protocol = ScheduledProtocol()
+
+        with tempfile.TemporaryDirectory() as tmpDir:
+            monitor = MonitorSystem(
+                [protocol],
+                workingDir=tmpDir,
+                samplingInterval=1,
+                monitorTime=1,
+                cpuAlert=101,
+                memAlert=101,
+                swapAlert=101,
+                doGpu=False,
+                doNetwork=False,
+                doDiskIO=False,
+                gpusToUse="0",
+                nif=None,
+            )
+
+            try:
+                with patch(
+                    "emfacilities.protocols.protocol_monitor_system."
+                    "getUpdatedProtocol",
+                    return_value=protocol,
+                ), patch(
+                    "emfacilities.protocols.protocol_monitor_system."
+                    "psutil.cpu_percent",
+                    return_value=10.0,
+                ), patch(
+                    "emfacilities.protocols.protocol_monitor_system."
+                    "psutil.virtual_memory",
+                    return_value=Memory(),
+                ), patch(
+                    "emfacilities.protocols.protocol_monitor_system."
+                    "psutil.swap_memory",
+                    return_value=Memory(),
+                ):
+                    monitor.initLoop()
+                    finished = monitor.step()
+
+                self.assertFalse(
+                    finished,
+                    "A scheduled producer is active and must keep the "
+                    "system monitor alive.",
+                )
+            finally:
+                monitor.conn.close()

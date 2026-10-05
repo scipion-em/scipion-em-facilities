@@ -43,7 +43,7 @@ from pyworkflow.utils import red
 import pyworkflow.protocol.params as params
 
 from pyworkflow import VERSION_1_1
-from pyworkflow.protocol.constants import STATUS_RUNNING
+from pyworkflow.protocol.constants import ACTIVE_STATUS
 from pyworkflow.protocol import getUpdatedProtocol
 
 from pynvml import (nvmlInit, nvmlDeviceGetHandleByIndex,
@@ -384,7 +384,7 @@ class MonitorSystem(Monitor):
         finished = []
         for prot in self.protocols:
             updatedProt = getUpdatedProtocol(prot)
-            finished.append(updatedProt.getStatus() != STATUS_RUNNING)
+            finished.append(updatedProt.getStatus() not in ACTIVE_STATUS)
 
         return all(finished)
 

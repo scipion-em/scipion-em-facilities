@@ -34,7 +34,7 @@ import pytz
 from configparser import ConfigParser
 import pyworkflow.protocol.params as params
 from pyworkflow import VERSION_1_1
-from pyworkflow.protocol.constants import STATUS_RUNNING
+from pyworkflow.protocol.constants import ACTIVE_STATUS
 from pyworkflow.protocol import getUpdatedProtocol
 
 from .protocol_monitor import ProtMonitor, Monitor
@@ -177,7 +177,7 @@ class MonitorCTF(Monitor):
         prot = getUpdatedProtocol(self.protocol)
 
         if not hasattr(prot, 'outputCTF'):
-            return prot.getStatus() != STATUS_RUNNING
+            return prot.getStatus() not in ACTIVE_STATUS
 
         setOfCTFs = prot.outputCTF
 
@@ -186,7 +186,7 @@ class MonitorCTF(Monitor):
         # only IDs newer than the watermark. Once the producer finishes, perform
         # one final full reconciliation so out-of-order IDs below the watermark
         # are not lost.
-        producerFinished = prot.getStatus() != STATUS_RUNNING
+        producerFinished = prot.getStatus() not in ACTIVE_STATUS
 
         where = None
         if not producerFinished and self._lastCtfId > 0:

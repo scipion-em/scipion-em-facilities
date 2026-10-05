@@ -27,7 +27,8 @@
 import os
 
 import pyworkflow.protocol.params as params
-from pyworkflow.protocol.constants import STATUS_RUNNING
+from pyworkflow.protocol.constants import ACTIVE_STATUS
+from pyworkflow.protocol import getUpdatedProtocol
 from pyworkflow import VERSION_1_1
 
 from .protocol_monitor import ProtMonitor, Monitor
@@ -153,12 +154,12 @@ class MonitorMovieGain(Monitor):
         self._reportedWarnings.add(warningLine)
 
     def step(self):
-        prot = self.protocol
+        prot = getUpdatedProtocol(self.protocol)
         fnSummary = prot._getPath("summaryForMonitor.txt")
         fnWarning = prot._getPath("warningsMonitor.txt")
 
         if not os.path.exists(fnSummary) or os.path.getsize(fnSummary) < 1:
-            return False
+            return prot.getStatus() not in ACTIVE_STATUS
 
         # If the producer recreated/truncated the summary file, restart from
         # the beginning instead of keeping an offset beyond the current EOF.
@@ -210,9 +211,9 @@ class MonitorMovieGain(Monitor):
             return False
 
         if not processedAnyLine:
-            return prot.getStatus() != STATUS_RUNNING
+            return prot.getStatus() not in ACTIVE_STATUS
 
-        return prot.getStatus() != STATUS_RUNNING
+        return prot.getStatus() not in ACTIVE_STATUS
 
 
 

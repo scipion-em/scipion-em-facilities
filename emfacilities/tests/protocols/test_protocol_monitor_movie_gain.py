@@ -1,11 +1,22 @@
 import os
 import tempfile
 from unittest import TestCase
+from unittest.mock import patch
 
 from pyworkflow.protocol.constants import STATUS_RUNNING
 
 from emfacilities.protocols.protocol_monitor_movie_gain import MonitorMovieGain
 
+
+class MovieGainMonitorTestCase(TestCase):
+    def setUp(self):
+        self._updatedProtocolPatcher = patch(
+            "emfacilities.protocols.protocol_monitor_movie_gain."
+            "getUpdatedProtocol",
+            side_effect=lambda protocol: protocol,
+        )
+        self._updatedProtocolPatcher.start()
+        self.addCleanup(self._updatedProtocolPatcher.stop)
 
 class DummyMovieGainProtocol:
     def __init__(self, root):
@@ -18,7 +29,7 @@ class DummyMovieGainProtocol:
         return STATUS_RUNNING
 
 
-class TestMonitorMovieGain(TestCase):
+class TestMonitorMovieGain(MovieGainMonitorTestCase):
 
     def _newMonitor(self, root):
         return MonitorMovieGain(
@@ -161,7 +172,120 @@ class TestMonitorMovieGain(TestCase):
             )
 
 
-class TestMonitorMovieGainPartialSummaryRegression(TestCase):
+
+    def testScheduledProducerWithSummaryKeepsMonitorAlive(self):
+        from unittest.mock import patch
+        from pyworkflow.protocol.constants import STATUS_SCHEDULED
+
+        class ScheduledMovieGainProtocol(DummyMovieGainProtocol):
+            def getStatus(self):
+                return STATUS_SCHEDULED
+
+        with tempfile.TemporaryDirectory() as tmpDir:
+            summary = os.path.join(tmpDir, "summaryForMonitor.txt")
+            with open(summary, "w") as handle:
+                handle.write(
+                    "movie_000001_residual: 0.010000 1.0 1.0 1.0\n"
+                )
+
+            monitor = MonitorMovieGain(
+                ScheduledMovieGainProtocol(tmpDir),
+                workingDir=tmpDir,
+                samplingInterval=1,
+                monitorTime=1,
+                stddevValue=0.04,
+                ratio1Value=99,
+                ratio2Value=99,
+            )
+            monitor.initLoop()
+
+            with patch(
+                "emfacilities.protocols.protocol_monitor_movie_gain."
+                "getUpdatedProtocol",
+                return_value=ScheduledMovieGainProtocol(tmpDir),
+            ):
+                result = monitor.step()
+
+            self.assertFalse(
+                result,
+                "A scheduled movie-gain producer is still active and must "
+                "not stop its monitor before it starts running.",
+            )
+
+    def testFinishedProducerWithoutSummaryStopsMonitor(self):
+        from unittest.mock import patch
+        class FinishedMovieGainProtocol(DummyMovieGainProtocol):
+            def getStatus(self):
+                return "finished"
+
+        with tempfile.TemporaryDirectory() as tmpDir:
+            monitor = MonitorMovieGain(
+                FinishedMovieGainProtocol(tmpDir),
+                workingDir=tmpDir,
+                samplingInterval=1,
+                monitorTime=1,
+                stddevValue=0.04,
+                ratio1Value=99,
+                ratio2Value=99,
+            )
+            monitor.initLoop()
+
+            with patch(
+                "emfacilities.protocols.protocol_monitor_movie_gain."
+                "getUpdatedProtocol",
+                return_value=FinishedMovieGainProtocol(tmpDir),
+            ):
+                result = monitor.step()
+
+            self.assertTrue(
+                result,
+                "A finished movie-gain producer with no summary file must "
+                "not keep the monitor alive until monitorTime expires.",
+            )
+
+    def testStepRefreshesProducerStatusBeforeStopping(self):
+        from unittest.mock import patch
+
+        class FinishedMovieGainProtocol(DummyMovieGainProtocol):
+            def getStatus(self):
+                return "finished"
+
+        with tempfile.TemporaryDirectory() as tmpDir:
+            summary = os.path.join(tmpDir, "summaryForMonitor.txt")
+            with open(summary, "w") as handle:
+                handle.write(
+                    "movie_000001_residual: 0.010000 1.0 1.0 1.0\n"
+                )
+
+            originalProtocol = DummyMovieGainProtocol(tmpDir)
+            refreshedProtocol = FinishedMovieGainProtocol(tmpDir)
+
+            monitor = MonitorMovieGain(
+                originalProtocol,
+                workingDir=tmpDir,
+                samplingInterval=1,
+                monitorTime=1,
+                stddevValue=0.04,
+                ratio1Value=99,
+                ratio2Value=99,
+            )
+            monitor.initLoop()
+
+            with patch(
+                "emfacilities.protocols.protocol_monitor_movie_gain."
+                "getUpdatedProtocol",
+                return_value=refreshedProtocol,
+                create=True,
+            ):
+                finished = monitor.step()
+
+            self.assertTrue(
+                finished,
+                "Movie-gain polling must refresh the producer protocol "
+                "before deciding whether monitoring is complete.",
+            )
+
+class TestMonitorMovieGainPartialSummaryRegression(MovieGainMonitorTestCase):
     def testPartialLastSummaryLineIsRetriedWhenCompleted(self):
         with tempfile.TemporaryDirectory() as tmpDir:
             summary = os.path.join(tmpDir, "summaryForMonitor.txt")

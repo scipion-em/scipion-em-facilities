@@ -457,6 +457,31 @@ class TestCtfStream(pwtests.BaseTest):
                 )
             finally:
                 monitor.conn.close()
+
+    def testScheduledProducerWithoutOutputKeepsMonitorAlive(self):
+        from unittest.mock import patch
+        from pyworkflow.protocol.constants import STATUS_SCHEDULED
+
+        class ScheduledProtocol:
+            def getStatus(self):
+                return STATUS_SCHEDULED
+
+        protocol = ScheduledProtocol()
+        monitor = object.__new__(monitorsProt.MonitorCTF)
+        monitor.protocol = protocol
+
+        with patch(
+            "emfacilities.protocols.protocol_monitor_ctf.getUpdatedProtocol",
+            return_value=protocol,
+        ):
+            finished = monitor.step()
+
+        self.assertFalse(
+            finished,
+            "A scheduled CTF producer is still active and must not stop "
+            "its monitor before it starts running.",
+        )
+
     @classmethod
     def setUpClass(cls):
         pwtests.setupTestProject(cls)
