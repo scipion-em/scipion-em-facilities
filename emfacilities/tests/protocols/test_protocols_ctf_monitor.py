@@ -253,6 +253,7 @@ class TestCtfStream(pwtests.BaseTest):
 
     def testStepUsesIncrementalDiscoveryAfterInitialReconciliation(self):
         from unittest.mock import patch
+        from pyworkflow.protocol.constants import STATUS_RUNNING
 
         class DummyMicrograph:
             def getFileName(self):
@@ -320,7 +321,7 @@ class TestCtfStream(pwtests.BaseTest):
                 self.outputCTF = output
 
             def getStatus(self):
-                return 0
+                return STATUS_RUNNING
 
         with tempfile.TemporaryDirectory() as tmpDir:
             output = DummyCtfSet()
@@ -362,6 +363,100 @@ class TestCtfStream(pwtests.BaseTest):
             finally:
                 monitor.conn.close()
 
+
+    def testFinishedProducerReconcilesIdsBelowDiscoveryWatermark(self):
+        from unittest.mock import patch
+        from pyworkflow.protocol.constants import STATUS_RUNNING
+
+        class DummyMicrograph:
+            def getFileName(self):
+                return "/tmp/mic.mrc"
+
+        class DummyCtf:
+            def getDefocusU(self):
+                return 2000.0
+
+            def getDefocusV(self):
+                return 1500.0
+
+            def getDefocusAngle(self):
+                return 0.0
+
+            def getResolution(self):
+                return 3.0
+
+            def getFitQuality(self):
+                return 1.0
+
+            def hasPhaseShift(self):
+                return False
+
+            def getPsdFile(self):
+                return "/tmp/psd.psd"
+
+            def getMicrograph(self):
+                return DummyMicrograph()
+
+            def getObjCreation(self):
+                return "2026-10-05 10:00:00"
+
+        class DummyCtfSet:
+            def __init__(self):
+                self.ids = [10, 30]
+
+            def getUniqueValues(self, field, where=None):
+                if field != "id":
+                    raise AssertionError("Unexpected field requested from CTF fixture.")
+                if where is None:
+                    return list(self.ids)
+                lastId = int(where.split(">")[1].strip())
+                return [objId for objId in self.ids if objId > lastId]
+
+            def __getitem__(self, objId):
+                return DummyCtf()
+
+        class DummyProtocol:
+            def __init__(self, output):
+                self.outputCTF = output
+                self.status = STATUS_RUNNING
+
+            def getStatus(self):
+                return self.status
+
+        with tempfile.TemporaryDirectory() as tmpDir:
+            output = DummyCtfSet()
+            protocol = DummyProtocol(output)
+            monitor = monitorsProt.MonitorCTF(
+                protocol,
+                workingDir=tmpDir,
+                samplingInterval=1,
+                monitorTime=1,
+                minDefocus=1000,
+                maxDefocus=40000,
+                astigmatism=2000,
+            )
+            monitor.initLoop()
+
+            try:
+                with patch(
+                    "emfacilities.protocols.protocol_monitor_ctf.getUpdatedProtocol",
+                    return_value=protocol,
+                ):
+                    self.assertFalse(monitor.step())
+                    self.assertEqual(monitor.readCTFs, {10, 30})
+
+                    output.ids = [10, 20, 30]
+                    protocol.status = 999999
+                    self.assertTrue(monitor.step())
+
+                self.assertEqual(
+                    monitor.readCTFs,
+                    {10, 20, 30},
+                    "The final poll must reconcile the whole logical CTF output "
+                    "before the monitor stops, including IDs below the discovery watermark.",
+                )
+            finally:
+                monitor.conn.close()
     @classmethod
     def setUpClass(cls):
         pwtests.setupTestProject(cls)

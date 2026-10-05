@@ -125,16 +125,11 @@ class TestGoodClassesExtractor(BaseTest):
         prot.lastCheck = datetime.now()
         prot._loadInputClassesSet = lambda: inputSet
 
-        with patch(
-                "emfacilities.protocols.protocol_good_classes_extractor.os.path.getmtime",
-                return_value=0,
-        ):
-            hasNewParticles = prot._newParticlesToProcess()
+        hasNewParticles = prot._newParticlesToProcess()
 
         self.assertTrue(
             hasNewParticles,
-            "Logical Set contents must be checked even when the sqlite mtime "
-            "does not change.",
+            "Logical Set contents must be checked independently of backing-file mtime.",
         )
         self.assertTrue(inputSet.closed)
 
@@ -170,33 +165,13 @@ class TestGoodClassesExtractor(BaseTest):
         prot.dictsTimes = {"1": "2026-09-19 08:00:00"}
         prot.isStreamClosed = Set.STREAM_OPEN
         prot.lastCheck = datetime.now()
-
         prot._loadInputClassesSet = lambda: inputSet
 
-        with patch(
-                "emfacilities.protocols.protocol_good_classes_extractor.os.path.getmtime",
-                return_value=0,
-        ):
-            hasNewParticles = prot._newParticlesToProcess()
+        hasNewParticles = prot._newParticlesToProcess()
 
         self.assertFalse(hasNewParticles)
         self.assertEqual(prot.isStreamClosed, Set.STREAM_CLOSED)
         self.assertTrue(inputSet.closed)
-
-
-    def testContinueRestoresLastProcessedClassTimes(self):
-        expectedTimes = {
-            "1": "2026-09-19 08:00:00",
-            "5": "2026-09-19 08:01:00",
-        }
-
-        prot = self.newProtocol(ProtGoodClassesExtractor)
-        prot.isContinued = lambda: True
-        prot._getLastDone = lambda: expectedTimes.copy()
-
-        prot.initialStep()
-
-        self.assertEqual(prot.dictsTimes, expectedTimes)
 
 
     def testGoodClassesSelectorAvgs(self):
@@ -234,26 +209,30 @@ class TestGoodClassesExtractor(BaseTest):
         class OutputSet:
             def __init__(self, ids):
                 self._ids = set(ids)
+                self.loaded = False
+
+            def loadAllProperties(self):
+                self.loaded = True
 
             def getIdSet(self):
+                if not self.loaded:
+                    raise AssertionError("Persisted outputs must be refreshed before reading their ids.")
                 return set(self._ids)
 
         prot = self.newProtocol(ProtGoodClassesExtractor)
         prot.isContinued = lambda: True
-        prot._getLastDone = lambda: {
-            "1": "2026-09-19 08:00:00",
-        }
         prot.outputParticles = OutputSet({1, 2, 3})
         prot.outputParticlesDiscarded = OutputSet({4, 5})
+        prot._rebuildClassCreationTimes = lambda persistedIds: {}
 
         prot.initialStep()
 
         self.assertEqual(set(prot.goodParticles), {1, 2, 3})
         self.assertEqual(set(prot.badParticles), {4, 5})
-        self.assertEqual(
-            prot.particlesDistribution,
-            {"good": [3], "bad": [2]},
-        )
+        self.assertTrue(prot.outputParticles.loaded)
+        self.assertTrue(prot.outputParticlesDiscarded.loaded)
+        self.assertEqual(prot.particlesDistribution, {"good": [3], "bad": [2]})
+
 
     def testContinueClassWithoutNewParticlesKeepsCheckpoint(self):
         class EmptyOutput:
@@ -372,52 +351,6 @@ class TestGoodClassesExtractor(BaseTest):
         self.assertEqual(prot.dictsTimes["1"], "2026-09-19 08:10:00")
 
 
-    def testLastDoneLegacyCheckpointDoesNotUseEval(self):
-        prot = self.newProtocol(ProtGoodClassesExtractor)
-        checkpoint = prot._getExtraPath("last_done.txt")
-        os.makedirs(os.path.dirname(checkpoint), exist_ok=True)
-        expected = {
-            "1": "2026-09-19 08:00:00",
-            "5": "2026-09-19 08:01:00",
-        }
-
-        with open(checkpoint, "w") as handle:
-            handle.write(str(expected))
-
-        with patch(
-                "builtins.eval",
-                side_effect=AssertionError("eval must not be used"),
-        ):
-            restored = prot._getLastDone()
-
-        self.assertEqual(restored, expected)
-
-    def testLastDoneWritePreservesPreviousCheckpointOnReplaceFailure(self):
-        prot = self.newProtocol(ProtGoodClassesExtractor)
-        checkpoint = prot._getExtraPath("last_done.txt")
-        os.makedirs(os.path.dirname(checkpoint), exist_ok=True)
-        previous = {"1": "2026-09-19 08:00:00"}
-        updated = {
-            "1": "2026-09-19 08:00:00",
-            "2": "2026-09-19 08:05:00",
-        }
-
-        with open(checkpoint, "w") as handle:
-            handle.write(str(previous))
-
-        with patch(
-                "emfacilities.protocols.protocol_good_classes_extractor.os.replace",
-                side_effect=OSError("simulated replace failure"),
-        ):
-            with self.assertRaises(OSError):
-                prot._writeLastDone(updated)
-
-        with open(checkpoint, "r") as handle:
-            content = handle.read()
-
-        self.assertEqual(content, str(previous))
-
-
 class TestGoodClassesExtractorLockScope(unittest.TestCase):
     """Lightweight regression tests that need no real project/dataset."""
 
@@ -473,27 +406,6 @@ class TestGoodClassesExtractorLockScope(unittest.TestCase):
             "their own fresh output Set and silently drop one "
             "another's results.",
         )
-
-class TestGoodClassesExtractorContinueCheckpointRegression(unittest.TestCase):
-    def testContinueFallsBackWhenLastDoneCheckpointIsInvalid(self):
-        class _Harness:
-            def isContinued(self):
-                return True
-
-            def _getLastDone(self):
-                raise SyntaxError("truncated checkpoint")
-
-            def info(self, message):
-                pass
-
-        protocol = _Harness()
-
-        ProtGoodClassesExtractor.initialStep(protocol)
-
-        self.assertEqual(protocol.dictsTimes, {})
-        self.assertEqual(protocol.goodParticles, [])
-        self.assertEqual(protocol.badParticles, [])
-
 
 class TestGoodClassesExtractorStreamingArchitecture(unittest.TestCase):
     def testUsesFacilitiesStreamingBaseAndCoreGeneratorInsertion(self):
@@ -595,3 +507,114 @@ class TestGoodClassesExtractorStreamingArchitecture(unittest.TestCase):
             classSet.clazz.whereCalls,
         )
         self.assertTrue(classSet.closed)
+
+
+class TestGoodClassesExtractorLogicalResumeRegression(unittest.TestCase):
+    def testContinueRebuildsClassWatermarksFromPersistedOutputsWithoutCheckpointFile(self):
+        class _Particle:
+            def __init__(self, objId, creation):
+                self._objId = objId
+                self._creation = creation
+
+            def getObjId(self):
+                return self._objId
+
+            def getObjCreation(self):
+                return self._creation
+
+        class _Class:
+            def getObjId(self):
+                return 7
+
+            def iterItems(self, orderBy=None, direction=None, where=None):
+                self.assertedOrder = (orderBy, direction, where)
+                return iter((
+                    _Particle(101, "2026-09-19 08:00:00"),
+                    _Particle(102, "2026-09-19 08:05:00"),
+                    _Particle(103, "2026-09-19 08:10:00"),
+                ))
+
+        class _ClassSet:
+            def __init__(self):
+                self.closed = False
+
+            def iterItems(self, **kwargs):
+                return iter((_Class(),))
+
+            def close(self):
+                self.closed = True
+
+        class _OutputSet:
+            def __init__(self, ids):
+                self._ids = set(ids)
+                self.loaded = False
+
+            def loadAllProperties(self):
+                self.loaded = True
+
+            def getIdSet(self):
+                if not self.loaded:
+                    raise AssertionError("Persisted outputs must be refreshed before rebuilding resume state.")
+                return set(self._ids)
+
+        class _Harness:
+            def __init__(self):
+                self.outputParticles = _OutputSet({101, 103})
+                self.outputParticlesDiscarded = _OutputSet(set())
+                self.classSet = _ClassSet()
+                self.messages = []
+
+            def isContinued(self):
+                return True
+
+            def _getLastDone(self):
+                raise AssertionError("Continue must not depend on last_done.txt.")
+
+            def _loadInputClassesSet(self):
+                return self.classSet
+
+            def _rebuildClassCreationTimes(self, persistedIds):
+                return ProtGoodClassesExtractor._rebuildClassCreationTimes(self, persistedIds)
+
+            def info(self, message):
+                self.messages.append(message)
+
+        protocol = _Harness()
+
+        ProtGoodClassesExtractor.initialStep(protocol)
+
+        self.assertEqual({"7": "2026-09-19 08:00:00"}, protocol.dictsTimes)
+        self.assertTrue(protocol.outputParticles.loaded)
+        self.assertTrue(protocol.outputParticlesDiscarded.loaded)
+        self.assertTrue(protocol.classSet.closed)
+        self.assertEqual({101, 103}, set(protocol.goodParticles))
+        self.assertEqual([], protocol.badParticles)
+
+
+class TestGoodClassesExtractorPersistedOutputRefresh(unittest.TestCase):
+    def testLoadOutputSetRefreshesExistingLogicalOutputBeforeAppend(self):
+        class ExistingOutput:
+            def __init__(self):
+                self.loaded = False
+                self.appendEnabled = False
+
+            def loadAllProperties(self):
+                self.loaded = True
+
+            def enableAppend(self):
+                if not self.loaded:
+                    raise AssertionError("Persisted output must be refreshed before enableAppend().")
+                self.appendEnabled = True
+
+        existing = ExistingOutput()
+
+        class Harness:
+            def __init__(self):
+                self.outputParticles = existing
+
+        protocol = Harness()
+        outputSet = ProtGoodClassesExtractor._loadOutputSet(protocol, "outputParticles", "_accepted")
+
+        self.assertIs(existing, outputSet)
+        self.assertTrue(existing.loaded)
+        self.assertTrue(existing.appendEnabled)

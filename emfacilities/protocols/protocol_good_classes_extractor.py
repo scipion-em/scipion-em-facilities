@@ -23,9 +23,6 @@
 # *  e-mail address 'scipion@cnb.csic.es'
 # *
 # **************************************************************************
-import ast
-import os
-import tempfile
 import time
 import sys
 import matplotlib.pyplot as plt
@@ -40,7 +37,6 @@ from pyworkflow import BETA, UPDATED, NEW, PROD
 
 OUTPUT_PARTICLES = "outputParticles"
 OUTPUT_DISCARDED_PARTICLES = "outputParticlesDiscarded"
-LAST_DONE_FILE = "last_done.txt"
 
 
 class ProtGoodClassesExtractor(ProtFacilitiesStreamingBase):
@@ -137,25 +133,18 @@ class ProtGoodClassesExtractor(ProtFacilitiesStreamingBase):
         self.dictsTimes = {}
 
         if self.isContinued():
-            try:
-                self.dictsTimes = self._getLastDone()
-                self.info(
-                    'Restored last processed creation times for %d classes'
-                    % len(self.dictsTimes)
-                )
-            except (FileNotFoundError, SyntaxError, ValueError):
-                self.info(
-                    'No valid previous last-done checkpoint found; '
-                    'starting without restored class times.'
-                )
-
             goodOutput = getattr(self, OUTPUT_PARTICLES, None)
             badOutput = getattr(self, OUTPUT_DISCARDED_PARTICLES, None)
 
             if goodOutput is not None:
+                goodOutput.loadAllProperties()
                 self.goodParticles = list(goodOutput.getIdSet())
             if badOutput is not None:
+                badOutput.loadAllProperties()
                 self.badParticles = list(badOutput.getIdSet())
+
+            persistedIds = set(self.goodParticles).union(self.badParticles)
+            self.dictsTimes = self._rebuildClassCreationTimes(persistedIds)
 
             if goodOutput is not None or badOutput is not None:
                 self.particlesDistribution = {
@@ -166,6 +155,11 @@ class ProtGoodClassesExtractor(ProtFacilitiesStreamingBase):
                     'Restored particle counters: %d good, %d discarded'
                     % (len(self.goodParticles), len(self.badParticles))
                 )
+
+            self.info(
+                'Restored last processed creation times for %d classes'
+                % len(self.dictsTimes)
+            )
 
 
     def extractElements(self, inputClasses):
@@ -242,7 +236,6 @@ class ProtGoodClassesExtractor(ProtFacilitiesStreamingBase):
             if len(outputDiscarded) > 0:
                 self._updateOutputSet(OUTPUT_DISCARDED_PARTICLES, outputDiscarded, self.isStreamClosed)
 
-            self._writeLastDone(self.dictsTimes)
 
         self._createPlots()
 
@@ -280,6 +273,7 @@ class ProtGoodClassesExtractor(ProtFacilitiesStreamingBase):
             outputSet.copyInfo(images)
             outputSet.setStreamState(Set.STREAM_OPEN)
         else:
+            outputSet.loadAllProperties()
             outputSet.enableAppend()
 
         return outputSet
@@ -320,39 +314,25 @@ class ProtGoodClassesExtractor(ProtFacilitiesStreamingBase):
         listIDs = [int(id) for id in ids]
         return listIDs
 
-    def _writeLastDone(self, creationTimeDict):
-        """Write the last processed creation times atomically."""
-        checkpoint = self._getExtraPath(LAST_DONE_FILE)
-        directory = os.path.dirname(checkpoint)
-        fd, tmpPath = tempfile.mkstemp(
-            prefix=os.path.basename(checkpoint) + ".",
-            suffix=".tmp",
-            dir=directory,
-        )
+    def _rebuildClassCreationTimes(self, persistedIds):
+        classTimes = {}
+        classSet = self._loadInputClassesSet()
 
         try:
-            with os.fdopen(fd, "w") as handle:
-                handle.write(repr(creationTimeDict))
-            os.replace(tmpPath, checkpoint)
-        except Exception:
-            try:
-                os.unlink(tmpPath)
-            except FileNotFoundError:
-                pass
-            raise
+            for clazz in classSet.iterItems():
+                lastCreation = None
 
-    def _getLastDone(self):
-        """Read the last processed creation times safely."""
-        with open(self._getExtraPath(LAST_DONE_FILE), "r") as file:
-            content = file.read()
+                for image in clazz.iterItems(orderBy='creation', direction='ASC'):
+                    if image.getObjId() not in persistedIds:
+                        break
+                    lastCreation = image.getObjCreation()
 
-        dictTimes = ast.literal_eval(content)
-        if not isinstance(dictTimes, dict):
-            raise ValueError(
-                "Invalid last-done checkpoint: expected a dictionary."
-            )
+                if lastCreation is not None:
+                    classTimes[str(clazz.getObjId())] = lastCreation
+        finally:
+            classSet.close()
 
-        return dictTimes
+        return classTimes
 
     def _createPlots(self):
         """

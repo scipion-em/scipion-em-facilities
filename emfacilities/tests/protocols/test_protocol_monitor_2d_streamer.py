@@ -35,18 +35,17 @@ class _ProjectInfo:
 class _OutputSet:
     def __init__(self, ids=()):
         self._ids = set(ids)
+        self.loaded = False
+
+    def loadAllProperties(self):
+        self.loaded = True
 
     def getSize(self):
         return len(self._ids)
 
-    def aggregate(self, operations, field):
-        if operations != ["MAX"] or field != "_objId":
-            raise AssertionError(
-                "Unexpected aggregate query in monitor Continue fixture."
-            )
-        return [{"MAX": max(self._ids) if self._ids else None}]
-
     def getIdSet(self):
+        if not self.loaded:
+            raise AssertionError("Persisted outputs must be refreshed before reading ids.")
         return set(self._ids)
 
 
@@ -122,24 +121,22 @@ class TestMonitor2dStreamer(BaseTest):
         )
 
 
+
     def testContinueRestoresProgressFromExistingSubsets(self):
         class OutputSet:
             def __init__(self, ids):
                 self._ids = set(ids)
+                self.loaded = False
+
+            def loadAllProperties(self):
+                self.loaded = True
 
             def getSize(self):
                 return len(self._ids)
 
-            def aggregate(self, operations, field):
-                if operations != ["MAX"] or field != "_objId":
-                    raise AssertionError(
-                        "Unexpected aggregate query in monitor Continue fixture."
-                    )
-                return [{
-                    "MAX": max(self._ids) if self._ids else None
-                }]
-
             def getIdSet(self):
+                if not self.loaded:
+                    raise AssertionError("Persisted outputs must be refreshed before reading ids.")
                 return set(self._ids)
 
         class Input2dProtocol:
@@ -153,12 +150,10 @@ class TestMonitor2dStreamer(BaseTest):
             def get(self):
                 return self.value
 
-        prot = self.newProtocol(
-            ProtMonitor2dStreamer,
-            samplingInterval=1,
-        )
+        prot = self.newProtocol(ProtMonitor2dStreamer, samplingInterval=1)
         prot.isContinued = lambda: True
         prot.input2dProtocol = Pointer(Input2dProtocol())
+
         def createSubset():
             prot._counter += 1
             return object()
@@ -174,19 +169,18 @@ class TestMonitor2dStreamer(BaseTest):
 
         def checkNewInput():
             restoredState["lastPartId"] = prot._lastPartId
+            restoredState["persistedIds"] = set(prot._persistedParticleIds)
             restoredState["counter"] = prot._counter
             restoredState["processed"] = prot._counterParticlesProcessed
             prot._streamClosed = True
 
         prot._checkNewInput = checkNewInput
 
-        with patch(
-                "emfacilities.protocols.protocol_monitor_2d_streamer.time.sleep",
-                return_value=None,
-        ):
+        with patch("emfacilities.protocols.protocol_monitor_2d_streamer.time.sleep", return_value=None):
             prot.monitorStep()
 
-        self.assertEqual(restoredState["lastPartId"], 6)
+        self.assertEqual(restoredState["lastPartId"], 0)
+        self.assertEqual(restoredState["persistedIds"], {1, 2, 3, 4, 5, 6})
         self.assertEqual(restoredState["counter"], 3)
         self.assertEqual(restoredState["processed"], 6)
 
@@ -622,6 +616,65 @@ class TestMonitor2dStreamer(BaseTest):
         )
 
 
+    def testContinueDoesNotReapplyStartingNumber(self):
+        class OutputSet:
+            def __init__(self, ids):
+                self._ids = set(ids)
+
+            def loadAllProperties(self):
+                pass
+
+            def getIdSet(self):
+                return set(self._ids)
+
+        class Particle:
+            def __init__(self, objId, micId):
+                self._objId = objId
+                self._micId = micId
+
+            def getObjId(self):
+                return self._objId
+
+            def getMicId(self):
+                return self._micId
+
+        class InputSet:
+            def load(self):
+                pass
+
+            def loadAllProperties(self):
+                pass
+
+            def isStreamClosed(self):
+                return False
+
+            def iterItems(self, **kwargs):
+                return iter([
+                    Particle(10, 1),
+                    Particle(20, 1),
+                    Particle(30, 2),
+                    Particle(40, 2),
+                ])
+
+            def close(self):
+                pass
+
+        prot = self.newProtocol(ProtMonitor2dStreamer, cumulativeBatch=False, startingNumber=2)
+        prot._runIds.set([])
+        prot.iterOutputAttributes = lambda: [("outputParticles_001", OutputSet({10, 30}))]
+        prot._restoreScheduledRuns = lambda outputNames: None
+        prot.inputParticles = _Pointer(InputSet())
+
+        prot._restoreContinueState()
+        particleIds = [particle.getObjId() for particle in prot._iterParticles()]
+
+        self.assertEqual(
+            particleIds,
+            [20, 40],
+            "startingNumber is an initial-run skip and must not be applied again after Continue state has been restored.",
+        )
+
+
 class TestMonitor2dStreamerResumeScalability(BaseTest):
     @classmethod
     def setUpClass(cls):
@@ -629,27 +682,19 @@ class TestMonitor2dStreamerResumeScalability(BaseTest):
 
     class _OutputSet:
         def __init__(self, size, maxId):
-            self._size = size
-            self._maxId = maxId
+            self._ids = set(range(maxId - size + 1, maxId + 1))
+            self.loaded = False
+
+        def loadAllProperties(self):
+            self.loaded = True
 
         def getSize(self):
-            return self._size
-
-        def aggregate(self, operations, field):
-            if operations != ["MAX"]:
-                raise AssertionError(
-                    "Resume should only request MAX."
-                )
-            if field != "_objId":
-                raise AssertionError(
-                    "Resume should aggregate the logical object id."
-                )
-            return [{"MAX": self._maxId}]
+            return len(self._ids)
 
         def getIdSet(self):
-            raise AssertionError(
-                "Continue must not materialize every persisted particle ID."
-            )
+            if not self.loaded:
+                raise AssertionError("Persisted outputs must be refreshed before reading ids.")
+            return set(self._ids)
 
     def _makeProtocol(self, cumulativeBatch, outputs):
         prot = self.newProtocol(
@@ -661,18 +706,13 @@ class TestMonitor2dStreamerResumeScalability(BaseTest):
         prot._restoreScheduledRuns = lambda outputNames: None
         return prot
 
-    def testContinueRestoresNonCumulativeProgressWithoutIdScan(self):
+
+    def testContinueRestoresNonCumulativeProgressFromPersistedIds(self):
         prot = self._makeProtocol(
             False,
             [
-                (
-                    "outputParticles_001",
-                    self._OutputSet(3, 3),
-                ),
-                (
-                    "outputParticles_002",
-                    self._OutputSet(3, 6),
-                ),
+                ("outputParticles_001", self._OutputSet(3, 3)),
+                ("outputParticles_002", self._OutputSet(3, 6)),
             ],
         )
 
@@ -680,20 +720,16 @@ class TestMonitor2dStreamerResumeScalability(BaseTest):
 
         self.assertEqual(prot._counter, 2)
         self.assertEqual(prot._counterParticlesProcessed, 6)
-        self.assertEqual(prot._lastPartId, 6)
+        self.assertEqual(prot._persistedParticleIds, {1, 2, 3, 4, 5, 6})
+        self.assertEqual(prot._lastPartId, 0)
+
 
     def testContinueRestoresCumulativeProgressWithoutDoubleCounting(self):
         prot = self._makeProtocol(
             True,
             [
-                (
-                    "outputParticles_001",
-                    self._OutputSet(3, 3),
-                ),
-                (
-                    "outputParticles_002",
-                    self._OutputSet(6, 6),
-                ),
+                ("outputParticles_001", self._OutputSet(3, 3)),
+                ("outputParticles_002", self._OutputSet(6, 6)),
             ],
         )
 
@@ -703,6 +739,89 @@ class TestMonitor2dStreamerResumeScalability(BaseTest):
         self.assertEqual(
             prot._counterParticlesProcessed,
             6,
-            "Cumulative subsets must not be summed during Continue.",
+            "Cumulative subsets must be deduplicated by persisted particle id during Continue.",
         )
-        self.assertEqual(prot._lastPartId, 6)
+        self.assertEqual(prot._persistedParticleIds, {1, 2, 3, 4, 5, 6})
+        self.assertEqual(prot._lastPartId, 0)
+
+class TestMonitor2dStreamerLogicalResumeRegression(BaseTest):
+    @classmethod
+    def setUpClass(cls):
+        setupTestProject(cls)
+
+    def testContinueDoesNotSkipUnpersistedParticleBelowPersistedMaxId(self):
+        class OutputSet:
+            def __init__(self, ids):
+                self._ids = set(ids)
+                self.loaded = False
+
+            def loadAllProperties(self):
+                self.loaded = True
+
+            def getSize(self):
+                return len(self._ids)
+
+            def getIdSet(self):
+                if not self.loaded:
+                    raise AssertionError("Persisted monitor outputs must be refreshed before reading ids.")
+                return set(self._ids)
+
+        class Particle:
+            def __init__(self, objId, micId):
+                self._objId = objId
+                self._micId = micId
+
+            def getObjId(self):
+                return self._objId
+
+            def getMicId(self):
+                return self._micId
+
+        class InputSet:
+            def __init__(self):
+                self.closed = False
+                self.particles = [
+                    Particle(10, 1),
+                    Particle(20, 1),
+                    Particle(30, 2),
+                    Particle(40, 2),
+                ]
+
+            def load(self):
+                pass
+
+            def loadAllProperties(self):
+                pass
+
+            def isStreamClosed(self):
+                return False
+
+            def iterItems(self, orderBy=None, direction=None, where=None):
+                particles = list(self.particles)
+                if where:
+                    lastId = int(where.split(">")[1].strip())
+                    particles = [particle for particle in particles if particle.getObjId() > lastId]
+                return iter(particles)
+
+            def close(self):
+                self.closed = True
+
+        outputSet = OutputSet({10, 30})
+        inputSet = InputSet()
+
+        prot = self.newProtocol(ProtMonitor2dStreamer, cumulativeBatch=False, startingNumber=0)
+        prot._runIds.set([])
+        prot.iterOutputAttributes = lambda: [("outputParticles_001", outputSet)]
+        prot._restoreScheduledRuns = lambda outputNames: None
+        prot.inputParticles = _Pointer(inputSet)
+
+        prot._restoreContinueState()
+        particleIds = [particle.getObjId() for particle in prot._iterParticles()]
+
+        self.assertEqual(
+            particleIds,
+            [20, 40],
+            "Continue must retry every logical input particle absent from persisted outputs, even when its id is below a later persisted id.",
+        )
+        self.assertTrue(outputSet.loaded)
+        self.assertTrue(inputSet.closed)

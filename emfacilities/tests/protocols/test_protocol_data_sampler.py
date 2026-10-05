@@ -373,10 +373,16 @@ class TestDataSamplerLoadOutputSet(tests.unittest.TestCase):
 
         class ExistingOutputSet:
             def __init__(self):
+                self.loadAllPropertiesCalls = 0
                 self.enableAppendCalls = 0
                 self.copiedFrom = None
 
+            def loadAllProperties(self):
+                self.loadAllPropertiesCalls += 1
+
             def enableAppend(self):
+                if not self.loadAllPropertiesCalls:
+                    raise AssertionError("Persisted output must be refreshed before enableAppend().")
                 self.enableAppendCalls += 1
 
             def copyInfo(self, inputs):
@@ -394,6 +400,7 @@ class TestDataSamplerLoadOutputSet(tests.unittest.TestCase):
             )
 
         self.assertIs(existingOutputSet, outputSet)
+        self.assertEqual(1, existingOutputSet.loadAllPropertiesCalls)
         self.assertEqual(1, existingOutputSet.enableAppendCalls)
 
 class TestDataSamplerFinalizationRegression(tests.unittest.TestCase):
@@ -945,3 +952,91 @@ class TestDataSamplerCheckNewOutputVisibilityRegression(tests.unittest.TestCase)
             "protocol from declaring itself finished this round.",
         )
         self.assertEqual(protocol.outputSet.STREAM_OPEN, protocol.updatedMode)
+
+
+class TestDataSamplerPersistedOutputRegression(tests.unittest.TestCase):
+    def testPersistedOutputIsRefreshedAndBackingFileIsNotWorkflowIdentity(self):
+        class _Pointer:
+            def __init__(self, value):
+                self._value = value
+
+            def get(self):
+                return self._value
+
+        class _ExistingOutput:
+            def __init__(self):
+                self.loaded = False
+                self.appendEnabled = False
+                self.copiedFrom = None
+
+            def loadAllProperties(self):
+                self.loaded = True
+
+            def enableAppend(self):
+                if not self.loaded:
+                    raise AssertionError("Logical output must be refreshed before enableAppend().")
+                self.appendEnabled = True
+
+            def copyInfo(self, inputs):
+                self.copiedFrom = inputs
+
+            def getSize(self):
+                if not self.loaded:
+                    raise AssertionError("Logical output must be refreshed before reading its size.")
+                return 2
+
+            def getIdSet(self):
+                if not self.loaded:
+                    raise AssertionError("Logical output must be refreshed before reading its ids.")
+                return {1, 2}
+
+        class _FreshOutput:
+            STREAM_OPEN = 1
+
+            def __init__(self, filename=None):
+                self.filename = filename
+                self.loaded = False
+                self.streamState = None
+                self.copiedFrom = None
+
+            def loadAllProperties(self):
+                self.loaded = True
+                raise AssertionError("A backing file must not restore an output absent from protocol outputs.")
+
+            def setStreamState(self, state):
+                self.streamState = state
+
+            def copyInfo(self, inputs):
+                self.copiedFrom = inputs
+
+        inputs = object()
+        existing = _ExistingOutput()
+
+        class _Harness:
+            def __init__(self):
+                self.outputSet = existing
+                self.inputImages = _Pointer(inputs)
+
+            def _getPath(self, name):
+                return "/tmp/" + name
+
+        protocol = _Harness()
+
+        loaded = ProtDataSampler._loadOutputSet(protocol, object, "images.sqlite", outputName=OUTPUT)
+        doneIds, size = ProtDataSampler._getAllDoneIds(protocol)
+
+        self.assertIs(existing, loaded)
+        self.assertTrue(existing.loaded)
+        self.assertTrue(existing.appendEnabled)
+        self.assertEqual({1, 2}, set(doneIds))
+        self.assertEqual(2, size)
+
+        del protocol.outputSet
+
+        with patch("emfacilities.protocols.protocol_data_sampler.pwutils.cleanPath") as cleanPathMock:
+            fresh = ProtDataSampler._loadOutputSet(protocol, _FreshOutput, "images.sqlite", outputName=OUTPUT)
+
+        cleanPathMock.assert_called_once_with("/tmp/images.sqlite")
+        self.assertFalse(fresh.loaded)
+        self.assertEqual(_FreshOutput.STREAM_OPEN, fresh.streamState)
+        self.assertIs(inputs, fresh.copiedFrom)

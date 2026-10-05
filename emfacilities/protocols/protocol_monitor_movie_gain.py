@@ -25,16 +25,12 @@
 # **************************************************************************
 
 import os
-import tempfile
 
 import pyworkflow.protocol.params as params
 from pyworkflow.protocol.constants import STATUS_RUNNING
 from pyworkflow import VERSION_1_1
 
 from .protocol_monitor import ProtMonitor, Monitor
-
-MOVIE_GAIN_LAST_LINE = 'movie_gain_monitor.last_line'
-
 
 class ProtMonitorMovieGain(ProtMonitor):
     """ check CPU, mem and IO usage.
@@ -140,64 +136,21 @@ class MonitorMovieGain(Monitor):
     def initLoop(self):
         self._lastSummaryLine = 0
         self._summaryOffset = 0
-        checkpoint = os.path.join(self.workingDir, MOVIE_GAIN_LAST_LINE)
+        self._reportedWarnings = set()
+        fnWarning = self.protocol._getPath("warningsMonitor.txt")
 
-        if os.path.exists(checkpoint):
-            try:
-                with open(checkpoint, "r") as handle:
-                    self._lastSummaryLine = int(
-                        handle.read().strip() or 0
-                    )
-            except (OSError, ValueError):
-                self._lastSummaryLine = 0
+        if os.path.exists(fnWarning):
+            with open(fnWarning, "r") as handle:
+                self._reportedWarnings = {line.rstrip("\n") for line in handle}
 
-        # Keep the existing line-count checkpoint for compatibility, but
-        # translate it to a byte/file offset only once at startup. After this,
-        # every polling round can seek directly to the unread tail instead of
-        # rereading the complete summary file.
-        fnSummary = self.protocol._getPath("summaryForMonitor.txt")
-        if self._lastSummaryLine <= 0:
+    def _reportWarning(self, fhWarning, movieName, message):
+        warningLine = "%s: %s" % (movieName, message)
+        if warningLine in self._reportedWarnings:
             return
 
-        if not os.path.exists(fnSummary):
-            self._lastSummaryLine = 0
-            return
-
-        restoredLines = 0
-        with open(fnSummary, "r") as handle:
-            while restoredLines < self._lastSummaryLine:
-                line = handle.readline()
-
-                if not line or not line.endswith("\n"):
-                    # The producer recreated/truncated the summary or the
-                    # checkpoint points beyond the complete records currently
-                    # available. Reconcile again from the beginning.
-                    self._lastSummaryLine = 0
-                    self._summaryOffset = 0
-                    return
-
-                restoredLines += 1
-                self._summaryOffset = handle.tell()
-
-
-
-    def _writeLastSummaryLine(self):
-        checkpoint = os.path.join(self.workingDir, MOVIE_GAIN_LAST_LINE)
-        fd, tmpPath = tempfile.mkstemp(
-            prefix=os.path.basename(checkpoint) + ".",
-            suffix=".tmp",
-            dir=self.workingDir,
-        )
-        try:
-            with os.fdopen(fd, "w") as handle:
-                handle.write(str(self._lastSummaryLine))
-            os.replace(tmpPath, checkpoint)
-        except Exception:
-            try:
-                os.unlink(tmpPath)
-            except FileNotFoundError:
-                pass
-            raise
+        self.warning(message)
+        fhWarning.write(warningLine + "\n")
+        self._reportedWarnings.add(warningLine)
 
     def step(self):
         prot = self.protocol
@@ -241,42 +194,16 @@ class MonitorMovieGain(Monitor):
                     movieName = fields[0]
 
                     if stddev > self.stddevValue:
-                        self.warning(
-                            "Residual gain standard deviation is %f."
-                            % stddev
-                        )
-                        fhWarning.write(
-                            "%s: Residual gain standard deviation is %f.\n"
-                            % (movieName, stddev)
-                        )
+                        self._reportWarning(fhWarning, movieName, "Residual gain standard deviation is %f." % stddev)
 
                     if (perc975 / perc25) > self.ratio1Value:
-                        self.warning(
-                            "The ratio between the 97.5 and 2.5 "
-                            "percentiles is %f."
-                            % (perc975 / perc25)
-                        )
-                        fhWarning.write(
-                            "%s: The ratio between the 97.5 and 2.5 "
-                            "percentiles is %f.\n"
-                            % (movieName, (perc975 / perc25))
-                        )
+                        self._reportWarning(fhWarning, movieName, "The ratio between the 97.5 and 2.5 percentiles is %f." % (perc975 / perc25))
 
                     if (maxVal / perc975) > self.ratio2Value:
-                        self.warning(
-                            "The ratio between the maximum gain value "
-                            "and the 97.5 percentile is %f."
-                            % (maxVal / perc975)
-                        )
-                        fhWarning.write(
-                            "%s: The ratio between the maximum gain value "
-                            "and the 97.5 percentile is %f.\n"
-                            % (movieName, (maxVal / perc975))
-                        )
+                        self._reportWarning(fhWarning, movieName, "The ratio between the maximum gain value and the 97.5 percentile is %f." % (maxVal / perc975))
 
                     self._lastSummaryLine += 1
                     self._summaryOffset = fhSummary.tell()
-                    self._writeLastSummaryLine()
                     processedAnyLine = True
 
         if hasPendingPartialLine:

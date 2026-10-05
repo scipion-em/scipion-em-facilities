@@ -258,23 +258,15 @@ class ProtDataCounter(ProtFacilitiesStreamingBase):
         return self._loadLogicalSet(self.inputImages)
 
     def _loadOutputSet(self, SetClass, baseName, outputName=None):
-        # Reuse the logical output Scipion already knows about before
-        # falling back to the on-disk backing file, otherwise an output
-        # still awaiting its backing file to materialize would be silently
-        # discarded and replaced with an empty fresh Set.
         outputSet = getattr(self, outputName, None) if outputName else None
         if outputSet is not None:
+            outputSet.loadAllProperties()
             outputSet.enableAppend()
         else:
             setFile = self._getPath(baseName)
-
-            if os.path.exists(setFile):
-                outputSet = SetClass(filename=setFile)
-                outputSet.loadAllProperties()
-                outputSet.enableAppend()
-            else:
-                outputSet = SetClass(filename=setFile)
-                outputSet.setStreamState(outputSet.STREAM_OPEN)
+            pwutils.cleanPath(setFile)
+            outputSet = SetClass(filename=setFile)
+            outputSet.setStreamState(outputSet.STREAM_OPEN)
 
         inputs = self.inputImages.get()
         outputSet.copyInfo(inputs)
@@ -334,6 +326,7 @@ class ProtDataCounter(ProtFacilitiesStreamingBase):
         sizeOutput = 0
 
         if hasattr(self, OUTPUT):
+            self.outputSet.loadAllProperties()
             sizeOutput = self.outputSet.getSize()
             doneIds.extend(list(self.outputSet.getIdSet()))
 

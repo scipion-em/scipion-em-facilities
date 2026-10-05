@@ -236,3 +236,38 @@ class TestMonitorMovieGainPartialSummaryRegression(TestCase):
                 "until that record can be retried.",
             )
             self.assertEqual(monitor._lastSummaryLine, 0)
+
+
+class TestMonitorMovieGainLogicalResumeRegression(TestMonitorMovieGain):
+    def testResumeDoesNotDependOnExternalLastLineCheckpoint(self):
+        with tempfile.TemporaryDirectory() as tmpDir:
+            summary = os.path.join(tmpDir, "summaryForMonitor.txt")
+            checkpoint = os.path.join(tmpDir, "movie_gain_monitor.last_line")
+            with open(summary, "w") as handle:
+                handle.write("movie_000001_residual: 0.050000 1.0 1.0 1.0\n")
+                handle.write("movie_000002_residual: 0.060000 1.0 1.0 1.0\n")
+            with open(checkpoint, "w") as handle:
+                handle.write("999")
+
+            monitor = self._newMonitor(tmpDir)
+            monitor.initLoop()
+            monitor.step()
+
+            warnings = os.path.join(tmpDir, "warningsMonitor.txt")
+            with open(warnings, "r") as handle:
+                lines = handle.readlines()
+
+            self.assertEqual(len(lines), 2)
+            self.assertEqual(monitor._lastSummaryLine, 2)
+
+    def testMonitorDoesNotCreateLastLineCheckpoint(self):
+        with tempfile.TemporaryDirectory() as tmpDir:
+            summary = os.path.join(tmpDir, "summaryForMonitor.txt")
+            with open(summary, "w") as handle:
+                handle.write("movie_000001_residual: 0.050000 1.0 1.0 1.0\n")
+
+            monitor = self._newMonitor(tmpDir)
+            monitor.initLoop()
+            monitor.step()
+
+            self.assertFalse(os.path.exists(os.path.join(tmpDir, "movie_gain_monitor.last_line")))

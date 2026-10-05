@@ -127,6 +127,8 @@ class ProtMonitor2dStreamer(ProtMonitor):
         self._counter = 0
         self._lastMicId = None
         self._lastPartId = 0
+        self._persistedParticleIds = set()
+        self._continueStateRestored = False
         self._runPrerequisites = []
 
         if self.isContinued():
@@ -158,65 +160,30 @@ class ProtMonitor2dStreamer(ProtMonitor):
     def _restoreContinueState(self):
         outputNames = set()
         lastSubsetNumber = 0
-        lastPartId = 0
-        processedCount = 0
-        cumulativeProcessedCount = 0
+        persistedParticleIds = set()
 
         for outputName, outputSet in self.iterOutputAttributes():
             if not outputName.startswith('outputParticles_'):
                 continue
 
             try:
-                subsetNumber = int(
-                    outputName.rsplit('_', 1)[1]
-                )
+                subsetNumber = int(outputName.rsplit('_', 1)[1])
             except (IndexError, ValueError):
                 continue
 
             outputNames.add(outputName)
-            lastSubsetNumber = max(
-                lastSubsetNumber,
-                subsetNumber,
-            )
-
-            subsetSize = outputSet.getSize()
-            processedCount += subsetSize
-            cumulativeProcessedCount = max(
-                cumulativeProcessedCount,
-                subsetSize,
-            )
-
-            maxRows = outputSet.aggregate(
-                ["MAX"],
-                "_objId",
-            )
-            if maxRows:
-                maxId = maxRows[0].get("MAX")
-                if maxId is not None:
-                    lastPartId = max(
-                        lastPartId,
-                        int(maxId),
-                    )
+            lastSubsetNumber = max(lastSubsetNumber, subsetNumber)
+            outputSet.loadAllProperties()
+            persistedParticleIds.update(outputSet.getIdSet())
 
         self._restoreScheduledRuns(outputNames)
-
         self._counter = lastSubsetNumber
-        self._counterParticlesProcessed = (
-            cumulativeProcessedCount
-            if self.cumulativeBatch.get()
-            else processedCount
-        )
-        self._lastPartId = lastPartId
+        self._counterParticlesProcessed = len(persistedParticleIds)
+        self._persistedParticleIds = persistedParticleIds
+        self._lastPartId = 0
+        self._continueStateRestored = True
 
-        self.info(
-            'Restored monitor progress: %d particles, last particle %d, '
-            '%d written subsets.'
-            % (
-                self._counterParticlesProcessed,
-                self._lastPartId,
-                self._counter,
-            )
-        )
+        self.info('Restored monitor progress: %d persisted particles, %d written subsets.' % (self._counterParticlesProcessed, self._counter))
 
 
     def _restoreScheduledRuns(self, outputNames):
@@ -373,18 +340,9 @@ class ProtMonitor2dStreamer(ProtMonitor):
         inputParts.load()
         inputParts.loadAllProperties()
         self._streamClosed = inputParts.isStreamClosed()
+        particles = inputParts.iterItems(orderBy=['_micId', 'id'], direction='ASC', where='id > %d' % self._lastPartId)
 
-        particles = inputParts.iterItems(
-            orderBy=['_micId', 'id'],
-            direction='ASC',
-            where='id > %d' % self._lastPartId,
-        )
-
-        # startingNumber means "skip this many particles", not "skip IDs <= N".
-        # Apply it only before any particle has been processed. On Continue,
-        # _lastPartId is restored from previous subsets, so the initial skip
-        # must not be applied again.
-        if self._lastPartId == 0:
+        if self._lastPartId == 0 and not getattr(self, '_continueStateRestored', False):
             for _ in range(self.startingNumber.get()):
                 try:
                     next(particles)
@@ -393,7 +351,8 @@ class ProtMonitor2dStreamer(ProtMonitor):
 
         try:
             for particle in particles:
-                yield particle
+                if particle.getObjId() not in getattr(self, '_persistedParticleIds', set()):
+                    yield particle
         finally:
             inputParts.close()
 

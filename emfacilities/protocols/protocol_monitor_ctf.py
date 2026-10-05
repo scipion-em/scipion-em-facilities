@@ -182,11 +182,14 @@ class MonitorCTF(Monitor):
         setOfCTFs = prot.outputCTF
 
         # The first polling round performs one full reconciliation against the
-        # monitor log. Subsequent rounds discover only IDs newer than the
-        # watermark. Failed inserts remain in _pendingCtfIds and are retried
-        # independently of the discovery watermark.
+        # monitor log. While the producer is running, subsequent rounds discover
+        # only IDs newer than the watermark. Once the producer finishes, perform
+        # one final full reconciliation so out-of-order IDs below the watermark
+        # are not lost.
+        producerFinished = prot.getStatus() != STATUS_RUNNING
+
         where = None
-        if self._lastCtfId > 0:
+        if not producerFinished and self._lastCtfId > 0:
             where = 'id > %d' % self._lastCtfId
 
         discoveredIds = set(
@@ -306,7 +309,7 @@ class MonitorCTF(Monitor):
                 )
                 self.minDefocus = defocusV
 
-        return prot.getStatus() != STATUS_RUNNING
+        return producerFinished
 
 
     def _createTable(self):
