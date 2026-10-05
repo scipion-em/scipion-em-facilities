@@ -25,6 +25,7 @@
 # *
 # **************************************************************************
 from pyworkflow.protocol import ProtStreamingBase
+import pyworkflow.utils as pwutils
 from pwem.protocols import EMProtocol
 
 
@@ -101,6 +102,37 @@ class ProtFacilitiesStreamingBase(EMProtocol, ProtStreamingBase):
         )
 
         return newIds, terminalConsistent
+
+
+    def _loadInputSet(self, inputFn=None):
+        return self._loadLogicalSet(self.inputImages)
+
+    def _loadOutputSet(self, SetClass, baseName, outputName=None):
+        outputSet = getattr(self, outputName, None) if outputName else None
+        if outputSet is not None:
+            outputSet.loadAllProperties()
+            outputSet.enableAppend()
+        else:
+            setFile = self._getPath(baseName)
+            pwutils.cleanPath(setFile)
+            outputSet = SetClass(filename=setFile)
+            outputSet.setStreamState(outputSet.STREAM_OPEN)
+
+        inputs = self.inputImages.get()
+        outputSet.copyInfo(inputs)
+        return outputSet
+
+    def _getAllDoneIds(self, outputName="outputSet"):
+        doneIds = []
+        sizeOutput = 0
+        outputSet = getattr(self, outputName, None)
+
+        if outputSet is not None:
+            outputSet.loadAllProperties()
+            sizeOutput = outputSet.getSize()
+            doneIds.extend(list(outputSet.getIdSet()))
+
+        return doneIds, sizeOutput
 
     def _getPersistedOutputIds(self, outputName):
         outputSet = getattr(self, outputName, None)

@@ -49,6 +49,28 @@ class _OutputSet:
         return set(self._ids)
 
 
+class _Particle:
+    def __init__(self, objId, micId):
+        self._objId = objId
+        self._micId = micId
+
+    def getObjId(self):
+        return self._objId
+
+    def getMicId(self):
+        return self._micId
+
+
+class _Subset:
+    def __init__(self):
+        self.ids = []
+
+    def append(self, particle):
+        self.ids.append(particle.getObjId())
+
+    def getSize(self):
+        return len(self.ids)
+
 class TestMonitor2dStreamer(BaseTest):
 
     def _prepareContinueMonitor(
@@ -497,43 +519,22 @@ class TestMonitor2dStreamer(BaseTest):
         self.assertTrue(prot.classificationStop())
 
     def testParticleLimitWritesPendingSubsetWithoutExtraParticle(self):
-        class Particle:
-            def __init__(self, objId, micId):
-                self._objId = objId
-                self._micId = micId
-
-            def getObjId(self):
-                return self._objId
-
-            def getMicId(self):
-                return self._micId
-
-        class Subset:
-            def __init__(self):
-                self.ids = []
-
-            def append(self, particle):
-                self.ids.append(particle.getObjId())
-
-            def getSize(self):
-                return len(self.ids)
-
         prot = self.newProtocol(
             ProtMonitor2dStreamer,
             maximumOption=ProtMonitor2dStreamer.NUMBER_PARTICLES,
             numberParticles=2,
             batchSize=100,
         )
-        prot._subset = Subset()
+        prot._subset = _Subset()
         prot._lastMicId = None
         prot._lastPartId = 0
         prot._counterNewParticles = 0
         prot._counterParticlesProcessed = 0
         prot._streamClosed = False
         prot._iterParticles = lambda: iter([
-            Particle(1, 1),
-            Particle(2, 1),
-            Particle(3, 2),
+            _Particle(1, 1),
+            _Particle(2, 1),
+            _Particle(3, 2),
         ])
 
         written = []
@@ -547,32 +548,11 @@ class TestMonitor2dStreamer(BaseTest):
         self.assertEqual(prot._counterParticlesProcessed, 2)
 
     def testBatchBoundaryDoesNotSplitNextMicrograph(self):
-        class Particle:
-            def __init__(self, objId, micId):
-                self._objId = objId
-                self._micId = micId
-
-            def getObjId(self):
-                return self._objId
-
-            def getMicId(self):
-                return self._micId
-
-        class Subset:
-            def __init__(self):
-                self.ids = []
-
-            def append(self, particle):
-                self.ids.append(particle.getObjId())
-
-            def getSize(self):
-                return len(self.ids)
-
         prot = self.newProtocol(
             ProtMonitor2dStreamer,
             batchSize=2,
         )
-        prot._subset = Subset()
+        prot._subset = _Subset()
         prot._lastMicId = None
         prot._lastPartId = 0
         prot._counterNewParticles = 0
@@ -581,11 +561,11 @@ class TestMonitor2dStreamer(BaseTest):
         prot.maximumOption.set(ProtMonitor2dStreamer.NONE_OPTION)
 
         particles = [
-            Particle(1, 1),
-            Particle(2, 1),
-            Particle(3, 1),
-            Particle(4, 2),
-            Particle(5, 2),
+            _Particle(1, 1),
+            _Particle(2, 1),
+            _Particle(3, 1),
+            _Particle(4, 2),
+            _Particle(5, 2),
         ]
 
         prot._iterParticles = lambda: iter(particles)
@@ -595,11 +575,8 @@ class TestMonitor2dStreamer(BaseTest):
         def writeSubset(subset):
             written.append(list(subset.ids))
 
-        def createSubset():
-            return Subset()
-
         prot._writeSubset = writeSubset
-        prot._createSubset = createSubset
+        prot._createSubset = _Subset
 
         prot._checkNewInput()
 

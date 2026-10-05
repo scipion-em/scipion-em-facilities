@@ -26,6 +26,11 @@ from pyworkflow.tests import BaseTest, DataSet
 from pwem.protocols.protocol_import import ProtImportMicrographs
 from pyworkflow.object import Pointer
 import pyworkflow.tests as tests
+from emfacilities.tests.protocols.streaming_test_utils import (
+    assert_closed_stream_reconciliation,
+    assert_late_visibility_retry,
+    assert_persisted_output_identity,
+)
 from emfacilities.protocols.protocol_data_counter import ProtDataCounter, OUTPUT
 
 
@@ -603,319 +608,33 @@ class TestDataCounterStreamingArchitecture(tests.unittest.TestCase):
 class TestDataCounterClosedStreamLateVisibilityRegression(
         tests.unittest.TestCase):
     def testClosedStreamReconcilesIdsBelowWatermark(self):
-        class _Value:
-            def __init__(self, value):
-                self.value = value
-
-            def get(self):
-                return self.value
-
-        class _InputSet:
-            def __init__(self):
-                self.uniqueCalls = []
-                self.closedCalls = 0
-
-            def getUniqueValues(self, attributes, where=None):
-                self.uniqueCalls.append((attributes, where))
-
-                if where is None:
-                    return list(range(1, 11))
-
-                if where == "id > 0":
-                    return [9, 10]
-
-                if where == "id > 10":
-                    return []
-
-                raise AssertionError(
-                    "Unexpected discovery query: %r" % (where,)
-                )
-
-            def getSize(self):
-                return 10
-
-            def isStreamClosed(self):
-                return True
-
-            def close(self):
-                self.closedCalls += 1
-
-        class _Harness:
-            finished = False
-            insertedIds = set()
-            processedIds = set()
-            _lastInputId = 0
-            isStreamClosed = False
-            lastRound = False
-            limitReach = False
-            timerOut = False
-            outputSize = _Value(10)
-
-            def __init__(self):
-                self.inputSet = _InputSet()
-                self.insertedBatches = []
-
-            def _loadInputSet(self, _):
-                return self.inputSet
-
-            def _discoverIdsAfter(self, inputSet, lastId):
-                return ProtDataCounter._discoverIdsAfter(
-                    self,
-                    inputSet,
-                    lastId,
-                )
-
-            def _reconcileClosedStreamIds(
-                    self,
-                    inputSet,
-                    discoveredIds,
-                    knownIds,
-                    producerClosed,
-            ):
-                return ProtDataCounter._reconcileClosedStreamIds(
-                    self,
-                    inputSet,
-                    discoveredIds,
-                    knownIds,
-                    producerClosed,
-                )
-
-            def isContinued(self):
-                return False
-
-            def _insertNewImageSteps(self, newIds):
-                ids = list(newIds)
-                self.insertedBatches.append(ids)
-                self.insertedIds.update(ids)
-                return []
-
-            def info(self, message):
-                pass
-
-        protocol = _Harness()
-
-        with patch(
-                "emfacilities.protocols.protocol_data_counter.time.sleep",
-                return_value=None,
-        ):
-            ProtDataCounter._checkNewInput(protocol)
-            ProtDataCounter._checkNewInput(protocol)
-
-        self.assertEqual(
-            protocol.insertedIds,
-            set(range(1, 11)),
-            "Closing the stream must trigger reconciliation when the "
-            "declared Set size is larger than the IDs discovered through "
-            "the monotonic watermark.",
-        )
-        self.assertIn(
-            ("id", None),
-            protocol.inputSet.uniqueCalls,
-            "The terminal mismatch must use a one-off full ID "
-            "reconciliation instead of advancing the watermark forever.",
+        assert_closed_stream_reconciliation(
+            self,
+            ProtDataCounter,
+            "emfacilities.protocols.protocol_data_counter",
         )
 
 
-class TestDataCounterCheckNewOutputVisibilityRegression(tests.unittest.TestCase):
 
+class TestDataCounterCheckNewOutputVisibilityRegression(
+        tests.unittest.TestCase):
     def testCheckNewOutputSkipsImageNotYetVisibleAndDoesNotFinishPrematurely(self):
-        # Regression test: an id discovered earlier (via _discoverIdsAfter
-        # in _checkNewInput) is not guaranteed to still be selectable via
-        # Set.getItem() on a freshly reloaded input Set later - e.g. under
-        # replication lag on a PostgreSQL-backed compatibility bridge.
-        # Set.getItem raises rather than returning None for a missing row,
-        # so a membership check is required before indexing. Skipping the
-        # invisible id must not let the protocol declare itself finished
-        # (and hence close the output) before that id is actually
-        # persisted.
-        class _Value:
-            def __init__(self, value):
-                self._value = value
-
-            def get(self):
-                return self._value
-
-        class _Image:
-            def __init__(self, objId):
-                self.objId = objId
-
-            def clone(self):
-                return _Image(self.objId)
-
-        class _InputSet:
-            def __init__(self, visibleIds, size):
-                self._visibleIds = set(visibleIds)
-                self._size = size
-                self.closed = False
-
-            def getSize(self):
-                return self._size
-
-            def __contains__(self, objId):
-                return objId in self._visibleIds
-
-            def getItem(self, field, value):
-                assert field == "id"
-                # Real Set.getItem raises (UnboundLocalError) rather than
-                # returning None for a row it cannot find - match that
-                # here so a missing membership guard is caught.
-                if value not in self._visibleIds:
-                    raise UnboundLocalError("row not found for id %r" % value)
-                return _Image(value)
-
-            def close(self):
-                self.closed = True
-
-        class _OutputSet:
-            STREAM_OPEN = 1
-            STREAM_CLOSED = 2
-
-            def __init__(self):
-                self.ids = []
-
-            def getSize(self):
-                return len(self.ids)
-
-            def append(self, image):
-                self.ids.append(image.objId)
-
-        class _Harness:
-            finished = False
-            processedIds = {4, 5}  # 5 is not yet visible
-            isStreamClosed = True
-            limitReach = False
-            timerOut = False
-            outputSize = _Value(100)  # far from the limit
-            _inputClass = object
-            _baseName = "images.sqlite"
-
-            def __init__(self):
-                # getSize() == 2 matches len(processedIds), so the
-                # pre-loop optimistic completion check would (incorrectly)
-                # already consider the round finished.
-                self.inputSet = _InputSet(visibleIds={4}, size=2)
-                self.outputSet = _OutputSet()
-                self.updated = False
-                self.streamMode = None
-                self.errors = []
-
-            def _loadInputSet(self, _):
-                return self.inputSet
-
-            def _loadOutputSet(self, SetClass, baseName, outputName=None):
-                return self.outputSet
-
-            def _updateOutputSet(self, outputName, outputSet, streamMode):
-                self.updated = True
-                self.streamMode = streamMode
-
-            def _getFirstJoinStep(self):
-                return None
-
-            def _store(self):
-                pass
-
-            def error(self, msg):
-                self.errors.append(msg)
-
-        protocol = _Harness()
-
-        ProtDataCounter._checkNewOutput(protocol)
-
-        self.assertEqual([4], protocol.outputSet.ids)
-        self.assertEqual({5}, protocol.processedIds)
-        self.assertEqual(1, len(protocol.errors))
-        self.assertFalse(
-            protocol.finished,
-            "A skipped (not-yet-visible) id must prevent the protocol "
-            "from declaring itself finished this round.",
+        assert_late_visibility_retry(
+            self,
+            ProtDataCounter,
+            pendingAttribute="processedIds",
+            processedIds={4, 5},
+            inputSize=2,
         )
-        self.assertEqual(protocol.outputSet.STREAM_OPEN, protocol.streamMode)
 
 
-class TestDataCounterPersistedOutputRegression(tests.unittest.TestCase):
+
+class TestDataCounterPersistedOutputRegression(
+        tests.unittest.TestCase):
     def testPersistedOutputIsRefreshedAndBackingFileIsNotWorkflowIdentity(self):
-        class _Pointer:
-            def __init__(self, value):
-                self._value = value
-
-            def get(self):
-                return self._value
-
-        class _ExistingOutput:
-            def __init__(self):
-                self.loaded = False
-                self.appendEnabled = False
-                self.copiedFrom = None
-
-            def loadAllProperties(self):
-                self.loaded = True
-
-            def enableAppend(self):
-                if not self.loaded:
-                    raise AssertionError("Logical output must be refreshed before enableAppend().")
-                self.appendEnabled = True
-
-            def copyInfo(self, inputs):
-                self.copiedFrom = inputs
-
-            def getSize(self):
-                if not self.loaded:
-                    raise AssertionError("Logical output must be refreshed before reading its size.")
-                return 2
-
-            def getIdSet(self):
-                if not self.loaded:
-                    raise AssertionError("Logical output must be refreshed before reading its ids.")
-                return {1, 2}
-
-        class _FreshOutput:
-            STREAM_OPEN = 1
-
-            def __init__(self, filename=None):
-                self.filename = filename
-                self.loaded = False
-                self.streamState = None
-                self.copiedFrom = None
-
-            def loadAllProperties(self):
-                self.loaded = True
-                raise AssertionError("A backing file must not restore an output absent from protocol outputs.")
-
-            def setStreamState(self, state):
-                self.streamState = state
-
-            def copyInfo(self, inputs):
-                self.copiedFrom = inputs
-
-        inputs = object()
-        existing = _ExistingOutput()
-
-        class _Harness:
-            def __init__(self):
-                self.outputSet = existing
-                self.inputImages = _Pointer(inputs)
-
-            def _getPath(self, name):
-                return "/tmp/" + name
-
-        protocol = _Harness()
-
-        loaded = ProtDataCounter._loadOutputSet(protocol, object, "images.sqlite", outputName=OUTPUT)
-        doneIds, size = ProtDataCounter._getAllDoneIds(protocol)
-
-        self.assertIs(existing, loaded)
-        self.assertTrue(existing.loaded)
-        self.assertTrue(existing.appendEnabled)
-        self.assertEqual({1, 2}, set(doneIds))
-        self.assertEqual(2, size)
-
-        del protocol.outputSet
-
-        with patch("emfacilities.protocols.protocol_data_counter.pwutils.cleanPath") as cleanPathMock:
-            fresh = ProtDataCounter._loadOutputSet(protocol, _FreshOutput, "images.sqlite", outputName=OUTPUT)
-
-        cleanPathMock.assert_called_once_with("/tmp/images.sqlite")
-        self.assertFalse(fresh.loaded)
-        self.assertEqual(_FreshOutput.STREAM_OPEN, fresh.streamState)
-        self.assertIs(inputs, fresh.copiedFrom)
+        assert_persisted_output_identity(
+            self,
+            ProtDataCounter,
+            "emfacilities.protocols.protocol_streaming_base.pwutils.cleanPath",
+            OUTPUT,
+        )

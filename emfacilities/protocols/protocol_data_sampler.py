@@ -31,7 +31,6 @@ import copy
 import random
 
 from pyworkflow import VERSION_3_0
-import pyworkflow.utils as pwutils
 from pwem.objects import SetOfImages, Set
 import pyworkflow.protocol.params as params
 
@@ -245,25 +244,6 @@ class ProtDataSampler(ProtFacilitiesStreamingBase):
         self._store()
 
 
-    def _loadInputSet(self, inputFn=None):
-        return self._loadLogicalSet(self.inputImages)
-
-    def _loadOutputSet(self, SetClass, baseName, outputName=None):
-        outputSet = getattr(self, outputName, None) if outputName else None
-        if outputSet is not None:
-            outputSet.loadAllProperties()
-            outputSet.enableAppend()
-        else:
-            setFile = self._getPath(baseName)
-            pwutils.cleanPath(setFile)
-            outputSet = SetClass(filename=setFile)
-            outputSet.setStreamState(outputSet.STREAM_OPEN)
-
-        inputs = self.inputImages.get()
-        outputSet.copyInfo(inputs)
-
-        return outputSet
-
     def _insertNewImageSteps(self, newIds, batchSize):
         """ Insert steps to register new images (from streaming)
         Params:
@@ -397,17 +377,6 @@ class ProtDataSampler(ProtFacilitiesStreamingBase):
         return stateFile
 
     # ------------------------- UTILS functions --------------------------------
-    def _getAllDoneIds(self):
-        doneIds = []
-        sizeOutput = 0
-
-        if hasattr(self, OUTPUT):
-            self.outputSet.loadAllProperties()
-            sizeOutput = self.outputSet.getSize()
-            doneIds.extend(list(self.outputSet.getIdSet()))
-
-        return doneIds, sizeOutput
-
     def _summary(self):
         pass
 
