@@ -32,6 +32,7 @@ from emfacilities.tests.protocols.streaming_test_utils import (
     assert_persisted_output_identity,
 )
 from emfacilities.protocols.protocol_data_counter import ProtDataCounter, OUTPUT
+from emfacilities.protocols.protocol_streaming_base import ProtFacilitiesStreamingBase
 
 
 class TestDataCounter(BaseTest):
@@ -563,6 +564,12 @@ class TestDataCounterStreamingArchitecture(tests.unittest.TestCase):
         class _Harness:
             boolTimer = _Value()
             timerOut = False
+
+            # The polling skeleton now lives in ProtFacilitiesStreamingBase,
+            # so this lightweight harness borrows it the same way it borrows
+            # the discovery helpers elsewhere in this module.
+            _runStreamingLoop = ProtFacilitiesStreamingBase._runStreamingLoop
+            _onStreamingIteration = ProtDataCounter._onStreamingIteration
 
             def __init__(self):
                 self.finished = False

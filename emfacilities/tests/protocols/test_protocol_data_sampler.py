@@ -33,6 +33,7 @@ from emfacilities.tests.protocols.streaming_test_utils import (
     assert_persisted_output_identity,
 )
 from emfacilities.protocols.protocol_data_sampler import ProtDataSampler, OUTPUT
+from emfacilities.protocols.protocol_streaming_base import ProtFacilitiesStreamingBase
 
 
 
@@ -411,6 +412,12 @@ class TestDataSamplerLoadOutputSet(tests.unittest.TestCase):
 class TestDataSamplerFinalizationRegression(tests.unittest.TestCase):
     def testFinishedGeneratorDoesNotPollInputOrOutput(self):
         class _Harness:
+            # The polling skeleton lives in ProtFacilitiesStreamingBase now.
+            _runStreamingLoop = ProtFacilitiesStreamingBase._runStreamingLoop
+            _onStreamingIteration = (
+                ProtFacilitiesStreamingBase._onStreamingIteration
+            )
+
             def __init__(self):
                 self.finished = False
                 self._checkNewInput = Mock()
@@ -700,6 +707,12 @@ class TestDataSamplerStreamingArchitecture(tests.unittest.TestCase):
 
     def testGeneratorWaitsForPersistedCompletionAfterInputCloses(self):
         class _Harness:
+            # The polling skeleton lives in ProtFacilitiesStreamingBase now.
+            _runStreamingLoop = ProtFacilitiesStreamingBase._runStreamingLoop
+            _onStreamingIteration = (
+                ProtFacilitiesStreamingBase._onStreamingIteration
+            )
+
             def __init__(self):
                 self.finished = False
                 self.isStreamClosed = False

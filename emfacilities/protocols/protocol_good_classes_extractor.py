@@ -23,7 +23,6 @@
 # *  e-mail address 'scipion@cnb.csic.es'
 # *
 # **************************************************************************
-import time
 import sys
 import matplotlib.pyplot as plt
 
@@ -79,6 +78,11 @@ class ProtGoodClassesExtractor(ProtFacilitiesStreamingBase):
                       help='List of good reference IDs, separated by commas, '
                            'to extract particles from the inputClasses.')
 
+        self._defineStreamingParams(form)
+        # Preserve the historical polling cadence of this protocol, now as a
+        # tunable param instead of a hardcoded sleep in the generator loop.
+        form.getParam('streamingSleepOnWait').setDefault(60)
+
         form.addParallelSection(threads=3, mpi=1)
 
     # -------------------------- INSERT steps functions ---------------------------
@@ -91,7 +95,7 @@ class ProtGoodClassesExtractor(ProtFacilitiesStreamingBase):
         self.newDeps = []
         self.initialStep()
 
-        while not self.finish:
+        while not self.finished:
             if not self._newParticlesToProcess():
                  self.info('No new particles')
             else:
@@ -115,15 +119,16 @@ class ProtGoodClassesExtractor(ProtFacilitiesStreamingBase):
                 # Finish everything and close output sets
                 self._insertFunctionStep(self.closeOutputStep,
                                          prerequisites=self.newDeps)
-                self.finish = True
+                self.finished = True
                 continue  # To avoid waiting 1 min
 
             sys.stdout.flush()
-            time.sleep(60)
+
+            self._streamingSleepOnWait()
 
     # --------------------------- STEPS functions -------------------------------
     def initialStep(self):
-        self.finish = False
+        self.finished = False
         self.selectGood = True
         self.isStreamClosed = False
         self.goodParticles = []

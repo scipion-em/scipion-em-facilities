@@ -104,6 +104,69 @@ class ProtFacilitiesStreamingBase(EMProtocol, ProtStreamingBase):
         return newIds, terminalConsistent
 
 
+    def _initInputTypeState(self):
+        """Cache the input Set class/type and the own-output base name."""
+        inputSet = self.inputImages.get()
+        self._inputClass = inputSet.getClass()
+        self._inputType = inputSet.getClassName().split('SetOf')[1]
+        self._baseName = '%s.sqlite' % self._inputType.lower()
+
+    def _discoverNewInputIds(self, knownIds):
+        """Discover input IDs above the watermark on the logical input Set.
+
+        Wraps the load/discover/reconcile/close sequence shared by every
+        streaming protocol here. ``self.isStreamClosed`` is updated to
+        reflect both the producer flag and terminal consistency, so a closed
+        producer whose rows still lag behind its declared size does not end
+        the consumer stream early.
+
+        Returns ``(newIds, producerClosed)``.
+        """
+        inputSet = self._loadInputSet(None)
+        try:
+            newIds, self._lastInputId = self._discoverIdsAfter(
+                inputSet,
+                self._lastInputId,
+            )
+
+            producerClosed = inputSet.isStreamClosed()
+
+            newIds, terminalConsistent = (
+                self._reconcileClosedStreamIds(
+                    inputSet,
+                    newIds,
+                    knownIds,
+                    producerClosed,
+                )
+            )
+
+            self.isStreamClosed = producerClosed and terminalConsistent
+        finally:
+            inputSet.close()
+
+        return newIds, producerClosed
+
+    def _onStreamingIteration(self):
+        """Hook for per-poll work, before the input/output checks."""
+        pass
+
+    def _runStreamingLoop(self):
+        """Shared streaming generator loop.
+
+        The protocol keeps owning _checkNewInput/_checkNewOutput; only the
+        polling skeleton (and the terminal output close) lives here.
+        """
+        while not self.finished:
+            self._onStreamingIteration()
+
+            self._checkNewInput()
+            self._checkNewOutput()
+
+            if not self.finished:
+                self._streamingSleepOnWait()
+
+        self._closeOutputSet()
+
     def _loadInputSet(self, inputFn=None):
         return self._loadLogicalSet(self.inputImages)
 

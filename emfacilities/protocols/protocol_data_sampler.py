@@ -74,15 +74,7 @@ class ProtDataSampler(ProtFacilitiesStreamingBase):
 # --------------------------- INSERT steps functions -------------------------
     def stepsGeneratorStep(self):
         self.initializeParams()
-
-        while not self.finished:
-            self._checkNewInput()
-            self._checkNewOutput()
-
-            if not self.finished:
-                self._streamingSleepOnWait()
-
-        self._closeOutputSet()
+        self._runStreamingLoop()
 
     def initializeParams(self):
         self.finished = False
@@ -97,45 +89,20 @@ class ProtDataSampler(ProtFacilitiesStreamingBase):
         self._pendingInputIds = []
         self.isStreamClosed = self.inputImages.get().isStreamClosed()
         # Contains images that have been processed in a Step (checkNewOutput).
-        self._inputClass = self.inputImages.get().getClass()
-        self._inputType = self.inputImages.get().getClassName().split('SetOf')[1]
-        self._baseName = '%s.sqlite' % self._inputType.lower()
+        self._initInputTypeState()
 
     def _checkNewInput(self):
         # Discover only IDs newer than the current watermark. The watermark is
         # not completion state: IDs that do not yet fill a batch are retained
         # separately in _pendingInputIds.
-        inputSet = self._loadInputSet(None)
-        try:
-            discoveredIds, self._lastInputId = self._discoverIdsAfter(
-                inputSet,
-                self._lastInputId,
-            )
+        knownIds = set(self.insertedIds)
+        knownIds.update(self._pendingInputIds)
 
-            producerClosed = inputSet.isStreamClosed()
-
-            knownIds = set(self.insertedIds)
-            knownIds.update(self._pendingInputIds)
-
-            discoveredIds, terminalConsistent = (
-                self._reconcileClosedStreamIds(
-                    inputSet,
-                    discoveredIds,
-                    knownIds,
-                    producerClosed,
-                )
-            )
-
-            # A producer-side CLOSED flag is not enough while its declared
-            # size is ahead of the rows currently visible. Keeping this False
-            # also prevents an incomplete final sampling batch from being
-            # scheduled prematurely.
-            self.isStreamClosed = (
-                producerClosed
-                and terminalConsistent
-            )
-        finally:
-            inputSet.close()
+        # A producer-side CLOSED flag is not enough while its declared size is
+        # ahead of the rows currently visible; _discoverNewInputIds keeps
+        # isStreamClosed False until then, which also prevents an incomplete
+        # final sampling batch from being scheduled prematurely.
+        discoveredIds, _ = self._discoverNewInputIds(knownIds)
 
         if self.isContinued() and not self.insertedIds:
             doneIds, _ = self._getAllDoneIds()

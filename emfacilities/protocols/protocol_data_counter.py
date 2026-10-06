@@ -89,18 +89,11 @@ class ProtDataCounter(ProtFacilitiesStreamingBase):
 # --------------------------- INSERT steps functions -------------------------
     def stepsGeneratorStep(self):
         self.initializeParams()
+        self._runStreamingLoop()
 
-        while not self.finished:
-            if self.boolTimer.get() and not self.timerOut:
-                self.timerStep()
-
-            self._checkNewInput()
-            self._checkNewOutput()
-
-            if not self.finished:
-                self._streamingSleepOnWait()
-
-        self._closeOutputSet()
+    def _onStreamingIteration(self):
+        if self.boolTimer.get() and not self.timerOut:
+            self.timerStep()
 
     def initializeParams(self):
         self.finished = False
@@ -112,9 +105,7 @@ class ProtDataCounter(ProtFacilitiesStreamingBase):
         self._lastInputId = 0
         self.isStreamClosed = self.inputImages.get().isStreamClosed()
         # Contains images that have been processed in a Step (checkNewOutput).
-        self._inputClass = self.inputImages.get().getClass()
-        self._inputType = self.inputImages.get().getClassName().split('SetOf')[1]
-        self._baseName = '%s.sqlite' % self._inputType.lower()
+        self._initInputTypeState()
         self.limitReach = False
         self.timerOut = False
         self.timeoutSecs = self.getTimeOutInSeconds(self.timeout.get())
@@ -132,35 +123,12 @@ class ProtDataCounter(ProtFacilitiesStreamingBase):
             self.info("Last round sleeping for 10 seconds to allow all the input to be loaded")
             time.sleep(10) # Needs to make sure that eventhough the stream is closed all the data in the inputset is loaded
 
-        inputSet = self._loadInputSet(None)
-        try:
-            newIds, self._lastInputId = self._discoverIdsAfter(
-                inputSet,
-                self._lastInputId,
-            )
-
-            self.lastCheck = datetime.now()
-            producerClosed = inputSet.isStreamClosed()
-
-            newIds, terminalConsistent = (
-                self._reconcileClosedStreamIds(
-                    inputSet,
-                    newIds,
-                    self.insertedIds,
-                    producerClosed,
-                )
-            )
-
-            # Keep the historical terminal wait while PostgreSQL catches up,
-            # but do not declare the consumer stream closed until every item
-            # advertised by getSize() is actually visible.
-            self.lastRound = producerClosed
-            self.isStreamClosed = (
-                producerClosed
-                and terminalConsistent
-            )
-        finally:
-            inputSet.close()
+        newIds, producerClosed = self._discoverNewInputIds(self.insertedIds)
+        self.lastCheck = datetime.now()
+        # Keep the historical terminal wait while PostgreSQL catches up;
+        # _discoverNewInputIds already refuses to declare the consumer
+        # stream closed until every item advertised by getSize() is visible.
+        self.lastRound = producerClosed
 
         if self.isContinued() and not self.insertedIds:  # For "Continue" action and the first round
             doneIds, _ = self._getAllDoneIds()
