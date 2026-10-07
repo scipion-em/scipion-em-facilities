@@ -437,7 +437,8 @@ class TestGoodClassesExtractorStreamingArchitecture(unittest.TestCase):
 
     def testKeepsCreationTimestampWatermarkInsteadOfIdCursor(self):
         class _Particle:
-            pass
+            def getObjId(self):
+                return 101
 
         class _Class:
             def __init__(self):
@@ -478,6 +479,7 @@ class TestGoodClassesExtractorStreamingArchitecture(unittest.TestCase):
                 "7": "2026-09-19 08:00:00",
             }
             isStreamClosed = Set.STREAM_OPEN
+            _processedParticleIds = set()
 
             def _loadInputClassesSet(self):
                 return classSet
@@ -501,7 +503,9 @@ class TestGoodClassesExtractorStreamingArchitecture(unittest.TestCase):
                 (
                     "creation",
                     "ASC",
-                    'creation>"2026-09-19 08:00:00"',
+                    # Inclusive: creation stamps carry no microseconds, so
+                    # the boundary second can still be gaining particles.
+                    'creation>="2026-09-19 08:00:00"',
                 )
             ],
             classSet.clazz.whereCalls,

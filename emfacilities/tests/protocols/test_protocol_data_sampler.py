@@ -414,6 +414,7 @@ class TestDataSamplerFinalizationRegression(tests.unittest.TestCase):
         class _Harness:
             # The polling skeleton lives in ProtFacilitiesStreamingBase now.
             _runStreamingLoop = ProtFacilitiesStreamingBase._runStreamingLoop
+            _streamingMustStop = ProtFacilitiesStreamingBase._streamingMustStop
             _onStreamingIteration = (
                 ProtFacilitiesStreamingBase._onStreamingIteration
             )
@@ -534,6 +535,14 @@ class TestDataSamplerStreamingScalability(tests.unittest.TestCase):
 
             def _loadInputSet(self, _):
                 return self.inputSet
+
+            # The protocol now goes through the shared discovery wrapper,
+            # so the harness has to borrow it too - otherwise this test
+            # would only exercise helpers nothing calls any more.
+            def _discoverNewInputIds(self, knownIds):
+                return ProtFacilitiesStreamingBase._discoverNewInputIds(
+                    self, knownIds
+                )
 
             def _discoverIdsAfter(self, inputSet, lastId):
                 return ProtDataSampler._discoverIdsAfter(
@@ -709,6 +718,7 @@ class TestDataSamplerStreamingArchitecture(tests.unittest.TestCase):
         class _Harness:
             # The polling skeleton lives in ProtFacilitiesStreamingBase now.
             _runStreamingLoop = ProtFacilitiesStreamingBase._runStreamingLoop
+            _streamingMustStop = ProtFacilitiesStreamingBase._streamingMustStop
             _onStreamingIteration = (
                 ProtFacilitiesStreamingBase._onStreamingIteration
             )

@@ -125,8 +125,8 @@ class ProtDataCounter(ProtFacilitiesStreamingBase):
 
         newIds, producerClosed = self._discoverNewInputIds(self.insertedIds)
         self.lastCheck = datetime.now()
-        # Keep the historical terminal wait while PostgreSQL catches up;
-        # _discoverNewInputIds already refuses to declare the consumer
+        # Keep the historical terminal wait while the input Set catches
+        # up; _discoverNewInputIds already refuses to declare the consumer
         # stream closed until every item advertised by getSize() is visible.
         self.lastRound = producerClosed
 
@@ -179,11 +179,10 @@ class ProtDataCounter(ProtFacilitiesStreamingBase):
                     # Set.getItem raises rather than returning None for a
                     # row it cannot find. An id discovered earlier via
                     # _discoverIdsAfter is not guaranteed to still be
-                    # selectable on this freshly reloaded input Set (e.g.
-                    # replication lag under a PostgreSQL-backed
-                    # compatibility bridge) - check membership first and
-                    # leave it pending for the next round instead of
-                    # crashing the whole protocol.
+                    # selectable on this freshly reloaded input Set: a
+                    # row can lag behind the metadata that advertised it.
+                    # Check membership first and leave it pending for the
+                    # next round instead of crashing the whole protocol.
                     if imageId not in inputSet:
                         self.error(
                             "Image with id %d is not yet visible in the "

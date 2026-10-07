@@ -55,6 +55,9 @@ class ProtGoodClassesExtractor(ProtFacilitiesStreamingBase):
     def __init__(self, **args):
         ProtFacilitiesStreamingBase.__init__(self, **args)
         self.stepsExecutionMode = STEPS_PARALLEL
+        # Collected ids. initialStep refills it, but a step must never find
+        # it missing, so it exists from construction.
+        self._processedParticleIds = set()
 
     def _defineParams(self, form):
         form.addSection(label='Input')
@@ -95,7 +98,20 @@ class ProtGoodClassesExtractor(ProtFacilitiesStreamingBase):
         self.newDeps = []
         self.initialStep()
 
+        # Own the "selection already queued" decision here instead of
+        # asking a step whether it already ran: that answer would come
+        # from another thread, so the generator could queue the very same
+        # selection several times before the first one gets to run - and
+        # every extraction would then wait on a redundant step.
+        selectStep = None
+
         while not self.finished:
+            # A failed step makes the executor stop and then join every
+            # thread, this generator included: keep polling and the run
+            # hangs for good with nothing left to do.
+            if self._streamingMustStop():
+                break
+
             if not self._newParticlesToProcess():
                  self.info('No new particles')
             else:
@@ -104,7 +120,7 @@ class ProtGoodClassesExtractor(ProtFacilitiesStreamingBase):
 
                 self.isStreamClosed = classSet.getStreamState()
 
-                if self.selectGood:  # Only happens once
+                if selectStep is None:  # Only happens once
                     selectStep = self._insertFunctionStep(self.selectGoodClasses,
                                                           prerequisites=[])
 
@@ -129,10 +145,12 @@ class ProtGoodClassesExtractor(ProtFacilitiesStreamingBase):
     # --------------------------- STEPS functions -------------------------------
     def initialStep(self):
         self.finished = False
-        self.selectGood = True
         self.isStreamClosed = False
         self.goodParticles = []
         self.badParticles = []
+        # Collected ids, kept as a set so neither the per-step dedup nor the
+        # new-work check has to re-read the outputs built so far.
+        self._processedParticleIds = set()
         self.particlesDistribution = {'good': [], 'bad': []}
         self.goodClassesIDs = []
         self.dictsTimes = {}
@@ -148,8 +166,12 @@ class ProtGoodClassesExtractor(ProtFacilitiesStreamingBase):
                 badOutput.loadAllProperties()
                 self.badParticles = list(badOutput.getIdSet())
 
-            persistedIds = set(self.goodParticles).union(self.badParticles)
-            self.dictsTimes = self._rebuildClassCreationTimes(persistedIds)
+            self._processedParticleIds = set(self.goodParticles).union(
+                self.badParticles
+            )
+            self.dictsTimes = self._rebuildClassCreationTimes(
+                self._processedParticleIds
+            )
 
             if goodOutput is not None or badOutput is not None:
                 self.particlesDistribution = {
@@ -181,6 +203,9 @@ class ProtGoodClassesExtractor(ProtFacilitiesStreamingBase):
             # otherwise two concurrent steps could both see no output yet,
             # each create their own fresh Set, and whichever publishes last
             # would silently discard the other's already-appended particles.
+            # A Set that _loadOutputSet has just created has nothing behind
+            # it yet, so it cannot be read back - only an output already
+            # published as a protocol attribute can.
             existingOutput = getattr(self, OUTPUT_PARTICLES, None)
             existingDiscardedOutput = getattr(
                 self, OUTPUT_DISCARDED_PARTICLES, None
@@ -191,11 +216,24 @@ class ProtGoodClassesExtractor(ProtFacilitiesStreamingBase):
                 OUTPUT_DISCARDED_PARTICLES, "discarded"
             )
 
-            persistedParticleIds = set()
-            if existingOutput is not None:
-                persistedParticleIds.update(output.getIdSet())
-            if existingDiscardedOutput is not None:
-                persistedParticleIds.update(outputDiscarded.getIdSet())
+            # Reuse the ids collected so far rather than reading both
+            # outputs back on every step: rebuilding that set here is
+            # O(output) per step, which at millions of particles means
+            # re-reading everything already collected each time a batch
+            # arrives. The set is kept in step with the appends below,
+            # under this lock.
+            persistedParticleIds = self._processedParticleIds
+
+            if not persistedParticleIds:
+                # Nothing tracked in memory, which may simply mean this
+                # process has not looked at the outputs yet. They are the
+                # record of what really got persisted, so reconcile against
+                # them once - appending a particle twice would be worse
+                # than one extra read on an all but empty output.
+                if existingOutput is not None:
+                    persistedParticleIds.update(output.getIdSet())
+                if existingDiscardedOutput is not None:
+                    persistedParticleIds.update(outputDiscarded.getIdSet())
 
             # For each class (order by number of items)
             for clazz in inputClasses.iterItems(orderBy="_size", direction="DESC"):
@@ -203,7 +241,12 @@ class ProtGoodClassesExtractor(ProtFacilitiesStreamingBase):
                 where = None
                 if str(clazz.getObjId()) in self.dictsTimes:
                     lastTime = str(self.dictsTimes[str(clazz.getObjId())])
-                    where = 'creation>"' + lastTime + '"'
+                    # Inclusive on purpose: creation stamps are stored
+                    # without microseconds, so a batch written inside one
+                    # second shares a single value. Excluding it would drop
+                    # every sibling of the last particle seen. The id dedup
+                    # above keeps the re-read ones from being appended twice.
+                    where = 'creation>="' + lastTime + '"'
                     self.debug('Last creation time in class %d: %s'
                                % (clazz.getObjId(), lastTime))
 
@@ -241,8 +284,11 @@ class ProtGoodClassesExtractor(ProtFacilitiesStreamingBase):
             if len(outputDiscarded) > 0:
                 self._updateOutputSet(OUTPUT_DISCARDED_PARTICLES, outputDiscarded, self.isStreamClosed)
 
-
-        self._createPlots()
+            # Stay inside the lock: the plots are drawn on pyplot's single
+            # global current figure, so two parallel steps drawing at once
+            # would save each other's half-drawn figure. It also keeps the
+            # cumulative series in step with the counters just updated.
+            self._createPlots()
 
     def selectGoodClasses(self):
         """
@@ -259,7 +305,6 @@ class ProtGoodClassesExtractor(ProtFacilitiesStreamingBase):
 
         self.info('Good classes IDs:')
         self.info(self.goodClassesIDs)
-        self.selectGood = False
 
     def closeOutputStep(self):
         self.info("Size of good particles output: %d" % len(self.goodParticles))
@@ -297,14 +342,21 @@ class ProtGoodClassesExtractor(ProtFacilitiesStreamingBase):
                 lastTime = self.dictsTimes.get(str(clazz.getObjId()))
                 where = None
                 if lastTime is not None:
-                    where = 'creation>"%s"' % lastTime
+                    # Inclusive, for the same reason extractElements is:
+                    # creation stamps have no microseconds, so the boundary
+                    # second can still be gaining particles.
+                    where = 'creation>="%s"' % lastTime
 
-                if next(clazz.iterItems(
+                for image in clazz.iterItems(
                         orderBy='creation',
                         direction='ASC',
                         where=where,
-                ), None) is not None:
-                    return True
+                ):
+                    # The boundary second always answers that query, so an
+                    # id already collected is not new work - saying it is
+                    # would queue an extraction step on every single poll.
+                    if image.getObjId() not in self._processedParticleIds:
+                        return True
 
             return False
         finally:

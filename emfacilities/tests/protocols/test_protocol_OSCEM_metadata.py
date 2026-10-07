@@ -28,9 +28,9 @@ from ...protocols.protocol_OSCEM_metadata import INPUT_MOVIES, INPUT_MICS
 
 box_size = 300
 
-class TestOscemMetadataPostgresqlCompatibility(unittest.TestCase):
+class TestOscemMetadataLogicalSetCompatibility(unittest.TestCase):
 
-    def testVolumeParticleCountDoesNotRequireParticlesSqlite(self):
+    def testVolumeParticleCountDoesNotRequireAStorageFile(self):
         class ParticleSet:
             def getSize(self):
                 return 42
@@ -118,7 +118,7 @@ class TestOscemMetadataPostgresqlCompatibility(unittest.TestCase):
                 metadata.get("vol_number_particles"),
                 42,
                 "Volume particle count must come from the logical parent "
-                "protocol output, not from a sibling particles.sqlite file.",
+                "protocol output, not from a sibling storage file.",
             )
             self.assertEqual(project.graph.lastNodeId, "77")
             self.assertTrue(project.refresh)

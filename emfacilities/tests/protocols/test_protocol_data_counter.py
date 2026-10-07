@@ -492,6 +492,14 @@ class TestDataCounterStreamingScalability(tests.unittest.TestCase):
             def _loadInputSet(self, _):
                 return self.inputSet
 
+            # The protocol now goes through the shared discovery wrapper,
+            # so the harness has to borrow it too - otherwise this test
+            # would only exercise helpers nothing calls any more.
+            def _discoverNewInputIds(self, knownIds):
+                return ProtFacilitiesStreamingBase._discoverNewInputIds(
+                    self, knownIds
+                )
+
             def _discoverIdsAfter(self, inputSet, lastId):
                 return ProtDataCounter._discoverIdsAfter(self, inputSet, lastId)
 
@@ -569,6 +577,7 @@ class TestDataCounterStreamingArchitecture(tests.unittest.TestCase):
             # so this lightweight harness borrows it the same way it borrows
             # the discovery helpers elsewhere in this module.
             _runStreamingLoop = ProtFacilitiesStreamingBase._runStreamingLoop
+            _streamingMustStop = ProtFacilitiesStreamingBase._streamingMustStop
             _onStreamingIteration = ProtDataCounter._onStreamingIteration
 
             def __init__(self):

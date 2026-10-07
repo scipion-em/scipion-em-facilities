@@ -1,5 +1,9 @@
 from unittest.mock import patch
 
+from emfacilities.protocols.protocol_streaming_base import (
+    ProtFacilitiesStreamingBase,
+)
+
 
 class _Value:
     def __init__(self, value):
@@ -176,6 +180,14 @@ def assert_closed_stream_reconciliation(
 
         def _loadInputSet(self, _):
             return self.inputSet
+
+        # The protocol now goes through the shared discovery wrapper, so
+        # the harness has to borrow it too - otherwise this test would only
+        # exercise helpers nothing calls any more.
+        def _discoverNewInputIds(self, knownIds):
+            return ProtFacilitiesStreamingBase._discoverNewInputIds(
+                self, knownIds
+            )
 
         def _discoverIdsAfter(self, inputSet, lastId):
             return protocolClass._discoverIdsAfter(

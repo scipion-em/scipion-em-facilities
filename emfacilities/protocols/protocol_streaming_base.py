@@ -24,6 +24,7 @@
 # *  e-mail address 'scipion@cnb.csic.es'
 # *
 # **************************************************************************
+import pyworkflow.protocol.constants as cons
 from pyworkflow.protocol import ProtStreamingBase
 import pyworkflow.utils as pwutils
 from pwem.protocols import EMProtocol
@@ -56,10 +57,10 @@ class ProtFacilitiesStreamingBase(EMProtocol, ProtStreamingBase):
         """Reconcile IDs once a producer closes but rows lag behind metadata.
 
         Normal streaming discovery remains monotonic (``id > watermark``).
-        PostgreSQL runtime Sets can transiently expose a closed Set whose
-        declared size is ahead of the rows visible to the consumer. In that
-        terminal mismatch only, scan the logical IDs again so late-visible
-        rows below the watermark are not lost forever.
+        A Set can transiently expose a closed stream whose declared size is
+        ahead of the rows visible to the consumer. In that terminal mismatch
+        only, scan the logical IDs again so late-visible rows below the
+        watermark are not lost forever.
 
         Returns ``(newIds, terminalConsistent)``. ``terminalConsistent`` is
         False only while a closed producer still declares more items than are
@@ -146,9 +147,46 @@ class ProtFacilitiesStreamingBase(EMProtocol, ProtStreamingBase):
 
         return newIds, producerClosed
 
+    def _iterKnownSteps(self):
+        """Every step this run can see, the previous run's included.
+
+        pyworkflow only carries a previous run's step over into _steps when
+        the same index exists in the freshly inserted list. A steps
+        generator inserts its work while it runs, long after that
+        comparison is made, so on Resume _steps holds the generator alone
+        and the finished steps of the previous run are reachable through
+        _prevSteps only.
+        """
+        seen = set()
+
+        for steps in (getattr(self, '_steps', None),
+                      getattr(self, '_prevSteps', None)):
+            # Copy before walking: the generator appends to _steps from its
+            # own thread, and list() takes the snapshot in one go.
+            for step in list(steps or ()):
+                if id(step) in seen:
+                    continue
+
+                seen.add(id(step))
+                yield step
+
     def _onStreamingIteration(self):
         """Hook for per-poll work, before the input/output checks."""
         pass
+
+    def _streamingMustStop(self):
+        """True when the generator has to abandon its polling loop.
+
+        A failed step makes pyworkflow mark the protocol as FAILED and
+        the executor break out of its own loop - and then join every
+        running thread, the generator's among them. A generator that
+        keeps polling is never joined, so the whole run hangs with
+        nothing left to do. The same applies once it has been aborted.
+        """
+        status = getattr(self, 'status', None)
+        value = status.get() if hasattr(status, 'get') else status
+
+        return value in (cons.STATUS_FAILED, cons.STATUS_ABORTED)
 
     def _runStreamingLoop(self):
         """Shared streaming generator loop.
@@ -157,6 +195,12 @@ class ProtFacilitiesStreamingBase(EMProtocol, ProtStreamingBase):
         polling skeleton (and the terminal output close) lives here.
         """
         while not self.finished:
+            # A failed step makes the executor stop and then join every
+            # thread, this generator included: keep polling and the run
+            # hangs for good with nothing left to do.
+            if self._streamingMustStop():
+                break
+
             self._onStreamingIteration()
 
             self._checkNewInput()

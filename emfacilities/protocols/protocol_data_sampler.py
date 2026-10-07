@@ -170,10 +170,9 @@ class ProtDataSampler(ProtFacilitiesStreamingBase):
                 # Set.getItem raises rather than returning None for a row
                 # it cannot find. An id sampled earlier is not guaranteed
                 # to still be selectable on this freshly reloaded input
-                # Set (e.g. replication lag under a PostgreSQL-backed
-                # compatibility bridge) - check membership first and
-                # leave it pending for the next round instead of
-                # crashing the whole protocol.
+                # Set: a row can lag behind the metadata that advertised
+                # it. Check membership first and leave it pending for the
+                # next round instead of crashing the whole protocol.
                 if imageId not in inputSet:
                     self.error(
                         "Image with id %d is not yet visible in the "
@@ -233,7 +232,7 @@ class ProtDataSampler(ProtFacilitiesStreamingBase):
         self.insertedIds.update(doneIds)
         self.processedIds.update(doneIds)
 
-        for step in self._steps:
+        for step in self._iterKnownSteps():
             isFinished = getattr(step, "isFinished", None)
             if not callable(isFinished) or not isFinished():
                 continue
