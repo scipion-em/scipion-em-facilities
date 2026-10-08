@@ -136,6 +136,9 @@ class ProtDataCounter(ProtFacilitiesStreamingBase):
             newIds = list(set(newIds).difference(set(doneIds)))
             self.info("Skipping Images with ID: %s, seems to be done" % skipIds)
             self.insertedIds = set(doneIds) # During the first round of "Continue" action it has to be filled
+            # Same reconciliation seeds what is already published, so the
+            # output poll never has to ask the output itself.
+            self._markOutputIdsPersisted(OUTPUT, doneIds)
 
         if newIds and not self.limitReach and not self.timerOut:
             self._insertNewImageSteps(newIds)
@@ -174,8 +177,19 @@ class ProtDataCounter(ProtFacilitiesStreamingBase):
                                             outputName=OUTPUT)
 
             if currentOutputSize < limitOutputSize:
+                # A commit can write and still be reported as failed,
+                # and processedIds is only emptied once it is known to
+                # have succeeded - so an id can come round again after
+                # it is already in the output. Appending it twice would
+                # duplicate it.
+                alreadyPublished = self._getKnownPersistedOutputIds(OUTPUT)
+
                 persistedNow = set()
                 for imageId in newDone:
+                    if imageId in alreadyPublished:
+                        persistedNow.add(imageId)
+                        continue
+
                     # Set.getItem raises rather than returning None for a
                     # row it cannot find. An id discovered earlier via
                     # _discoverIdsAfter is not guaranteed to still be
@@ -214,6 +228,7 @@ class ProtDataCounter(ProtFacilitiesStreamingBase):
                 self._updateOutputSet(OUTPUT, outputSet, streamMode)
                 # Only forget pending IDs after the output update succeeds.
                 # If persistence raises, they remain queued for retry.
+                self._markOutputIdsPersisted(OUTPUT, persistedNow)
                 self.processedIds.difference_update(persistedNow)
         finally:
             inputSet.close()

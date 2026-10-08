@@ -302,6 +302,26 @@ class ProtFacilitiesStreamingBase(EMProtocol, ProtStreamingBase):
 
         return doneIds, sizeOutput
 
+    def _getKnownPersistedOutputIds(self, outputName):
+        """Ids this run knows are already published.
+
+        Never reads the output: asking it for every id would be a scan
+        of everything published so far, and that grows with the run. It
+        is seeded once from durable state where Continue already
+        reconciles, and kept current by _markOutputIdsPersisted.
+        """
+        cached = getattr(self, '_persistedOutputIds', None)
+
+        if cached is None:
+            cached = {}
+            self._persistedOutputIds = cached
+
+        return cached.setdefault(outputName, set())
+
+    def _markOutputIdsPersisted(self, outputName, itemIds):
+        """Record ids this run has just published."""
+        self._getKnownPersistedOutputIds(outputName).update(itemIds)
+
     def _getPersistedOutputIds(self, outputName):
         outputSet = getattr(self, outputName, None)
         if outputSet is None:

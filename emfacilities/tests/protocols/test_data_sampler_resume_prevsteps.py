@@ -176,3 +176,54 @@ class TestResumeReadsPreviousRunSteps(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class TestResumeDoesNotRequeueWhatIsAlreadyPublished(unittest.TestCase):
+    """sampleIds is a queue of what still has to be written.
+
+    A commit can write and still be reported as failed, so after a
+    Continue the sampled ids of that round come round again - and the
+    ones that did land are already in the output. Queueing them again
+    appends them a second time.
+    """
+
+    def setUp(self):
+        self.workdir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.workdir, True)
+
+    def _stateFile(self, name, processedIds, sampledIds):
+        path = os.path.join(self.workdir, name)
+        with open(path, 'w', encoding='utf-8') as handle:
+            json.dump(
+                {"processedIds": processedIds, "sampledIds": sampledIds},
+                handle,
+            )
+        return path
+
+    def _restore(self, sampledIds, doneIds):
+        stateFile = self._stateFile("batch.json", sorted(sampledIds),
+                                    sorted(sampledIds))
+        harness = _Harness(
+            steps=[],
+            prevSteps=[_Step("samplingStep", ids=sorted(sampledIds),
+                             stateFile=stateFile)],
+        )
+
+        harness._restoreRuntimeStateFromFinishedSteps(doneIds=set(doneIds))
+
+        return harness
+
+    def testAnAlreadyPublishedIdIsNotQueuedAgain(self):
+        harness = self._restore(sampledIds={1, 2, 3}, doneIds={1, 2})
+
+        self.assertEqual(
+            harness.sampleIds,
+            {3},
+            "Images 1 and 2 are already in the output; queueing them "
+            "again appends them a second time: %s" % harness.sampleIds,
+        )
+
+    def testNothingPublishedYetKeepsEverythingQueued(self):
+        harness = self._restore(sampledIds={1, 2}, doneIds=set())
+
+        self.assertEqual(harness.sampleIds, {1, 2})

@@ -257,6 +257,15 @@ def assert_late_visibility_retry(
         inputSize,
 ):
     class _Harness:
+        # Publication is idempotent now; the guard lives in
+        # the shared base, so the harness borrows it.
+        _getKnownPersistedOutputIds = (
+            ProtFacilitiesStreamingBase._getKnownPersistedOutputIds)
+        _markOutputIdsPersisted = (
+            ProtFacilitiesStreamingBase._markOutputIdsPersisted)
+        _getPersistedOutputIds = (
+            ProtFacilitiesStreamingBase._getPersistedOutputIds)
+
         def __init__(self):
             self.finished = False
             self.isStreamClosed = True
@@ -327,6 +336,15 @@ def assert_persisted_output_identity(
     existing = _ExistingOutput()
 
     class _Harness:
+        # Publication is idempotent now; the guard lives in
+        # the shared base, so the harness borrows it.
+        _getKnownPersistedOutputIds = (
+            ProtFacilitiesStreamingBase._getKnownPersistedOutputIds)
+        _markOutputIdsPersisted = (
+            ProtFacilitiesStreamingBase._markOutputIdsPersisted)
+        _getPersistedOutputIds = (
+            ProtFacilitiesStreamingBase._getPersistedOutputIds)
+
         def __init__(self):
             self.outputSet = existing
             self.inputImages = _Pointer(inputs)

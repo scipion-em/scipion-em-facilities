@@ -314,6 +314,15 @@ class TestDataCounterInputSetLifecycleRegression(tests.unittest.TestCase):
                 self.ids.append(image.objId)
 
         class _Harness:
+            # Publication is idempotent now; the guard lives in
+            # the shared base, so the harness borrows it.
+            _getKnownPersistedOutputIds = (
+                ProtFacilitiesStreamingBase._getKnownPersistedOutputIds)
+            _markOutputIdsPersisted = (
+                ProtFacilitiesStreamingBase._markOutputIdsPersisted)
+            _getPersistedOutputIds = (
+                ProtFacilitiesStreamingBase._getPersistedOutputIds)
+
             finished = False
             processedIds = {4, 5}
             isStreamClosed = False
@@ -370,6 +379,15 @@ class TestDataCounterInputSetLifecycleRegression(tests.unittest.TestCase):
                 self.closed = True
 
         class _Harness:
+            # Publication is idempotent now; the guard lives in
+            # the shared base, so the harness borrows it.
+            _getKnownPersistedOutputIds = (
+                ProtFacilitiesStreamingBase._getKnownPersistedOutputIds)
+            _markOutputIdsPersisted = (
+                ProtFacilitiesStreamingBase._markOutputIdsPersisted)
+            _getPersistedOutputIds = (
+                ProtFacilitiesStreamingBase._getPersistedOutputIds)
+
             finished = False
             processedIds = set()
             isStreamClosed = False
@@ -476,6 +494,15 @@ class TestDataCounterStreamingScalability(tests.unittest.TestCase):
                 self.closed = True
 
         class _Harness:
+            # Publication is idempotent now; the guard lives in
+            # the shared base, so the harness borrows it.
+            _getKnownPersistedOutputIds = (
+                ProtFacilitiesStreamingBase._getKnownPersistedOutputIds)
+            _markOutputIdsPersisted = (
+                ProtFacilitiesStreamingBase._markOutputIdsPersisted)
+            _getPersistedOutputIds = (
+                ProtFacilitiesStreamingBase._getPersistedOutputIds)
+
             finished = False
             lastRound = False
             isStreamClosed = False
@@ -570,6 +597,15 @@ class TestDataCounterStreamingArchitecture(tests.unittest.TestCase):
                 return False
 
         class _Harness:
+            # Publication is idempotent now; the guard lives in
+            # the shared base, so the harness borrows it.
+            _getKnownPersistedOutputIds = (
+                ProtFacilitiesStreamingBase._getKnownPersistedOutputIds)
+            _markOutputIdsPersisted = (
+                ProtFacilitiesStreamingBase._markOutputIdsPersisted)
+            _getPersistedOutputIds = (
+                ProtFacilitiesStreamingBase._getPersistedOutputIds)
+
             boolTimer = _Value()
             timerOut = False
 
@@ -653,4 +689,183 @@ class TestDataCounterPersistedOutputRegression(
             ProtDataCounter,
             "emfacilities.protocols.protocol_streaming_base.pwutils.cleanPath",
             OUTPUT,
+        )
+
+
+class _Value:
+    def __init__(self, value):
+        self._value = value
+
+    def get(self):
+        return self._value
+
+class _AmbiguousCommitImage:
+    def __init__(self, objId):
+        self._objId = objId
+
+    def getObjId(self):
+        return self._objId
+
+    def clone(self):
+        return _AmbiguousCommitImage(self._objId)
+
+
+class _AmbiguousCommitInput:
+    def __init__(self, ids):
+        self._ids = list(ids)
+
+    def getSize(self):
+        return len(self._ids)
+
+    def __contains__(self, objId):
+        return objId in self._ids
+
+    def getItem(self, attribute, objId):
+        return _AmbiguousCommitImage(objId)
+
+    def close(self):
+        pass
+
+
+class _AmbiguousCommitOutput:
+    """An output that already holds what a previous round committed."""
+
+    def __init__(self, ids=()):
+        self.ids = list(ids)
+
+    def getSize(self):
+        return len(self.ids)
+
+    def getIdSet(self):
+        return set(self.ids)
+
+    def getUniqueValues(self, attribute, where=None):
+        return list(self.ids)
+
+    def append(self, image):
+        self.ids.append(image.getObjId())
+
+    def loadAllProperties(self):
+        pass
+
+    def enableAppend(self):
+        pass
+
+
+class TestDataCounterDoesNotPublishTwice(tests.unittest.TestCase):
+    """A commit can write and still be reported as failed.
+
+    pwem writes the Set and only then stores the protocol attribute; if
+    that second half fails the items are durable but the poll raises,
+    which fails the run. Continuing it must not append them a second
+    time - processedIds still holds them, and nothing else would stop
+    them going in again.
+    """
+
+    def _harness(self, alreadyPublished, stillQueued):
+        published = _AmbiguousCommitOutput(alreadyPublished)
+        allIds = sorted(set(alreadyPublished) | set(stillQueued))
+
+        class _Harness(ProtDataCounter):
+            _getKnownPersistedOutputIds = (
+                ProtFacilitiesStreamingBase._getKnownPersistedOutputIds)
+            _markOutputIdsPersisted = (
+                ProtFacilitiesStreamingBase._markOutputIdsPersisted)
+            _getPersistedOutputIds = (
+                ProtFacilitiesStreamingBase._getPersistedOutputIds)
+
+            def __init__(self):
+                self.processedIds = set(stillQueued)
+                self.insertedIds = set()
+                self.finished = False
+                self.isStreamClosed = True
+                self.limitReach = False
+                self.timerOut = False
+                self.lastRound = False
+                self.outputSize = _Value(1000)
+                self._inputClass = object
+                self._baseName = 'images'
+                self.errors = []
+
+            def _loadInputSet(self, _):
+                return _AmbiguousCommitInput(allIds)
+
+            def _loadOutputSet(self, SetClass, baseName, outputName=None):
+                return published
+
+            def _getAllDoneIds(self, outputName=OUTPUT):
+                return list(published.ids), len(published.ids)
+
+            def isContinued(self):
+                return True
+
+            def _discoverNewInputIds(self, knownIds):
+                return [], True
+
+            def _insertNewImageSteps(self, newIds):
+                return []
+
+            def _updateOutputSet(self, outputName, outputSet, state):
+                pass
+
+            def error(self, message):
+                self.errors.append(message)
+
+            def info(self, *args):
+                pass
+
+            def debug(self, *args):
+                pass
+
+            def _store(self, *args):
+                pass
+
+        harness = _Harness()
+        setattr(harness, OUTPUT, published)
+
+        return harness, published
+
+    def _continueThenPoll(self, harness):
+        # Continue reconciles against the durable output first.
+        harness._checkNewInput()
+        harness._checkNewOutput()
+
+    def testContinueDoesNotAppendWhatIsAlreadyPublished(self):
+        harness, published = self._harness(
+            alreadyPublished=[1, 2], stillQueued=[1, 2])
+
+        self._continueThenPoll(harness)
+
+        self.assertEqual(
+            sorted(published.ids),
+            [1, 2],
+            "Those two images were already committed; appending them "
+            "again duplicates them in the output: %s" % published.ids,
+        )
+
+    def testGenuinelyNewItemsAreStillAppended(self):
+        harness, published = self._harness(
+            alreadyPublished=[1], stillQueued=[1, 2])
+
+        self._continueThenPoll(harness)
+
+        self.assertEqual(sorted(published.ids), [1, 2])
+
+    def testPublishingRecordsWhatWasPublished(self):
+        """The cache is what later polls trust, so it has to stay true.
+
+        Nothing re-queues an id today, but a cache that silently falls
+        behind what is in the output is a duplicate waiting for the
+        first change that does.
+        """
+        harness, published = self._harness(
+            alreadyPublished=[], stillQueued=[1, 2])
+
+        self._continueThenPoll(harness)
+
+        self.assertEqual(
+            harness._getKnownPersistedOutputIds(OUTPUT),
+            {1, 2},
+            "Those two were just written and the protocol does not know "
+            "it published them.",
         )
