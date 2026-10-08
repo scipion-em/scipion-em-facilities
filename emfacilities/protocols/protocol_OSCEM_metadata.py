@@ -712,6 +712,34 @@ class ProtOSCEM(EMProtocol):
 
         return classes_2D
 
+    def _getVolumeParticleCount(self, volume):
+        # Read particle count from the protocol that produced this volume.
+        parentId = volume.getObjParentId()
+        if parentId is None:
+            return None
+
+        project = self.getProject()
+        if project is None:
+            return None
+
+        node = project.getRunsGraph(refresh=True).getNode(str(parentId))
+        if node is None:
+            return None
+
+        parentProtocol = node.run
+        particles = getattr(parentProtocol, 'outputParticles', None)
+        if particles is None:
+            return None
+
+        getSize = getattr(particles, 'getSize', None)
+        if callable(getSize):
+            return getSize()
+
+        try:
+            return len(particles)
+        except TypeError:
+            return None
+
     def volume_generation(self, volume_type, folder_name, volume, th):
         vol_size = str(volume.getDim())
         vol_size_list = [int(x) for x in vol_size.strip('()').split(',')]
@@ -725,11 +753,7 @@ class ProtOSCEM(EMProtocol):
         folder_path = join(extra_folder, folder_name)
         os.makedirs(folder_path, exist_ok=True)
         volume_file = volume.getFileName()
-
-        # Access to particles.sqlite to obtain particles in volume:
-        reference_path = volume.getFileName()
-        base_directory = os.path.dirname(os.path.dirname(reference_path))
-        sqlite_particles_file = os.path.join(base_directory, "particles.sqlite")
+        particleCount = self._getVolumeParticleCount(volume)
 
         # Getting orthogonal slices in X, Y and Z
         # Folder to store orthogonal slices
@@ -781,15 +805,10 @@ class ProtOSCEM(EMProtocol):
         else:
             logger.warning(cyanStr('Xmipp3 is not detected: unable to get the resolution'))
 
-        if os.path.exists(sqlite_particles_file) and resolution:
-            particles = self._createSetOfParticles()
-            particles._mapperPath.set('%s, %s' % (sqlite_particles_file, ''))
-            particles.load()
-            size = len(particles)
-
+        if particleCount is not None and resolution:
             volume = {
                 'volume_type': volume_type,
-                'vol_number_particles': size,
+                'vol_number_particles': particleCount,
                 'vol_resolution': {
                     'value': resolution,
                     'unit': 'Å',
@@ -805,14 +824,10 @@ class ProtOSCEM(EMProtocol):
                     'side_view': join(folder_name, isosurface_images_folder, side_view_img),
                     'top_view': join(folder_name, isosurface_images_folder, top_view_img)
                 }}
-        elif os.path.exists(sqlite_particles_file):
-            particles = self._createSetOfParticles()
-            particles._mapperPath.set('%s, %s' % (sqlite_particles_file, ''))
-            particles.load()
-            size = len(particles)
+        elif particleCount is not None:
             volume = {
                 'volume_type': volume_type,
-                'vol_number_particles': size,
+                'vol_number_particles': particleCount,
                 'size': vol_size_list,
                 'orthogonal_slices': {
                     'orthogonal_slices_X': join(folder_name, orthogonal_slices_folder, slices_x),

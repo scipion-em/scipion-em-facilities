@@ -27,11 +27,11 @@
 import os
 
 import pyworkflow.protocol.params as params
-from pyworkflow.protocol.constants import STATUS_RUNNING
+from pyworkflow.protocol.constants import ACTIVE_STATUS
+from pyworkflow.protocol import getUpdatedProtocol
 from pyworkflow import VERSION_1_1
 
 from .protocol_monitor import ProtMonitor, Monitor
-
 
 class ProtMonitorMovieGain(ProtMonitor):
     """ check CPU, mem and IO usage.
@@ -78,7 +78,7 @@ class ProtMonitorMovieGain(ProtMonitor):
 
     # -------------------------- STEPS functions ------------------------------
     def monitorStep(self):
-        self.createMonitor().loop()
+        self.createMonitor().loop(startTime=self.initTime.datetime())
 
     def createMonitor(self):
 
@@ -135,49 +135,87 @@ class MonitorMovieGain(Monitor):
         self.notify("Scipion Movie Gain Monitor WARNING", msg)
 
     def initLoop(self):
-        pass
+        self._lastSummaryLine = 0
+        self._summaryOffset = 0
+        self._reportedWarnings = set()
+        fnWarning = self.protocol._getPath("warningsMonitor.txt")
+
+        if os.path.exists(fnWarning):
+            with open(fnWarning, "r") as handle:
+                self._reportedWarnings = {line.rstrip("\n") for line in handle}
+
+    def _reportWarning(self, fhWarning, movieName, message):
+        warningLine = "%s: %s" % (movieName, message)
+        if warningLine in self._reportedWarnings:
+            return
+
+        self.warning(message)
+        fhWarning.write(warningLine + "\n")
+        self._reportedWarnings.add(warningLine)
 
     def step(self):
-        prot = self.protocol
+        prot = getUpdatedProtocol(self.protocol)
         fnSummary = prot._getPath("summaryForMonitor.txt")
         fnWarning = prot._getPath("warningsMonitor.txt")
+
         if not os.path.exists(fnSummary) or os.path.getsize(fnSummary) < 1:
+            return prot.getStatus() not in ACTIVE_STATUS
+
+        # If the producer recreated/truncated the summary file, restart from
+        # the beginning instead of keeping an offset beyond the current EOF.
+        if os.path.getsize(fnSummary) < self._summaryOffset:
+            self._lastSummaryLine = 0
+            self._summaryOffset = 0
+
+        warningMode = "a" if os.path.exists(fnWarning) else "w"
+        hasPendingPartialLine = False
+        processedAnyLine = False
+
+        with open(fnSummary, "r") as fhSummary:
+            fhSummary.seek(self._summaryOffset)
+
+            with open(fnWarning, warningMode) as fhWarning:
+                while True:
+                    line = fhSummary.readline()
+
+                    if not line:
+                        break
+
+                    # The producer may be writing the last summary record while
+                    # the monitor reads the file. Keep the offset at the start
+                    # of that partial record so it is retried next time.
+                    if not line.endswith("\n"):
+                        hasPendingPartialLine = True
+                        break
+
+                    fields = line.split()
+                    stddev, perc25, perc975, maxVal = map(
+                        float, fields[1:]
+                    )
+                    movieName = fields[0]
+
+                    if stddev > self.stddevValue:
+                        self._reportWarning(fhWarning, movieName, "Residual gain standard deviation is %f." % stddev)
+
+                    if (perc975 / perc25) > self.ratio1Value:
+                        self._reportWarning(fhWarning, movieName, "The ratio between the 97.5 and 2.5 percentiles is %f." % (perc975 / perc25))
+
+                    if (maxVal / perc975) > self.ratio2Value:
+                        self._reportWarning(fhWarning, movieName, "The ratio between the maximum gain value and the 97.5 percentile is %f." % (maxVal / perc975))
+
+                    self._lastSummaryLine += 1
+                    self._summaryOffset = fhSummary.tell()
+                    processedAnyLine = True
+
+        if hasPendingPartialLine:
             return False
-        fhSummary = open(fnSummary, "r")
-        if not os.path.exists(fnWarning):
-            fhWarning = open(fnWarning, "w")
-        else:
-            fhWarning = open(fnWarning, "a")
 
-        line = fhSummary.readlines()[-1]
-        stddev, perc25, perc975, maxVal = map(float, line.split()[1:])
-        movie_name = map(str, line.split()[0])
-        values = line.split()
+        if not processedAnyLine:
+            return prot.getStatus() not in ACTIVE_STATUS
 
-        if float(values[1]) > self.stddevValue:
-            self.warning("Residual gain standard deviation is %f."
-                         % stddev)
-            fhWarning.write("%s: Residual gain standard deviation is %f.\n"
-                            % (movie_name, stddev))
+        return prot.getStatus() not in ACTIVE_STATUS
 
-        if (perc975 / perc25) > self.ratio1Value:
-            self.warning("The ratio between the 97.5 and 2.5 "
-                         "percentiles is %f."
-                         % (perc975 / perc25))
-            fhWarning.write("%s: The ratio between the 97.5 and 2.5 "
-                            "percentiles is %f.\n"
-                            % (movie_name, (perc975 / perc25)))
 
-        if (maxVal / perc975) > self.ratio2Value:
-            self.warning("The ratio between the maximum gain value "
-                         "and the 97.5 percentile is %f."
-                         % (maxVal / perc975))
-            fhWarning.write("%s: The ratio between the maximum gain value "
-                            "and the 97.5 percentile is %f.\n"
-                            % (movie_name, (maxVal / perc975)))
-        fhSummary.close()
-        fhWarning.close()
-        return prot.getStatus() != STATUS_RUNNING
 
     def getData(self, lastId=-1):
         if self.influx:

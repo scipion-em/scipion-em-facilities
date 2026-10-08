@@ -23,27 +23,22 @@
 # *  e-mail address 'scipion@cnb.csic.es'
 # *
 # **************************************************************************
-from datetime import datetime
-import os
-import time
 import sys
 import matplotlib.pyplot as plt
 
-from pyworkflow.utils import prettyTime
 import pyworkflow.protocol.params as params
 from pyworkflow.object import Set
-from pyworkflow.protocol import ProtStreamingBase, STEPS_PARALLEL
-from pwem.protocols import EMProtocol
+from pyworkflow.protocol import STEPS_PARALLEL
+from .protocol_streaming_base import ProtFacilitiesStreamingBase
 from pwem.objects import SetOfParticles, SetOfAverages, SetOfClasses2D
 from pyworkflow import BETA, UPDATED, NEW, PROD
 
 
 OUTPUT_PARTICLES = "outputParticles"
 OUTPUT_DISCARDED_PARTICLES = "outputParticlesDiscarded"
-LAST_DONE_FILE = "last_done.txt"
 
 
-class ProtGoodClassesExtractor(EMProtocol, ProtStreamingBase):
+class ProtGoodClassesExtractor(ProtFacilitiesStreamingBase):
     """ Extracts items from a SetOfClasses based on a list of IDs or a set of given good averages/classes
     """
 
@@ -58,8 +53,11 @@ class ProtGoodClassesExtractor(EMProtocol, ProtStreamingBase):
     LIST_IDS = 1
 
     def __init__(self, **args):
-        EMProtocol.__init__(self, **args)
+        ProtFacilitiesStreamingBase.__init__(self, **args)
         self.stepsExecutionMode = STEPS_PARALLEL
+        # Collected ids. initialStep refills it, but a step must never find
+        # it missing, so it exists from construction.
+        self._processedParticleIds = set()
 
     def _defineParams(self, form):
         form.addSection(label='Input')
@@ -83,6 +81,11 @@ class ProtGoodClassesExtractor(EMProtocol, ProtStreamingBase):
                       help='List of good reference IDs, separated by commas, '
                            'to extract particles from the inputClasses.')
 
+        self._defineStreamingParams(form)
+        # Preserve the historical polling cadence of this protocol, now as a
+        # tunable param instead of a hardcoded sleep in the generator loop.
+        form.getParam('streamingSleepOnWait').setDefault(60)
+
         form.addParallelSection(threads=3, mpi=1)
 
     # -------------------------- INSERT steps functions ---------------------------
@@ -95,7 +98,20 @@ class ProtGoodClassesExtractor(EMProtocol, ProtStreamingBase):
         self.newDeps = []
         self.initialStep()
 
-        while not self.finish:
+        # Own the "selection already queued" decision here instead of
+        # asking a step whether it already ran: that answer would come
+        # from another thread, so the generator could queue the very same
+        # selection several times before the first one gets to run - and
+        # every extraction would then wait on a redundant step.
+        selectStep = None
+
+        while not self.finished:
+            # A failed step makes the executor stop and then join every
+            # thread, this generator included: keep polling and the run
+            # hangs for good with nothing left to do.
+            if self._streamingMustStop():
+                break
+
             if not self._newParticlesToProcess():
                  self.info('No new particles')
             else:
@@ -104,7 +120,7 @@ class ProtGoodClassesExtractor(EMProtocol, ProtStreamingBase):
 
                 self.isStreamClosed = classSet.getStreamState()
 
-                if self.selectGood:  # Only happens once
+                if selectStep is None:  # Only happens once
                     selectStep = self._insertFunctionStep(self.selectGoodClasses,
                                                           prerequisites=[])
 
@@ -119,22 +135,59 @@ class ProtGoodClassesExtractor(EMProtocol, ProtStreamingBase):
                 # Finish everything and close output sets
                 self._insertFunctionStep(self.closeOutputStep,
                                          prerequisites=self.newDeps)
-                self.finish = True
+                self.finished = True
                 continue  # To avoid waiting 1 min
 
             sys.stdout.flush()
-            time.sleep(60)
+
+            self._streamingSleepOnWait()
 
     # --------------------------- STEPS functions -------------------------------
     def initialStep(self):
-        self.finish = False
-        self.selectGood = True
+        self.finished = False
         self.isStreamClosed = False
         self.goodParticles = []
         self.badParticles = []
+        # Collected ids, kept as a set so neither the per-step dedup nor the
+        # new-work check has to re-read the outputs built so far.
+        self._processedParticleIds = set()
         self.particlesDistribution = {'good': [], 'bad': []}
         self.goodClassesIDs = []
         self.dictsTimes = {}
+
+        if self.isContinued():
+            goodOutput = getattr(self, OUTPUT_PARTICLES, None)
+            badOutput = getattr(self, OUTPUT_DISCARDED_PARTICLES, None)
+
+            if goodOutput is not None:
+                goodOutput.loadAllProperties()
+                self.goodParticles = list(goodOutput.getIdSet())
+            if badOutput is not None:
+                badOutput.loadAllProperties()
+                self.badParticles = list(badOutput.getIdSet())
+
+            self._processedParticleIds = set(self.goodParticles).union(
+                self.badParticles
+            )
+            self.dictsTimes = self._rebuildClassCreationTimes(
+                self._processedParticleIds
+            )
+
+            if goodOutput is not None or badOutput is not None:
+                self.particlesDistribution = {
+                    'good': [len(self.goodParticles)],
+                    'bad': [len(self.badParticles)],
+                }
+                self.info(
+                    'Restored particle counters: %d good, %d discarded'
+                    % (len(self.goodParticles), len(self.badParticles))
+                )
+
+            self.info(
+                'Restored last processed creation times for %d classes'
+                % len(self.dictsTimes)
+            )
+
 
     def extractElements(self, inputClasses):
         """
@@ -142,46 +195,100 @@ class ProtGoodClassesExtractor(EMProtocol, ProtStreamingBase):
             - accepted particles
             - discarded particles
         """
-        output = self._loadOutputSet(OUTPUT_PARTICLES, "")
-        outputDiscarded = self._loadOutputSet(OUTPUT_DISCARDED_PARTICLES, "discarded")
-
         with self._lock:
+            # _loadOutputSet decides whether to reuse the existing output or
+            # create a fresh one. This protocol runs under STEPS_PARALLEL
+            # with independent extractElements steps, so this whole
+            # decide-append-publish sequence must stay inside the lock -
+            # otherwise two concurrent steps could both see no output yet,
+            # each create their own fresh Set, and whichever publishes last
+            # would silently discard the other's already-appended particles.
+            # A Set that _loadOutputSet has just created has nothing behind
+            # it yet, so it cannot be read back - only an output already
+            # published as a protocol attribute can.
+            existingOutput = getattr(self, OUTPUT_PARTICLES, None)
+            existingDiscardedOutput = getattr(
+                self, OUTPUT_DISCARDED_PARTICLES, None
+            )
+
+            output = self._loadOutputSet(OUTPUT_PARTICLES, "")
+            outputDiscarded = self._loadOutputSet(
+                OUTPUT_DISCARDED_PARTICLES, "discarded"
+            )
+
+            # Reuse the ids collected so far rather than reading both
+            # outputs back on every step: rebuilding that set here is
+            # O(output) per step, which at millions of particles means
+            # re-reading everything already collected each time a batch
+            # arrives. The set is kept in step with the appends below,
+            # under this lock.
+            persistedParticleIds = self._processedParticleIds
+
+            if not persistedParticleIds:
+                # Nothing tracked in memory, which may simply mean this
+                # process has not looked at the outputs yet. They are the
+                # record of what really got persisted, so reconcile against
+                # them once - appending a particle twice would be worse
+                # than one extra read on an all but empty output.
+                if existingOutput is not None:
+                    persistedParticleIds.update(output.getIdSet())
+                if existingDiscardedOutput is not None:
+                    persistedParticleIds.update(outputDiscarded.getIdSet())
+
             # For each class (order by number of items)
             for clazz in inputClasses.iterItems(orderBy="_size", direction="DESC"):
                 # Make the query to load only the new particles
                 where = None
                 if str(clazz.getObjId()) in self.dictsTimes:
                     lastTime = str(self.dictsTimes[str(clazz.getObjId())])
-                    where = 'creation>"' + lastTime + '"'
+                    # Inclusive on purpose: creation stamps are stored
+                    # without microseconds, so a batch written inside one
+                    # second shares a single value. Excluding it would drop
+                    # every sibling of the last particle seen. The id dedup
+                    # above keeps the re-read ones from being appended twice.
+                    where = 'creation>="' + lastTime + '"'
                     self.debug('Last creation time in class %d: %s'
                                % (clazz.getObjId(), lastTime))
 
                 # Two sets of particles:
                 if clazz.getObjId() in self.goodClassesIDs:  # Accepted particles
+                    tmp_accepted = None
                     for image in clazz.iterItems(orderBy='creation', direction='ASC', where=where):
                         tmp_accepted = image.getObjCreation()
+                        if image.getObjId() in persistedParticleIds:
+                            continue
                         newImage = image.clone()
                         output.append(newImage)
                         self.goodParticles.append(image.getObjId())
-                    self.dictsTimes[str(clazz.getObjId())] = tmp_accepted  # Store the latest time
+                        persistedParticleIds.add(image.getObjId())
+                    if tmp_accepted is not None:
+                        self.dictsTimes[str(clazz.getObjId())] = tmp_accepted  # Store the latest time
                 else:  # Discarded particles
+                    tmp_discarded = None
                     for image in clazz.iterItems(orderBy='creation', direction='ASC', where=where):
                         tmp_discarded = image.getObjCreation()
+                        if image.getObjId() in persistedParticleIds:
+                            continue
                         newImageDiscarded = image.clone()
                         outputDiscarded.append(newImageDiscarded)
                         self.badParticles.append(image.getObjId())
-                    self.dictsTimes[str(clazz.getObjId())] = tmp_discarded  # Store the latest time
+                        persistedParticleIds.add(image.getObjId())
+                    if tmp_discarded is not None:
+                        self.dictsTimes[str(clazz.getObjId())] = tmp_discarded  # Store the latest time
 
-        self.info('Size output %d and size discarded output %d' % (len(output), len(outputDiscarded)))
-        self.debug(str(self.dictsTimes))
+            self.info('Size output %d and size discarded output %d' % (len(output), len(outputDiscarded)))
+            self.debug(str(self.dictsTimes))
 
-        if len(output) > 0:
-            self._updateOutputSet(OUTPUT_PARTICLES, output, self.isStreamClosed)
-        if len(outputDiscarded) > 0:
-            self._updateOutputSet(OUTPUT_DISCARDED_PARTICLES, outputDiscarded, self.isStreamClosed)
+            if len(output) > 0:
+                self._updateOutputSet(OUTPUT_PARTICLES, output, self.isStreamClosed)
+            if len(outputDiscarded) > 0:
+                self._updateOutputSet(OUTPUT_DISCARDED_PARTICLES, outputDiscarded, self.isStreamClosed)
 
-        self._writeLastDone(self.dictsTimes)
-        self._createPlots()
+            # Stay inside the lock: the plots are drawn on pyplot's single
+            # global current figure, so two parallel steps drawing at once
+            # would save each other's half-drawn figure. It also keeps the
+            # cumulative series in step with the counters just updated.
+            self._createPlots()
 
     def selectGoodClasses(self):
         """
@@ -198,7 +305,6 @@ class ProtGoodClassesExtractor(EMProtocol, ProtStreamingBase):
 
         self.info('Good classes IDs:')
         self.info(self.goodClassesIDs)
-        self.selectGood = False
 
     def closeOutputStep(self):
         self.info("Size of good particles output: %d" % len(self.goodParticles))
@@ -217,55 +323,73 @@ class ProtGoodClassesExtractor(EMProtocol, ProtStreamingBase):
             outputSet.copyInfo(images)
             outputSet.setStreamState(Set.STREAM_OPEN)
         else:
+            outputSet.loadAllProperties()
             outputSet.enableAppend()
 
         return outputSet
 
     def _newParticlesToProcess(self):
-        classesFile = self.inputClasses.get().getFileName()
-        now = datetime.now()
-        self.lastCheck = getattr(self, 'lastCheck', now)
-        mTime = datetime.fromtimestamp(os.path.getmtime(classesFile))
-        self.debug('Last check: %s, modification: %s'
-                   % (prettyTime(self.lastCheck),
-                      prettyTime(mTime)))
-        # If the input have not changed since our last check,
-        # it does not make sense to check for new input data
-        if self.lastCheck > mTime and self.dictsTimes:
-            newParticlesBool = False
-        else:
-            newParticlesBool = True
+        classSet = self._loadInputClassesSet()
+        try:
+            self.isStreamClosed = classSet.getStreamState()
 
-        self.lastCheck = now
-        return newParticlesBool
+            # First pass must process the current contents, independently of
+            # the storage backend used by the input set.
+            if not self.dictsTimes:
+                return True
+
+            for clazz in classSet.iterItems():
+                lastTime = self.dictsTimes.get(str(clazz.getObjId()))
+                where = None
+                if lastTime is not None:
+                    # Inclusive, for the same reason extractElements is:
+                    # creation stamps have no microseconds, so the boundary
+                    # second can still be gaining particles.
+                    where = 'creation>="%s"' % lastTime
+
+                for image in clazz.iterItems(
+                        orderBy='creation',
+                        direction='ASC',
+                        where=where,
+                ):
+                    # The boundary second always answers that query, so an
+                    # id already collected is not new work - saying it is
+                    # would queue an extraction step on every single poll.
+                    if image.getObjId() not in self._processedParticleIds:
+                        return True
+
+            return False
+        finally:
+            classSet.close()
 
     def _loadInputClassesSet(self):
-        """ Returns te input set of particles"""
-        classSet = self.inputClasses.get()
-        classSet.loadAllProperties()
-
-        return classSet
+        """Return the logical input classes Set."""
+        return self._loadLogicalSet(self.inputClasses)
 
     def _getGoodIds(self):
         ids = self.inputGoodListIds.get().split(',')
         listIDs = [int(id) for id in ids]
         return listIDs
 
-    def _writeLastDone(self, creationTimeDict):
-        """ Write to a text file the last item creation time done. """
-        dictStr = str(creationTimeDict)
+    def _rebuildClassCreationTimes(self, persistedIds):
+        classTimes = {}
+        classSet = self._loadInputClassesSet()
 
-        with open(self._getExtraPath(LAST_DONE_FILE), 'w') as f:
-            f.write(dictStr)
+        try:
+            for clazz in classSet.iterItems():
+                lastCreation = None
 
-    def _getLastDone(self):
-        """ Read from a text file the last item creation time done. """
-        # Open the file in read mode and read the number
-        with open(self._getExtraPath(LAST_DONE_FILE), "r") as file:
-            content = file.read()
-        dictTimes = eval(content)
+                for image in clazz.iterItems(orderBy='creation', direction='ASC'):
+                    if image.getObjId() not in persistedIds:
+                        break
+                    lastCreation = image.getObjCreation()
 
-        return dictTimes
+                if lastCreation is not None:
+                    classTimes[str(clazz.getObjId())] = lastCreation
+        finally:
+            classSet.close()
+
+        return classTimes
 
     def _createPlots(self):
         """

@@ -77,17 +77,10 @@ class Connect:
             self.sftp.mkdir(directory)  # Create directory
 
     def put(self,listLocalPaths, listRemotePaths):
-        try:
-            for local, remote in zip(listLocalPaths, listRemotePaths):
-                remote = os.path.join(self.remote_path, remote)
-                print(local, "-->", remote)
-                self.sftp.put(local, remote, confirm=True)
-        except IOError:
-            pass
-        except OSError:
-            pass
-        except Exception as e:
-            print(str(e))
+        for local, remote in zip(listLocalPaths, listRemotePaths):
+            remote = os.path.join(self.remote_path, remote)
+            print(local, "-->", remote)
+            self.sftp.put(local, remote, confirm=True)
         return 0
 
     def close(self):

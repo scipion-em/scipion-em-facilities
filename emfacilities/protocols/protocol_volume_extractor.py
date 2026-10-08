@@ -83,6 +83,21 @@ class ProtVolumeExtractor(EMProtocol):
                       label='Volume reference id',
                       help='Given the id you will extract the volume from the setOfClasses3D.')
 
+    def _validate(self):
+        errors = []
+        if not self.selectBig.get() and self.selectID.get():
+            # Set.getItem raises rather than returning None for a row it
+            # cannot find - validate the user-entered id up front instead
+            # of letting extractElements() crash with a confusing error.
+            referenceID = self.volumeID.get()
+            inputClasses = self.inputClasses.get()
+            if inputClasses is not None and referenceID not in inputClasses:
+                errors.append(
+                    'Volume reference id %d does not exist in the input '
+                    'set of classes.' % referenceID
+                )
+        return errors
+
     # -------------------------- INSERT steps functions ---------------------------
     def _insertAllSteps(self):
         """ Insert all steps """
@@ -154,6 +169,7 @@ class ProtVolumeExtractor(EMProtocol):
             - Volume
             - Both
         """
+        self.outputsToDefine = {}
         if outputParticles:
             self.outputsToDefine[OUTPUT_PARTICLES] = outputParticles
 

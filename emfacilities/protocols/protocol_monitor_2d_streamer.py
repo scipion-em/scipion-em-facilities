@@ -127,10 +127,24 @@ class ProtMonitor2dStreamer(ProtMonitor):
         self._counter = 0
         self._lastMicId = None
         self._lastPartId = 0
-        self._subset = self._createSubset()
+        self._persistedParticleIds = set()
+        self._continueStateRestored = False
         self._runPrerequisites = []
+
+        if self.isContinued():
+            self._restoreContinueState()
+
+        self._subset = self._createSubset()
+
         if self.input2dProtocol.get().isActive():
-            self._runPrerequisites.append(self.input2dProtocol.get().getObjId())
+            inputProtId = self.input2dProtocol.get().getObjId()
+            if inputProtId not in self._runPrerequisites:
+                self._runPrerequisites.insert(0, inputProtId)
+
+        for runId in self._runIds:
+            if runId not in self._runPrerequisites:
+                self._runPrerequisites.append(runId)
+
         self._streamClosed = False
         # list of runs that has been (or will) be scheduled/run
 
@@ -138,10 +152,98 @@ class ProtMonitor2dStreamer(ProtMonitor):
 
         while not finished:
             self._checkNewInput()
-            time.sleep(interval)
             finished = self._streamClosed
+            if not finished:
+                time.sleep(interval)
 
     # -------------------------- UTILS functions ------------------------------
+    def _restoreContinueState(self):
+        outputNames = set()
+        lastSubsetNumber = 0
+        persistedParticleIds = set()
+
+        for outputName, outputSet in self.iterOutputAttributes():
+            if not outputName.startswith('outputParticles_'):
+                continue
+
+            try:
+                subsetNumber = int(outputName.rsplit('_', 1)[1])
+            except (IndexError, ValueError):
+                continue
+
+            outputNames.add(outputName)
+            lastSubsetNumber = max(lastSubsetNumber, subsetNumber)
+            outputSet.loadAllProperties()
+            persistedParticleIds.update(outputSet.getIdSet())
+
+        self._restoreScheduledRuns(outputNames)
+        self._counter = lastSubsetNumber
+        self._counterParticlesProcessed = len(persistedParticleIds)
+        self._persistedParticleIds = persistedParticleIds
+        self._lastPartId = 0
+        self._continueStateRestored = True
+
+        self.info('Restored monitor progress: %d persisted particles, %d written subsets.' % (self._counterParticlesProcessed, self._counter))
+
+
+    def _restoreScheduledRuns(self, outputNames):
+        if not outputNames:
+            return
+
+        manager = Manager()
+        project = manager.loadProject(self.getProject().getName())
+        knownRunIds = set(self._runIds)
+        runsByOutput = {}
+
+        for run in project.getRuns():
+            inputParticles = getattr(run, 'inputParticles', None)
+            if inputParticles is None:
+                continue
+
+            try:
+                parentProtocol = inputParticles.getObjValue()
+                outputName = inputParticles.getExtended()
+            except (AttributeError, TypeError):
+                continue
+
+            if parentProtocol is None or outputName not in outputNames:
+                continue
+
+            try:
+                parentId = parentProtocol.getObjId()
+                runId = run.getObjId()
+            except AttributeError:
+                continue
+
+            if parentId == self.getObjId():
+                runsByOutput.setdefault(outputName, runId)
+
+        input2D = self.input2dProtocol.get()
+        runPrerequisites = []
+        if input2D.isActive():
+            runPrerequisites.append(input2D.getObjId())
+
+        for outputName in sorted(outputNames):
+            runId = runsByOutput.get(outputName)
+
+            if runId is None:
+                copyProt = project.copyProtocol(
+                    project.getProtocol(input2D.getObjId())
+                )
+                copyProt.inputParticles.set(
+                    project.getProtocol(self.getObjId())
+                )
+                copyProt.inputParticles.setExtended(outputName)
+                project.scheduleProtocol(copyProt, runPrerequisites)
+                runId = copyProt.getObjId()
+
+            if runId not in knownRunIds:
+                self._runIds.append(runId)
+                knownRunIds.add(runId)
+
+            if runId not in runPrerequisites:
+                runPrerequisites.append(runId)
+
     def _createSubset(self):
         """ Create a new empty set of particles with a given suffix. """
         self._counter += 1
@@ -168,8 +270,14 @@ class ProtMonitor2dStreamer(ProtMonitor):
         copyProt.inputParticles.set(project.getProtocol(self.getObjId()))
         copyProt.inputParticles.setExtended(newSubsetName)
         project.scheduleProtocol(copyProt, self._runPrerequisites)
-        # Next schedule will be after this one
-        self._runPrerequisites.append(copyProt.getObjId())
+
+        # Persist scheduled runs so Continue can rebuild the dependency chain.
+        runId = copyProt.getObjId()
+        self._runIds.append(runId)
+        self._store(self._runIds)
+
+        # Next schedule will be after this one.
+        self._runPrerequisites.append(runId)
 
     def _checkNewInput(self):
         """ Check if there are new particles and generate a new set
@@ -180,18 +288,28 @@ class ProtMonitor2dStreamer(ProtMonitor):
         for particle in self._iterParticles():
             micId = particle.getMicId()
             partId = particle.getObjId()
-            subset.append(particle)
-            self.debug("micId: %03d, particle: %05s, size: %s"
-                      % (micId, partId, subset.getSize()))
 
-            # Check the following after finding particles of a new micrograph
             if micId != self._lastMicId:
+                # For a particle-count limit, stop at the micrograph boundary
+                # before adding the first particle beyond the requested maximum.
+                if (self.maximumOption == self.NUMBER_PARTICLES
+                        and self.classificationStop()):
+                    self._streamClosed = True
+                    if self._counterNewParticles > 0:
+                        self._writeSubset(subset)
+                    self.info(
+                        "The limit for launching classification jobs has been "
+                        "reached, stopping protocol"
+                    )
+                    return
+
                 if self.classificationStop():
                     self._streamClosed = True
                     self.info("The limit for launching classification jobs has been reached, stopping protocol")
                     return  # roll back to the monitorStep and finish
 
-                if self._lastMicId is not None and self._counterNewParticles > self.batchSize:  # New particles
+                if (self._lastMicId is not None
+                        and self._counterNewParticles >= self.batchSize):
                     self._writeSubset(subset)
                     subsetTmp = subset  # save the previous so we can have the cumulative functionality
                     subset = self._createSubset()
@@ -203,12 +321,16 @@ class ProtMonitor2dStreamer(ProtMonitor):
 
                 self._lastMicId = micId
 
+            subset.append(particle)
+            self.debug("micId: %03d, particle: %05s, size: %s"
+                      % (micId, partId, subset.getSize()))
+
             self._lastPartId = partId
             self._counterNewParticles += 1
             self._counterParticlesProcessed += 1
 
             # Write last group of particles if input stream is closed
-        if self._streamClosed:
+        if self._streamClosed and self._counterNewParticles > 0:
             self._writeSubset(subset)
 
         self._subset = subset
@@ -218,20 +340,28 @@ class ProtMonitor2dStreamer(ProtMonitor):
         inputParts.load()
         inputParts.loadAllProperties()
         self._streamClosed = inputParts.isStreamClosed()
+        particles = inputParts.iterItems(orderBy=['_micId', 'id'], direction='ASC', where='id > %d' % self._lastPartId)
 
-        for p in inputParts.iterItems(orderBy=['_micId', 'id'],
-                                      direction='ASC',
-                                      where='id > %d' % self._lastPartId):
-            yield p
+        if self._lastPartId == 0 and not getattr(self, '_continueStateRestored', False):
+            for _ in range(self.startingNumber.get()):
+                try:
+                    next(particles)
+                except StopIteration:
+                    break
 
-        inputParts.close()
+        try:
+            for particle in particles:
+                if particle.getObjId() not in getattr(self, '_persistedParticleIds', set()):
+                    yield particle
+        finally:
+            inputParts.close()
 
     def classificationStop(self):
         response = False
 
         if self.maximumOption == self.NUMBER_PARTICLES:
             inputSize = self._counterParticlesProcessed
-            if inputSize > self.numberParticles.get():
+            if inputSize >= self.numberParticles.get():
                 response = True
 
         if self.maximumOption == self.CLASSIFICATION_JOBS:
