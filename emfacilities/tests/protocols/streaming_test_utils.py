@@ -184,6 +184,13 @@ def assert_closed_stream_reconciliation(
         # The protocol now goes through the shared discovery wrapper, so
         # the harness has to borrow it too - otherwise this test would only
         # exercise helpers nothing calls any more.
+        # The stall detector lives in the shared base and runs inside
+        # the reconciliation, so the harness borrows it too.
+        _hasActiveStreamingWork = (
+            ProtFacilitiesStreamingBase._hasActiveStreamingWork)
+        _recordTerminalProgress = (
+            ProtFacilitiesStreamingBase._recordTerminalProgress)
+
         def _discoverNewInputIds(self, knownIds):
             return ProtFacilitiesStreamingBase._discoverNewInputIds(
                 self, knownIds
