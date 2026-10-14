@@ -37,7 +37,124 @@ OUTPUT_VOLUME = "bestVolume"
 class ProtVolumeExtractor(EMProtocol):
     """
     Extracts items (particles, volume or both) from a SetOf3DClasses based on number of items assigned to the class
-    or by a reference ID
+    or by a reference ID.
+
+    AI Generated:
+
+    Volume Extractor (ProtVolumeExtractor) - User Manual
+        Overview
+
+        The Volume Extractor protocol is designed to retrieve biologically relevant
+        information from a SetOf3DClasses generated during cryo-EM classification
+        workflows. Its main purpose is to isolate a representative 3D class and
+        recover the associated structural volume, the corresponding particle subset,
+        or both simultaneously. This operation is commonly used after heterogeneous
+        refinement or 3D classification when a user wants to continue processing a
+        specific structural population independently from the rest of the dataset.
+
+        In practical cryo-EM workflows, 3D classification often separates particles
+        into distinct conformational, compositional, or quality-related groups.
+        Once classification is complete, researchers usually need to select one of
+        these groups for downstream refinement, reconstruction, or interpretation.
+        This protocol simplifies that transition by creating clean outputs that can
+        be directly reused in subsequent processing stages.
+
+        Selection Strategies
+
+        The protocol offers two biologically meaningful ways to select a class.
+        The first option automatically selects the largest class, which is often
+        interpreted as the dominant structural state in the dataset. This approach
+        is especially useful during exploratory processing, when the user wants to
+        continue with the most statistically populated reconstruction without
+        manually inspecting all classes.
+
+        The second option allows selection by reference identifier. This mode is
+        particularly important when the biologically relevant state is not the
+        largest one. For example, minor conformations, transient assemblies, or
+        rare functional states may contain fewer particles but still represent the
+        most interesting structural population for the biological question under
+        investigation.
+
+        Extraction Modes
+
+        The protocol can generate three different types of outputs depending on the
+        intended downstream analysis. Users may extract only the particle subset,
+        only the representative volume, or both together.
+
+        Extracting particles is typically useful when additional refinement,
+        polishing, focused classification, or reconstruction steps are planned.
+        The resulting particle set preserves the identity of the selected class and
+        allows the workflow to continue independently from the original
+        classification results.
+
+        Extracting only the representative volume is useful for visualization,
+        interpretation, docking, comparison against other reconstructions, or
+        preparing maps for external analysis tools. This option is often chosen
+        when the structural state has already been sufficiently refined and the
+        user only needs the final map.
+
+        Extracting both particles and volume is the most common choice in
+        iterative cryo-EM workflows because it preserves complete continuity
+        between structural interpretation and additional processing.
+
+        Biological Interpretation
+
+        In cryo-EM studies, each 3D class may correspond to a distinct molecular
+        conformation, compositional arrangement, ligand-binding state, or data
+        quality subset. Selecting the correct class therefore has important
+        biological implications. The largest class is not always the most relevant
+        one, particularly in systems with strong conformational heterogeneity or
+        low-population functional intermediates.
+
+        Careful visual inspection of the classes before extraction is highly
+        recommended. Structural features such as domain movements, ligand density,
+        symmetry changes, or flexibility should guide the selection process rather
+        than particle count alone. In many projects, multiple classes may need to
+        be extracted independently and refined separately to fully characterize the
+        biological landscape of the sample.
+
+        Typical Workflow Integration
+
+        This protocol is commonly used immediately after 3D classification or
+        heterogeneous refinement. A typical workflow begins with particle cleaning
+        and consensus reconstruction, followed by classification into multiple 3D
+        states. Once the classes are generated, the user identifies the most
+        relevant structural population and extracts it using this protocol before
+        continuing with local refinement, postprocessing, focused analysis, or
+        atomic modeling.
+
+        The extracted particle subsets are particularly useful for improving map
+        quality through additional rounds of refinement. Likewise, extracted
+        representative volumes can serve as references for alignment, comparison,
+        visualization, or deposition preparation.
+
+        Practical Recommendations
+
+        When working with highly heterogeneous samples, it is advisable to inspect
+        all classes carefully before selecting the largest one automatically.
+        Dominant classes may correspond to preferred orientations, damaged
+        particles, partial assemblies, or inactive conformations rather than the
+        desired biological state.
+
+        For exploratory analyses, extracting both particles and volume provides
+        the greatest flexibility and preserves all relevant information for future
+        processing. When computational resources are limited or the structural
+        state has already been finalized, extracting only the representative volume
+        may be sufficient.
+
+        In workflows involving rare conformational states, users should prioritize
+        structural interpretability over particle count. Small but well-defined
+        classes often contain biologically critical information that would
+        otherwise be lost in consensus reconstructions.
+
+        Final Perspective
+
+        The Volume Extractor protocol serves as a bridge between classification and
+        downstream structural interpretation. By isolating specific 3D classes and
+        their associated particles or maps, it enables focused biological analysis
+        of individual structural states. Proper class selection is therefore not
+        only a technical decision but also an essential step in understanding the
+        functional diversity and conformational behavior of macromolecular systems.
     """
 
     _label = "volume extractor"

@@ -35,10 +35,180 @@ from pyworkflow import BETA, UPDATED, NEW, PROD
 
 
 class ProtMonitor2dStreamer(ProtMonitor):
-    """ This protocol will monitor an input set of particles
-    (usually in streaming) and will run/schedule many copies
-     of a given 2D classification protocol but using subsets
-     of the input particles as the 2D classification input.
+    """
+    Supervises streaming particle datasets and automatically launches
+    iterative 2D classification jobs on progressively generated particle
+    subsets. The protocol is intended to support continuous cryo-EM
+    processing workflows in which particles arrive over time and require
+    periodic classification without interrupting acquisition or upstream
+    processing.
+
+    AI Generated:
+
+    2D Classification Stream Monitor (ProtMonitor2dStreamer) — User Manual
+        Overview
+
+        The 2D Classification Stream Monitor is designed to automate the
+        execution of repeated 2D classification analyses during streaming
+        cryo-EM workflows. Instead of waiting until particle extraction is
+        completely finished, the protocol continuously observes incoming
+        particle sets and schedules new 2D classification jobs whenever a
+        sufficient amount of new data becomes available.
+
+        In practical cryo-EM environments, this approach provides early
+        feedback about particle quality, structural heterogeneity, ice
+        contamination, preferred orientations, aggregation, or acquisition
+        problems while data collection is still ongoing. This allows users
+        and facility operators to make informed experimental decisions before
+        large microscope sessions are completed.
+
+        General Workflow
+
+        The protocol operates by repeatedly monitoring a streaming set of
+        particles and dividing the incoming data into subsets suitable for
+        2D classification. Each subset is then processed using a selected 2D
+        classification protocol template. The resulting classifications can
+        be inspected independently as the experiment progresses.
+
+        This workflow is especially useful during automated acquisition
+        sessions, high-throughput screening, and online processing pipelines,
+        where rapid assessment of particle quality is essential. By launching
+        classifications continuously, users can evaluate whether particles
+        exhibit meaningful structural features long before the final dataset
+        is complete.
+
+        Template-Based Classification
+
+        The protocol relies on an existing 2D classification configuration as
+        a reusable template. This ensures that every classification job is
+        executed under consistent conditions throughout the streaming process.
+
+        From a biological perspective, maintaining stable classification
+        parameters across batches is important because it allows meaningful
+        comparison of class averages generated at different stages of data
+        acquisition. Consistent processing conditions simplify quality
+        assessment and improve interpretation of evolving datasets.
+
+        Particle Subset Generation
+
+        Incoming particles are grouped into batches before launching a new
+        classification job. The batch size determines approximately how many
+        particles are included in each classification cycle.
+
+        Small batches provide faster feedback and are useful during microscope
+        setup or screening sessions where immediate evaluation is more
+        important than classification stability. Larger batches generally
+        produce cleaner and more reliable class averages because more particle
+        information contributes to the alignment and averaging process.
+
+        In biological practice, the optimal batch size depends on sample
+        quality, particle size, heterogeneity, and acquisition speed.
+        Flexible or heterogeneous samples often benefit from larger batches,
+        whereas stable particles can produce useful feedback even with smaller
+        datasets.
+
+        Starting Point Control
+
+        The protocol allows users to ignore an initial fraction of particles
+        before starting automated classifications. This capability is useful
+        when early particles have already been processed separately or when
+        users wish to exclude initial microscope stabilization periods.
+
+        In many cryo-EM sessions, the first acquired images may exhibit drift,
+        unstable ice conditions, or suboptimal alignment. Delaying automated
+        classifications until acquisition stabilizes can improve the quality
+        and interpretability of the generated class averages.
+
+        Cumulative Classification Strategy
+
+        The monitoring system supports cumulative processing modes in which
+        newly generated classification batches include both recent particles
+        and particles processed previously. This produces progressively larger
+        particle sets over time.
+
+        Biologically, cumulative classification can improve class stability
+        and reveal weaker structural features as the number of particles
+        increases. It is particularly useful for difficult samples with low
+        contrast or substantial conformational variability.
+
+        However, cumulative processing also increases computational cost and
+        may progressively mix heterogeneous conformations if the incoming
+        particle population evolves during acquisition. Users should therefore
+        balance classification stability against sensitivity to temporal
+        variability.
+
+        Monitoring and Scheduling
+
+        The protocol periodically checks whether new particles have appeared
+        in the streaming dataset. When enough additional particles are
+        available, a new classification job is automatically scheduled.
+
+        This periodic supervision allows the protocol to adapt naturally to
+        variable acquisition rates without requiring manual intervention.
+        Fast acquisition sessions may trigger classifications frequently,
+        whereas slower experiments may generate jobs at longer intervals.
+
+        In facility-scale deployments, this automation reduces operator
+        workload and enables continuous online feedback during unattended
+        data collection sessions.
+
+        Limiting Classification Expansion
+
+        To prevent uncontrolled growth of computational workload, the protocol
+        allows users to impose stopping conditions. Classification launches
+        may be limited either by the total number of generated classification
+        jobs or by the total number of processed particles.
+
+        These limits are operationally important in shared computational
+        environments where resources must be carefully managed. They also help
+        users focus on early-stage data evaluation without committing to
+        unnecessary large-scale processing.
+
+        Outputs and Biological Interpretation
+
+        Each generated subset produces an independent 2D classification
+        result. Together, these classifications provide a temporal view of
+        how particle quality and structural content evolve throughout the
+        acquisition session.
+
+        Early classifications may reveal contamination, poor ice quality, or
+        alignment instability, while later classifications often become more
+        stable as the dataset grows. Users can therefore monitor the maturity
+        and consistency of the experiment in near real time.
+
+        In biological applications, repeated 2D classifications are valuable
+        for identifying rare views, conformational heterogeneity, aggregation,
+        partial denaturation, or preferential orientation problems before
+        committing to extensive downstream reconstruction efforts.
+
+        Practical Recommendations
+
+        During exploratory sessions or microscope setup, smaller batch sizes
+        and shorter monitoring intervals provide rapid diagnostic feedback.
+        Once acquisition conditions become stable, larger batches are often
+        preferable because they improve class quality and reduce scheduling
+        overhead.
+
+        Cumulative processing is particularly useful for weak or noisy
+        particles, whereas non-cumulative processing may better preserve
+        temporal information about evolving acquisition conditions.
+
+        For heterogeneous samples, users should inspect classifications
+        regularly to verify whether new structural states appear as more
+        particles are acquired.
+
+        Final Perspective
+
+        Continuous 2D classification monitoring represents an important step
+        toward fully automated cryo-EM streaming workflows. By combining
+        online supervision with iterative classification scheduling, the
+        protocol enables users to evaluate particle quality, structural
+        consistency, and experimental stability while acquisition is still
+        active.
+
+        This capability improves decision-making efficiency, reduces wasted
+        microscope time, and provides earlier biological insight into the
+        evolving cryo-EM dataset.
     """
     _label = '2d classification launcher'
     _devStatus = UPDATED

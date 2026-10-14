@@ -61,8 +61,109 @@ RESOLUTION_HIST_BIN_WIDTH = 0.5
 
 
 class ReportHtml:
-    """ Create an html report with a summary of the processing.
-    The report will be updated with a given frequency.
+    """
+    Creates and maintains a continuously updated HTML-based monitoring and visualization environment for
+    scientific processing workflows, providing real-time summaries, quality metrics, image thumbnails,
+    and operational status information.
+
+    AI Generated:
+
+    Report Html (ReportHtml) — User Manual
+        Overview
+
+        The ReportHtml class provides a web-oriented reporting and visualization system designed for
+        monitoring ongoing scientific processing workflows. Its main objective is to generate interactive
+        HTML summaries that allow users to inspect workflow progress, review image quality indicators,
+        monitor processing rates, and evaluate system activity in near real time.
+
+        In cryo-EM and large-scale imaging environments, processing pipelines often execute continuously
+        while generating large quantities of intermediate data and diagnostic measurements. This reporting
+        system enables facility users, operators, and collaborators to follow workflow execution remotely
+        through browser-accessible summaries without requiring direct access to the processing environment.
+
+        General Workflow
+
+        The reporting infrastructure gathers information from multiple workflow monitoring components,
+        including acquisition summaries, CTF estimation monitors, movie gain analysis, alignment outputs,
+        and computational resource statistics. These data are integrated into a unified HTML report that
+        is periodically refreshed during processing.
+
+        The generated report combines textual summaries, graphical statistics, historical measurements,
+        image thumbnails, and execution status indicators. This allows users to monitor both biological
+        data quality and computational workflow stability simultaneously.
+
+        Workflow Summary and Acquisition Information
+
+        The reporting system organizes workflow outputs into structured summaries where processing steps
+        and generated datasets can be inspected hierarchically. This improves transparency in complex
+        pipelines where multiple protocols contribute intermediate and final outputs.
+
+        Acquisition metadata are also incorporated into the report so users can verify microscope settings,
+        pixel sampling information, magnification parameters, and related experimental conditions. Such
+        information is biologically important because acquisition quality strongly influences downstream
+        reconstruction accuracy and interpretability.
+
+        Thumbnail Generation and Image Visualization
+
+        One of the central objectives of the reporting environment is providing visual inspection of
+        acquired and processed micrographs. The system generates lightweight thumbnail representations of
+        micrographs, power spectra, and motion correction plots suitable for rapid web visualization.
+
+        These thumbnails allow users to assess image quality remotely without transferring full-resolution
+        datasets. In cryo-EM workflows, early visual inspection is particularly important for identifying
+        contamination, drift, charging effects, ice quality problems, or acquisition instability before
+        extensive processing resources are consumed.
+
+        The reporting system supports both incremental image generation during streaming acquisition and
+        batch-oriented generation for larger completed datasets.
+
+        CTF and Quality Monitoring
+
+        The report integrates CTF-related statistics and visualization data to support continuous quality
+        assessment throughout processing. Defocus distributions, resolution histograms, phase shift
+        measurements, and time-series trends are incorporated into the monitoring environment.
+
+        These biological quality indicators help users evaluate microscope stability, acquisition
+        consistency, and reconstruction suitability over time. Monitoring trends dynamically is especially
+        valuable in automated cryo-EM facilities where rapid detection of acquisition problems can prevent
+        substantial data loss.
+
+        Processing Rate and Workflow Progress
+
+        The reporting system also estimates processing throughput and workflow activity rates. By tracking
+        the evolution of generated outputs over time, users can identify acceleration, slowdown, or
+        interruptions in data processing pipelines.
+
+        Such operational monitoring is valuable in high-throughput facilities where workflow efficiency and
+        computational stability directly influence microscope utilization and project turnaround times.
+
+        System Resource Monitoring
+
+        In addition to imaging-related metrics, the reporting environment integrates computational system
+        statistics. Monitoring processor activity, memory usage, and related infrastructure indicators
+        allows administrators and advanced users to evaluate processing load and identify computational
+        bottlenecks.
+
+        Combining biological quality measurements with infrastructure monitoring provides a comprehensive
+        operational perspective over both scientific and computational aspects of the workflow.
+
+        Dynamic Report Publication
+
+        The reporting framework supports periodic publication and synchronization of generated reports to
+        external locations. This capability enables remote dashboards, institutional portals, and shared
+        monitoring environments where collaborators and facility staff can review workflow evolution in
+        real time.
+
+        Such remote accessibility is especially important in distributed research environments where data
+        acquisition, processing, and interpretation may occur across different systems or institutions.
+
+        Final Perspective
+
+        The ReportHtml class serves as a comprehensive visualization and monitoring framework for
+        scientific imaging workflows. By integrating acquisition metadata, processing summaries, image
+        thumbnails, quality statistics, throughput estimation, and system monitoring into a continuously
+        updated HTML environment, it enables efficient real-time supervision of cryo-EM and imaging
+        pipelines while improving transparency, operational awareness, and collaborative accessibility.
     """
     def __init__(self, protocol, ctfMonitor, sysMonitor, movieGainMonitor, publishCmd=None, **kwargs):
         # The CTF protocol to monitor

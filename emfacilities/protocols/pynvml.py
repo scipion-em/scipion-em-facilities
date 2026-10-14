@@ -235,6 +235,156 @@ _nvmlLib_refcount = 0  # Incremented on each nvmlInit and decremented on nvmlShu
 
 # Error Checking ##
 class NVMLError(Exception):
+    """
+    Provides a high-level interface for managing and monitoring NVIDIA GPU devices through the NVIDIA Management Library (NVML). The class ecosystem centralizes GPU-related error handling, device discovery, hardware querying, monitoring, event management, accounting, and configuration tasks commonly required in high-performance computing, AI training environments, visualization systems, and infrastructure monitoring platforms.
+
+    AI Generated:
+
+    NVIDIA Management Library Interface (NVMLError) - User Manual
+        Overview
+
+        The NVMLError framework represents the central error handling and device management layer for interacting
+        with NVIDIA GPUs through the NVIDIA Management Library. Its primary goal is to expose a consistent and
+        user-friendly interface for querying hardware information, monitoring runtime behavior, configuring GPU
+        operation, and handling failures in heterogeneous compute environments.
+
+        The system is designed for scientific computing facilities, AI clusters, cloud GPU infrastructures,
+        workstation monitoring tools, and automated resource schedulers. It supports both low-level device
+        management and high-level monitoring workflows, allowing users and administrators to inspect GPU state,
+        collect performance metrics, control device policies, and react to hardware or driver events in a
+        predictable way.
+
+        Error Handling and Exception Management
+
+        The framework introduces a structured hierarchy of GPU-related exceptions that map directly to NVML
+        error conditions. This design allows applications to distinguish initialization failures, unsupported
+        operations, missing permissions, hardware faults, timeout conditions, and driver inconsistencies using
+        explicit exception classes instead of generic runtime errors.
+
+        For operational environments, this improves reliability and debugging. Monitoring systems can respond
+        differently to transient conditions such as timeouts versus permanent conditions such as missing
+        hardware support or corrupted firmware information. In production GPU clusters, this distinction is
+        essential for automation and fault recovery.
+
+        Library Initialization and Runtime Management
+
+        Before interacting with GPU devices, the NVML interface must be initialized. Initialization loads the
+        NVIDIA management library and establishes communication with the installed GPU drivers. The framework
+        automatically manages library loading, internal reference tracking, and synchronization to ensure safe
+        operation in multi-threaded applications.
+
+        Proper shutdown is equally important. Releasing the interface ensures that resources are cleaned up
+        correctly while preserving system stability. In long-running scientific services or orchestration
+        systems, maintaining correct initialization and shutdown behavior helps avoid resource leaks and driver
+        communication issues.
+
+        GPU Discovery and Identification
+
+        The interface supports multiple methods for discovering and identifying GPUs. Devices may be accessed
+        by index, UUID, PCI bus identifier, serial number, or topology relationship. This flexibility is
+        important in large GPU servers where hardware inventory and reproducibility matter.
+
+        In practical AI or HPC workflows, UUID-based identification is often preferred because device indices
+        may change between reboots or across operating systems. PCI information is particularly useful for
+        diagnosing NUMA relationships, bandwidth constraints, or topology-dependent performance behavior.
+
+        Hardware Monitoring and Telemetry
+
+        One of the central purposes of the framework is exposing detailed GPU telemetry. The interface provides
+        access to memory usage, temperature, fan speed, clock frequencies, PCIe throughput, utilization rates,
+        power consumption, ECC error statistics, and performance states.
+
+        These metrics are essential for monitoring model training jobs, scientific simulations, rendering
+        workloads, and production inference services. High temperature readings may indicate insufficient
+        cooling, while persistent power throttling can reveal hardware limits or inadequate power delivery.
+        Utilization metrics help identify idle accelerators, overloaded devices, or imbalanced workloads.
+
+        Memory and Process Tracking
+
+        The framework includes support for monitoring GPU memory allocation and active processes using the
+        device. Users can inspect compute workloads, graphics workloads, memory consumption per process, and
+        accounting statistics related to runtime activity.
+
+        This functionality is especially valuable in shared GPU environments where multiple users or services
+        compete for resources. Administrators can identify runaway processes, memory leaks, or unauthorized GPU
+        consumption. Accounting data can also support resource billing, quota systems, or workload auditing.
+
+        Clock and Power Management
+
+        Advanced operational controls allow users to inspect and configure application clocks, power limits,
+        throttling behavior, GPU operation modes, and persistence settings. These controls are important in
+        performance-sensitive environments where reproducibility and thermal stability are required.
+
+        For AI training clusters, setting application clocks can stabilize benchmark results and improve
+        consistency across experiments. Power management controls may reduce energy consumption in large-scale
+        facilities or help maintain thermal limits in constrained systems.
+
+        ECC and Reliability Features
+
+        The interface provides extensive support for ECC memory management and reliability monitoring. Users can
+        query ECC states, retrieve error counters, inspect memory failure locations, and clear accumulated
+        counters when appropriate.
+
+        In scientific and enterprise workloads, ECC monitoring is critical because memory corruption may affect
+        computational correctness. Persistent ECC failures can indicate aging hardware or unstable operating
+        conditions. Monitoring these counters over time helps organizations maintain long-term infrastructure
+        reliability.
+
+        Device Topology and Multi-GPU Awareness
+
+        Multi-GPU systems often depend heavily on topology-aware scheduling. The framework includes mechanisms
+        for discovering neighboring GPUs, identifying common PCIe ancestors, and analyzing device placement
+        relative to CPU affinity.
+
+        These capabilities are especially important for distributed AI training, high-speed peer-to-peer GPU
+        communication, and NUMA-sensitive applications. Proper topology awareness can significantly improve
+        performance by minimizing communication latency and avoiding inefficient data transfers.
+
+        Event Monitoring and Asynchronous Notifications
+
+        The framework supports event registration and asynchronous event waiting for hardware conditions such as
+        ECC errors, clock changes, thermal events, or critical failures. This enables monitoring systems to
+        react immediately instead of relying solely on polling mechanisms.
+
+        In operational GPU clusters, event-driven monitoring improves responsiveness and reduces monitoring
+        overhead. Critical hardware failures can be detected rapidly, allowing orchestration systems to isolate
+        affected devices before broader failures occur.
+
+        Friendly Object Conversion and Readability
+
+        To simplify integration into Python-based workflows, the framework includes helper structures that
+        transform low-level GPU data into more readable and flexible objects. Structured device information can
+        be represented using human-readable formatting while preserving compatibility with native NVML data
+        types.
+
+        This approach improves usability for developers building dashboards, notebooks, logging systems, or
+        automation scripts. Readable structures are particularly useful in interactive debugging or exploratory
+        hardware analysis.
+
+        Practical Recommendations
+
+        In production environments, it is recommended to initialize the NVML interface once during application
+        startup and reuse the established session throughout runtime. Repeated initialization and shutdown
+        cycles should be avoided unless explicitly required.
+
+        Monitoring systems should gracefully handle unsupported features because not all GPU models expose the
+        same capabilities. ECC, power management, accounting, or topology APIs may vary depending on hardware
+        generation, operating system, virtualization mode, or driver configuration.
+
+        For large-scale infrastructures, combining utilization metrics, topology information, process tracking,
+        and event monitoring provides the most comprehensive operational visibility.
+
+        Final Perspective
+
+        The NVMLError framework serves as the foundation for robust GPU management and monitoring in modern
+        accelerated computing environments. Beyond simple hardware inspection, it enables operational control,
+        reliability analysis, workload tracking, and infrastructure automation across a wide range of GPU-based
+        systems.
+
+        For researchers, administrators, and infrastructure engineers, the framework provides the essential
+        tools required to maintain stable, observable, and high-performance GPU environments while supporting
+        scalable scientific and AI workloads.
+    """
     _valClassMapping = dict()
     # List of currently known error codes
     _errcode_to_string = {

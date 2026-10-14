@@ -44,13 +44,148 @@ OUTPUT = "outputSet"
 
 class ProtDataCounter(EMProtocol):
     """
-    Protocol to make a subset of images from the original one. Waits until certain number of images is prepared and then send them to output.
-    It can works in 2 ways:
-        - Simple mode: once the number of items is reached, a setOfImages is returned and
-            the protocol finishes (ending the streaming from this point).
-        - If timer activated: either once the number of items is reached, or the timer is consumed
-            a setOfImages is returned and the protocol finishes (ending the streaming from this point).
-    The protocol will accept Micrographs, Particles and any kind of object that inherits from Image base class.
+    Collects and transfers a controlled number of images from streaming
+    or static cryo-EM datasets, allowing workflows to stop automatically
+    once a desired dataset size or acquisition time limit has been reached.
+
+    AI Generated:
+
+    Data Counter (ProtDataCounter) - User Manual
+        Overview
+
+        The Data Counter protocol is designed to monitor incoming image
+        datasets and generate an output collection once a predefined
+        number of images has been accumulated. Its primary purpose is to
+        provide controlled termination points in streaming or automated
+        cryo-EM workflows, enabling users to limit dataset size or stop
+        acquisition-driven processing after a specified amount of time.
+
+        In practical cryo-EM environments, data acquisition can continue
+        for many hours or even days. During this process, users may only
+        require a subset of the full dataset for rapid testing,
+        preliminary reconstruction, benchmarking, or quality assessment.
+        This protocol provides a simple mechanism to automatically close
+        processing streams once sufficient data has been collected.
+
+        General Workflow
+
+        The protocol continuously monitors an incoming image collection
+        such as particles, micrographs, or related cryo-EM image sets.
+        As new images become available, they are progressively registered
+        and transferred to the output dataset until the desired stopping
+        condition is reached.
+
+        Two operating modes are available. In the standard mode, the
+        protocol stops only after the requested number of images has been
+        accumulated. In timer-assisted mode, the protocol can also stop
+        automatically when a predefined acquisition time limit has
+        expired, even if the target number of images has not yet been
+        reached.
+
+        This dual behavior is particularly useful in automated facilities
+        and live microscopy sessions where users may need to balance data
+        quantity, computational cost, and available acquisition time.
+
+        Input Data Considerations
+
+        The protocol accepts any image-based dataset compatible with the
+        Scipion image framework, including particles, micrographs, and
+        related image collections. Since the protocol transfers incoming
+        images progressively, the biological representativeness of the
+        output depends on the order and diversity of the acquired data.
+
+        For homogeneous samples, early subsets are often sufficient for
+        rapid validation of acquisition quality and processing stability.
+        For heterogeneous or conformationally flexible systems, users
+        should consider that stopping acquisition too early may exclude
+        rare structural populations or poorly represented particle views.
+
+        Output Size Control
+
+        The output size parameter defines the maximum number of images
+        that will be transferred to the output dataset. Once this limit
+        is reached, the protocol finalizes the stream and closes the
+        output collection.
+
+        This functionality is especially valuable when preparing reduced
+        datasets for rapid experimentation or when computational
+        resources are limited. Users can quickly generate manageable
+        subsets suitable for testing alignment, classification, or
+        reconstruction strategies without processing the entire dataset.
+
+        In high-throughput environments, limiting dataset size also helps
+        reduce storage consumption and accelerates downstream processing.
+
+        Timer-Based Streaming Control
+
+        An optional timer mechanism allows the protocol to terminate
+        acquisition-driven workflows after a user-defined period of time.
+        This is useful when microscope access is limited, when overnight
+        acquisition sessions must stop automatically, or when users wish
+        to evaluate early data quality before committing to longer runs.
+
+        The timer accepts flexible human-readable durations including
+        seconds, minutes, hours, or days. Once the timer expires, the
+        protocol closes the output stream even if the requested image
+        count has not been reached.
+
+        From a practical perspective, this mode is valuable for facility
+        pipelines where rapid preliminary feedback is more important than
+        complete dataset collection.
+
+        Streaming Behavior
+
+        During execution, the protocol continuously checks for new input
+        images and progressively updates the output dataset. This allows
+        downstream workflows to begin immediately while acquisition is
+        still ongoing.
+
+        The protocol is designed to function safely in live streaming
+        environments, ensuring that all available data is properly
+        registered before the stream is finalized. This behavior is
+        particularly important in automated cryo-EM pipelines where data
+        may continue arriving asynchronously during acquisition.
+
+        Outputs and Interpretation
+
+        The protocol produces a new image dataset containing the selected
+        subset of images accumulated before the stopping condition was
+        reached. The output preserves the metadata and organizational
+        structure required for downstream cryo-EM analysis.
+
+        When the timer mode is enabled, the final dataset size may differ
+        from the requested target if the acquisition period ends before
+        enough images are collected. Conversely, when acquisition is
+        sufficiently fast, the output size condition may terminate the
+        workflow before the timer expires.
+
+        Practical Recommendations
+
+        For rapid quality-control workflows, relatively small output
+        sizes are often sufficient to evaluate particle quality,
+        microscope alignment, ice thickness, or reconstruction stability.
+        This enables fast iteration during microscope sessions without
+        waiting for complete acquisition.
+
+        In heterogeneous biological systems, users should avoid selecting
+        output sizes that are too small, as this may reduce angular
+        coverage or exclude low-abundance conformational states. Larger
+        subsets generally provide more biologically reliable
+        representation.
+
+        Timer mode is particularly useful for unattended overnight runs,
+        automated facility pipelines, and preliminary exploratory
+        experiments where acquisition time must remain bounded.
+
+        Final Perspective
+
+        Controlled streaming termination is an important component of
+        modern cryo-EM automation because it allows users to balance data
+        quantity, computational cost, and experimental timing. By
+        automatically stopping workflows according to dataset size or
+        acquisition duration, the Data Counter protocol supports more
+        efficient exploratory analysis, faster quality assessment, and
+        better resource management across large-scale cryo-EM pipelines.
     """
 
     _label = 'data counter'
