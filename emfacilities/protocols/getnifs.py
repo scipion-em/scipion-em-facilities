@@ -81,25 +81,137 @@ def getfamaddr(sa):
 
 
 class NetworkInterface(object):
-    def __init__(self, name):
-        self.name = name
-        self.index = libc.if_nametoindex(name)
-        self.addresses = {}
+    """
+    Represents low level network interface information used to identify and describe
+    the communication endpoints available on a system. The collection of related
+    structures and helper utilities provides access to IPv4 and IPv6 interface
+    addresses, interface identifiers, and address family information through native
+    operating system networking services.
 
-    def __str__(self):
-        return "%s [index=%d, IPv4=%s, IPv6=%s]" % (
-            self.name, self.index,
-            self.addresses.get(AF_INET),
-            self.addresses.get(AF_INET6))
+    AI Generated:
 
-    def getName(self):
-        return self.name
+    Network Interface Discovery (struct_sockaddr) - User Manual
+        Overview
 
-    def getIndex(self):
-        return self.index
+        This utility provides a platform-oriented mechanism for discovering and
+        inspecting the network interfaces available on a machine. Its primary goal
+        is to expose interface names, numerical identifiers, and associated network
+        addresses in a format that can be consumed by higher level applications,
+        monitoring services, or distributed computing environments.
 
-    def getAddresses(self):
-        return self.addresses
+        In practical environments, network interface inspection is important when
+        configuring communication between services, validating connectivity, or
+        selecting the correct interface for data transfer. Systems with multiple
+        adapters, virtual interfaces, VPN connections, or containerized networking
+        often require explicit interface discovery to ensure that communication
+        occurs through the intended route.
+
+        General Workflow
+
+        The utility interacts with the operating system networking layer to retrieve
+        the complete list of active interfaces currently registered on the machine.
+        Each detected interface is represented with a human readable name together
+        with its associated addressing information. Both IPv4 and IPv6 environments
+        are supported, allowing compatibility with modern dual-stack infrastructures.
+
+        The interface discovery process is designed to provide a lightweight snapshot
+        of the networking state at execution time. This makes it suitable for
+        initialization tasks, runtime diagnostics, and adaptive network selection in
+        distributed applications.
+
+        IPv4 and IPv6 Support
+
+        Modern computing environments commonly expose both IPv4 and IPv6 addresses.
+        The utility separates and interprets these address families independently so
+        that applications can determine which protocol versions are available on each
+        interface.
+
+        IPv4 addresses are generally used in traditional local area networks and
+        legacy infrastructures, while IPv6 addresses are increasingly important in
+        cloud environments, large institutional networks, and modern internet-facing
+        deployments. Supporting both standards ensures broader compatibility and
+        simplifies deployment across heterogeneous systems.
+
+        Interface Identification
+
+        Each interface is associated with a numerical index in addition to its name.
+        These identifiers are especially useful in low level networking workflows,
+        multicast communication, routing configuration, and socket-based applications
+        where interfaces must be referenced unambiguously.
+
+        In systems with many virtual or dynamically created interfaces, relying only
+        on textual names may not always be sufficient. Numerical identifiers provide
+        a stable mechanism for programmatic interaction with the networking stack.
+
+        Error Handling and Robustness
+
+        The utility is designed to tolerate partially inaccessible or invalid
+        interfaces while continuing discovery of the remaining network configuration.
+        This behavior is valuable in environments where interfaces may appear or
+        disappear dynamically, such as cloud orchestration systems, container
+        platforms, or hardware undergoing reconfiguration.
+
+        When an interface cannot be interpreted correctly, the discovery process
+        continues without interrupting the overall inspection workflow. This improves
+        robustness in heterogeneous operating system environments.
+
+        Outputs and Interpretation
+
+        The resulting interface objects provide a concise representation of the
+        network configuration available on the host. Each object contains the
+        interface name, its system index, and the available IP addresses grouped by
+        protocol family.
+
+        These outputs can be used directly for diagnostics, connection management,
+        distributed service discovery, or automated infrastructure validation. In
+        many workflows, they also serve as the basis for selecting the preferred
+        communication interface in multi-network systems.
+
+        Practical Recommendations
+
+        In production systems, it is often useful to verify that the expected IPv4
+        or IPv6 addresses are present before starting network-dependent services.
+        Interfaces associated with virtual machines, VPNs, or container overlays
+        should be inspected carefully because they may introduce additional routing
+        paths that influence communication behavior.
+
+        When working in distributed computing or scientific processing environments,
+        selecting the correct interface can significantly improve reliability and
+        prevent accidental exposure of services through unintended networks.
+
+        Final Perspective
+
+        Network interface discovery is a foundational capability for many networking
+        and distributed computing tasks. By exposing structured access to interface
+        names, protocol families, and address information, this utility simplifies
+        communication setup and helps applications adapt to complex and changing
+        networking environments.
+    """
+
+
+def __init__(self, name):
+    self.name = name
+    self.index = libc.if_nametoindex(name)
+    self.addresses = {}
+
+
+def __str__(self):
+    return "%s [index=%d, IPv4=%s, IPv6=%s]" % (
+        self.name, self.index,
+        self.addresses.get(AF_INET),
+        self.addresses.get(AF_INET6))
+
+
+def getName(self):
+    return self.name
+
+
+def getIndex(self):
+    return self.index
+
+
+def getAddresses(self):
+    return self.addresses
 
 
 def get_network_interfaces():
@@ -130,4 +242,3 @@ def get_network_interfaces():
 
 if __name__ == '__main__':
     print([str(ni) for ni in get_network_interfaces()])
-
