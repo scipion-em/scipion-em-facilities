@@ -17,6 +17,17 @@ import json
 import yaml
 import os
 
+
+from reportlab.lib import colors
+from reportlab.lib.enums import TA_CENTER
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.units import cm
+from reportlab.platypus import (
+    SimpleDocTemplate, Paragraph, Spacer,
+    Table, TableStyle, Image as PDFImage, PageBreak
+)
+
 from pyworkflow import NEW
 from pyworkflow.utils import weakImport, cyanStr
 
@@ -150,7 +161,7 @@ class ProtOSCEM(EMProtocol):
                       help="Sharpened volume",
                       allowsNull=True)
 
-        form.addParam('threshold_sharpenedVol', params.FloatParam, default=-1.0,
+        form.addParam('threshold_sharpenedVol', params.IntParam, default=-1,
                       label="Sharpened volume threshold",
                       help=threshold_help)
 
@@ -160,7 +171,7 @@ class ProtOSCEM(EMProtocol):
                       help="Polished volume",
                       allowsNull=True)
 
-        form.addParam('threshold_polishedVol', params.FloatParam, default=-1.0,
+        form.addParam('threshold_polishedVol', params.IntParam, default=-1,
                       label="Polished volume threshold",
                       help=threshold_help)
 
@@ -168,6 +179,7 @@ class ProtOSCEM(EMProtocol):
     def _insertAllSteps(self):
         self._insertFunctionStep(self.generateMetadata)
         self._insertFunctionStep(self.saveMetadataFile)
+        self._insertFunctionStep(self.generatePDFReport)
 
     # -------------------------- STEPS functions ------------------------------
     def generateMetadata(self):
@@ -248,6 +260,9 @@ class ProtOSCEM(EMProtocol):
         metadata_file = self.getOutFile()
         if os.path.exists(metadata_file):
             summary.append(f'OSCEM metadata file successfully saved at: {metadata_file}')
+            pdf_file = self._getExtraPath("Processing_report.pdf")
+        if os.path.exists(pdf_file):
+            summary.append(f"PDF report saved at: {pdf_file}")
         return summary
 
     def _methods(self):
@@ -279,11 +294,14 @@ class ProtOSCEM(EMProtocol):
         file_keys = [_gainFile, _darkFile]
         valid_file_keys = [key for key in file_keys if input_movies[key] is not None]
         for key in valid_file_keys:
-            data = self.load_image_path(input_movies[key])
+            with mrcfile.open(input_movies[key], 'r') as mrc:
+                # Read the data from the MRC file
+                data = mrc.data
 
-            p_low, p_high = np.percentile(data, [1, 99])
-            data_clip = np.clip(data, p_low, p_high)
-            normalized_data = 255 * (data_clip - p_low) / (p_high - p_low)
+            # Normalize the data to 8-bit (0-255) range
+            min_val = np.min(data)
+            max_val = np.max(data)
+            normalized_data = 255 * (data - min_val) / (max_val - min_val)
             normalized_data = normalized_data.astype(np.uint8)
 
             # Apply Histogram Equalization
@@ -389,21 +407,21 @@ class ProtOSCEM(EMProtocol):
 
         # To draw defocus value on image, we make images smaller and then larger
         # since the default font cannot be increased in size
-
-        data1 = self.load_image_path(lowest_defocus_path)
-        img1 = Image.fromarray(np.uint8(data1 / np.max(data1) * 255))
-        img1 = img1.convert('RGB')
-        img1_resized = self.resize_image(img1, scale=0.05)
-
-        data2 = self.load_image_path(medium_defocus_path)
-        img2 = Image.fromarray(np.uint8(data2 / np.max(data2) * 255))
-        img2 = img2.convert('RGB')
-        img2_resized = self.resize_image(img2, scale=0.05)
-
-        data3 = self.load_image_path(highest_defocus_path)
-        img3 = Image.fromarray(np.uint8(data3 / np.max(data3) * 255))
-        img3 = img3.convert('RGB')
-        img3_resized = self.resize_image(img3, scale=0.05)
+        with mrcfile.open(lowest_defocus_path, permissive=True) as mrc1:
+            data1 = mrc1.data
+            img1 = Image.fromarray(np.uint8(data1 / np.max(data1) * 255))
+            img1 = img1.convert('RGB')
+            img1_resized = self.resize_image(img1, scale=0.05)
+        with mrcfile.open(medium_defocus_path, permissive=True) as mrc2:
+            data2 = mrc2.data
+            img2 = Image.fromarray(np.uint8(data2 / np.max(data2) * 255))
+            img2 = img2.convert('RGB')
+            img2_resized = self.resize_image(img2, scale=0.05)
+        with mrcfile.open(highest_defocus_path, permissive=True) as mrc3:
+            data3 = mrc3.data
+            img3 = Image.fromarray(np.uint8(data3 / np.max(data3) * 255))
+            img3 = img3.convert('RGB')
+            img3_resized = self.resize_image(img3, scale=0.05)
 
 
         font = ImageFont.load_default()
@@ -530,37 +548,27 @@ class ProtOSCEM(EMProtocol):
         parts = self.particles.get()
         mic_dict = {}
 
-        # Iterate over particles
         for index, item in enumerate(parts.iterItems()):
             micrograph_num = str(item._micId)
             sampling_rate_part = item._samplingRate.get()
+            sampling_rate_ctf = item._ctfModel._micObj._samplingRate.get()
+            scale = sampling_rate_part/sampling_rate_ctf
 
-            # Try to get CTF sampling rate
-            try:
-                sampling_rate_ctf = item._ctfModel._micObj._samplingRate.get()
-            except:
-                sampling_rate_ctf = None
+            # coordinates scaled
+            coordinates_scaled = [item._coordinate._x.get() * scale, item._coordinate._y.get() * scale]
 
-            scale = sampling_rate_part / sampling_rate_ctf if sampling_rate_ctf else 1.0
-
-            # Coordinates are only used for micrograph examples
-            coordinates_scaled = [item._coordinate._x.get() * scale,
-                                  item._coordinate._y.get() * scale]
-
-            # Store info in mic_dict
+            # Key of dictionary is the micrograph ID
+            # If the key already exists in the dictionary, increment the count
+            # Otherwise, add the key with an initial count of 1
             if micrograph_num in mic_dict:
                 mic_dict[micrograph_num]['particles_num'] += 1
-                mic_dict[micrograph_num].setdefault('coordinates', []).append(coordinates_scaled)
-            else:
-                try:
-                    mic_path = item._ctfModel._micObj._filename.get()
-                except:
-                    mic_path = None
+                mic_dict[micrograph_num]['coordinates'].append(coordinates_scaled)
 
+            else:
                 mic_dict[micrograph_num] = {
                     'particles_num': 1,
                     'coordinates': [coordinates_scaled],
-                    'mic_path': mic_path
+                    'mic_path': item._ctfModel._micObj._filename.get()
                 }
 
         # Calculate the mean particle values
@@ -581,72 +589,65 @@ class ProtOSCEM(EMProtocol):
         particles_hist = self.hist_path(hist_name)
         plt.savefig(particles_hist)
 
-        # Generate micrograph examples ONLY if micrographs exist
-        micrograph_examples_path = None
-        if self.micrographs.get() is not None:
-            try:
-                # Select micrographs for collage
-                mic_closest_to_mean = min(
-                    mic_dict.items(),
-                    key=lambda x: abs(x[1]['particles_num'] - mean_particles_values)
-                )[0]
-                mic_with_lowest_particles = min(mic_dict, key=lambda k: mic_dict[k]['particles_num'])
-                mic_with_highest_particles = max(mic_dict, key=lambda k: mic_dict[k]['particles_num'])
 
-                mic_ids = [int(mic_with_highest_particles), int(mic_closest_to_mean), int(mic_with_lowest_particles)]
-                reduced_mics_dict = {
-                    mic_id: {
-                        "mic_path": mic_dict.get(str(mic_id), {}).get('mic_path'),
-                        "coordinates": mic_dict.get(str(mic_id), {}).get('coordinates', [])
-                    }
-                    for mic_id in mic_ids
-                }
+        # Obtain 3 micrographs with particles drawn on them
+        # Retrieve mic ID of micrograph with higher, medium and lower number of particles:
+        mic_closest_to_mean = min(mic_dict.items(), key=lambda x: abs(x[1]['particles_num']- mean_particles_values))[0]
+        mic_with_lowest_particles = min(mic_dict, key=lambda k: mic_dict[k]['particles_num'])
+        mic_with_highest_particles = max(mic_dict, key=lambda k: mic_dict[k]['particles_num'])
 
-                # Draw particles in images
-                images = [] # List to store the images after drawing particles
-                for micrograph, values in reduced_mics_dict.items():
-                    if not values['mic_path']:
-                        continue
+        mic_ids = [int(mic_with_highest_particles), int(mic_closest_to_mean), int(mic_with_lowest_particles)]
 
-                    mrc_data = self.load_image_path(values['mic_path'])
-                    mrc_normalized = 255 * (mrc_data - np.min(mrc_data)) / (np.max(mrc_data) - np.min(mrc_data))
-                    mrc_normalized = mrc_normalized.astype(np.uint8)
-                    image = Image.fromarray(mrc_normalized).convert('RGB')
+        # Dict to store the path and coordinates of the 3 micrographs keeping mic_ids order
+        reduced_mics_dict = {mic_id: {"mic_path": mic_dict.get(str(mic_id), {}).get('mic_path', 0), #None,
+                                      "coordinates": mic_dict.get(str(mic_id), {}).get('coordinates', 0)
+                             #        "particles_num": mic_dict.get(str(mic_id), {}).get('particles_num', 0)
+                                       }
+                             for mic_id in mic_ids
+                                      }
 
-                    W_jpg, _ = image.size
-                    draw = ImageDraw.Draw(image)
-                    r = W_jpg / 256
+        # Draw particles in images
+        images = [] # List to store the images after drawing particles
+        for micrograph, values in reduced_mics_dict.items():
+            with mrcfile.open(values['mic_path'], permissive=True) as mrc:
+                mrc_data = mrc.data
+            mrc_normalized = 255 * (mrc_data - np.min(mrc_data)) / (np.max(mrc_data) - np.min(mrc_data))
+            mrc_normalized = mrc_normalized.astype(np.uint8)
+            image = Image.fromarray(mrc_normalized).convert('RGB')
 
-                    for coord in values['coordinates']:
-                        x, y = coord
-                        draw.ellipse((x - r, y - r, x + r, y + r), fill=(0, 255, 0))
+            W_jpg, _ = image.size
+            draw = ImageDraw.Draw(image)
+            r = W_jpg / 256
 
-                    images.append(image)
+            for coord in values['coordinates']:
+                x = coord[0]
+                y = coord[1]
+                draw.ellipse((x - r, y - r, x + r, y + r), fill=(0, 255, 0))
 
-                if len(images) > 0:
-                    width, height = images[0].size
-                    collage = Image.new('RGB', (3 * width, height))
-                    for i, img in enumerate(images):
-                        collage.paste(img, (i * width, 0))
+            images.append(image)
 
-                    extra_folder = self._getExtraPath()
-                    micro_folder_name = 'Micro_examples'
-                    micro_folder_path = join(extra_folder, micro_folder_name)
-                    micro_name = 'micro_particles.jpg'
-                    micrograph_examples_path = join(micro_folder_name, micro_name)
-                    collage.save(join(micro_folder_path, micro_name))
-            except:
-                pass  # If anything fails, skip micrograph examples
+        # Create collage
+        width, height = images[0].size
+        collage_width = 3 * width
+        collage_height = height
+        collage = Image.new('RGB', (collage_width, collage_height))
+        # Paste each image into the collage
+        for i, img in enumerate(images):
+            collage.paste(img, (i * width, 0))
 
-        particles = {
-            "number_particles": sum(particle_counts),
-            "particles_per_micrograph": round(mean_particles_values, 1),
-            "particles_histogram": hist_name
-        }
+        extra_folder = self._getExtraPath()
+        micro_folder_name = 'Micro_examples'
+        micro_folder_path = join(extra_folder, micro_folder_name)
 
-        # Include micrograph_examples only if generated
-        if micrograph_examples_path:
-            particles["micrograph_examples"] = micrograph_examples_path
+        micro_name = 'micro_particles.jpg'
+        micro_path = join(micro_folder_path, micro_name)
+        collage.save(micro_path)
+
+        particles = {"number_particles": sum(particle_counts),
+                     "particles_per_micrograph": round(mean_particles_values, 1),
+                     "particles_histogram": hist_name,
+                     "micrograph_examples": join(micro_folder_name, micro_name)
+                     }
 
         return particles
 
@@ -674,38 +675,38 @@ class ProtOSCEM(EMProtocol):
         # Saving images in .jpg, drawing number of particles on them
         particles_list = []
         img_filenames = []
+        with mrcfile.open(img_classes_file, 'r') as mrc:
+            data = mrc.data
+            for i, class_2D in enumerate(sorted_list_classes):
+                particles = class_2D.getSize()
+                particles_list.append(particles)
+                index = class_2D.getRepresentative().getIndex()
 
-        data = self.load_image_path(img_classes_file)
-        for i, class_2D in enumerate(sorted_list_classes):
-            particles = class_2D.getSize()
-            particles_list.append(particles)
-            index = class_2D.getRepresentative().getIndex()
+                img = data[index - 1, :, :]
 
-            img = data[index - 1, :, :]
+                img_normalized = 255 * (img - np.min(img)) / (np.max(img) - np.min(img))
+                img_normalized = img_normalized.astype(np.uint8)
+                image = Image.fromarray(img_normalized)
+                image = image.convert('RGB')
 
-            img_normalized = 255 * (img - np.min(img)) / (np.max(img) - np.min(img))
-            img_normalized = img_normalized.astype(np.uint8)
-            image = Image.fromarray(img_normalized)
-            image = image.convert('RGB')
+                # Draw the number of particles on the images
+                draw = ImageDraw.Draw(image)
+                font = ImageFont.load_default()
+                position = (10, 10)
+                draw.text(position, str(particles), fill='#80FF00', font=font)
 
-            # Draw the number of particles on the images
-            draw = ImageDraw.Draw(image)
-            font = ImageFont.load_default()
-            position = (10, 10)
-            draw.text(position, str(particles), fill='#80FF00', font=font)
+                # Saving images
+                new_img_filename = splitext(img_classes_file)[0] + f'_image_{i}.jpg'
+                image.save(new_img_filename)
+                img_filenames.append(new_img_filename)
 
-            # Saving images
-            new_img_filename = splitext(img_classes_file)[0] + f'_image_{i}.jpg'
-            image.save(new_img_filename)
-            img_filenames.append(new_img_filename)
+            # Creating collage in .jpg with all images ordered in descending order
+            images = [Image.open(filename) for filename in img_filenames]
 
-        # Creating collage in .jpg with all images ordered in descending order
-        images = [Image.open(filename) for filename in img_filenames]
-
-        output_folder = self._getExtraPath()
-        collage_filename = 'classes_2D.jpg'
-        collage_filepath = join(output_folder, collage_filename)
-        self.create_collage(images, collage_filepath)
+            output_folder = self._getExtraPath()
+            collage_filename = 'classes_2D.jpg'
+            collage_filepath = join(output_folder, collage_filename)
+            self.create_collage(images, collage_filepath)
 
         classes_2D = {"particles_per_2Dclass": particles_list,
                       "images_classes_2D": collage_filename}
@@ -899,83 +900,83 @@ class ProtOSCEM(EMProtocol):
             # Option 2:
             if ':' in file_name:
                 file_name_without_suffix = file_name.split(':')[0]
-                file_name = file_name_without_suffix
 
-            data = self.load_image_path(file_name)
+            with mrcfile.open(file_name_without_suffix, 'r') as mrc:
+                data = mrc.data
 
-            ############################
-            ########## CLASSES #########
-            ############################
+                ############################
+                ########## CLASSES #########
+                ############################
 
-            particles = class_3D.getSize()
-            particles_list.append(particles)
+                particles = class_3D.getSize()
+                particles_list.append(particles)
 
-            mid_index = data.shape[0] // 2
+                mid_index = data.shape[0] // 2
 
-            img = data[mid_index, :, :]
+                img = data[mid_index, :, :]
 
-            img_normalized = 255 * (img - np.min(img)) / (np.max(img) - np.min(img))
-            img_normalized = img_normalized.astype(np.uint8)
-            image = Image.fromarray(img_normalized)
-            image = image.convert('RGB')
+                img_normalized = 255 * (img - np.min(img)) / (np.max(img) - np.min(img))
+                img_normalized = img_normalized.astype(np.uint8)
+                image = Image.fromarray(img_normalized)
+                image = image.convert('RGB')
 
-            # Draw the number of particles on the images
-            draw = ImageDraw.Draw(image)
-            font = ImageFont.load_default()
-            position = (10, 10)
-            draw.text(position, str(particles), fill='#80FF00', font=font)
+                # Draw the number of particles on the images
+                draw = ImageDraw.Draw(image)
+                font = ImageFont.load_default()
+                position = (10, 10)
+                draw.text(position, str(particles), fill='#80FF00', font=font)
 
-            new_img_filename = splitext(file_name)[0] + '.jpg'
-            image.save(new_img_filename)
-            img_filenames.append(new_img_filename)
+                new_img_filename = splitext(file_name)[0] + '.jpg'
+                image.save(new_img_filename)
+                img_filenames.append(new_img_filename)
 
-            #############################
-            ########## VOLUMES ##########
-            #############################
+                #############################
+                ########## VOLUMES ##########
+                #############################
 
-            # Volume size
-            size = data.shape
-            vol_size_list = [int(x) for x in size]
+                # Volume size
+                size = data.shape
+                vol_size_list = [int(x) for x in size]
 
-            # Getting orthogonal slices in X, Y and Z
-            # Folder to store orthogonal slices
-            orthogonal_slices_folder = f'orthogonal_slices_volume{i + 1}'
-            orthogonal_slices_path = join(classes3D_folder_path, orthogonal_slices_folder)
-            os.makedirs(orthogonal_slices_path, exist_ok=True)
+                # Getting orthogonal slices in X, Y and Z
+                # Folder to store orthogonal slices
+                orthogonal_slices_folder = f'orthogonal_slices_volume{i + 1}'
+                orthogonal_slices_path = join(classes3D_folder_path, orthogonal_slices_folder)
+                os.makedirs(orthogonal_slices_path, exist_ok=True)
 
-            self.orthogonalSlices(fnRoot=orthogonal_slices_path, map=data)
+                self.orthogonalSlices(fnRoot=orthogonal_slices_path, map=data)
 
-            # Getting 3 isosurface images
-            # Folder to store isosurface images
-            isosurface_images_folder = f'isosurface_images_volume{i + 1}'
-            isosurface_images_path = join(classes3D_folder_path, isosurface_images_folder)
-            os.makedirs(isosurface_images_path, exist_ok=True)
+                # Getting 3 isosurface images
+                # Folder to store isosurface images
+                isosurface_images_folder = f'isosurface_images_volume{i + 1}'
+                isosurface_images_path = join(classes3D_folder_path, isosurface_images_folder)
+                os.makedirs(isosurface_images_path, exist_ok=True)
 
-            th = int(self.threshold_classes3D.get())
-            volume_file_abspath = abspath(file_name)
-            front_view_img = 'front_view.jpg'
-            side_view_img = 'side_view.jpg'
-            top_view_img = 'top_view.jpg'
-            self.generate_isosurfaces(isosurface_images_path, volume_file_abspath,
-                                      th, front_view_img, side_view_img, top_view_img)
+                th = int(self.threshold_classes3D.get())
+                volume_file_abspath = abspath(file_name_without_suffix)
+                front_view_img = 'front_view.jpg'
+                side_view_img = 'side_view.jpg'
+                top_view_img = 'top_view.jpg'
+                self.generate_isosurfaces(isosurface_images_path, volume_file_abspath,
+                                          th, front_view_img, side_view_img, top_view_img)
 
-            # Dictionary fill in:
-            volume = {
-                "size": vol_size_list,
-                "orthogonal_slices": {
-                    "orthogonal_slices_X": join(classes_3D_folder_name, orthogonal_slices_folder,
-                                                slices_x),
-                    "orthogonal_slices_Y": join(classes_3D_folder_name, orthogonal_slices_folder,
-                                                slices_y),
-                    "orthogonal_slices_Z": join(classes_3D_folder_name, orthogonal_slices_folder,
-                                                slices_z)},
-                'isosurface_images': {
-                    'front_view': join(classes_3D_folder_name, isosurface_images_folder, front_view_img),
-                    'side_view': join(classes_3D_folder_name, isosurface_images_folder, side_view_img),
-                    'top_view': join(classes_3D_folder_name, isosurface_images_folder, top_view_img)
-                }}
+                # Dictionary fill in:
+                volume = {
+                    "size": vol_size_list,
+                    "orthogonal_slices": {
+                        "orthogonal_slices_X": join(classes_3D_folder_name, orthogonal_slices_folder,
+                                                    slices_x),
+                        "orthogonal_slices_Y": join(classes_3D_folder_name, orthogonal_slices_folder,
+                                                    slices_y),
+                        "orthogonal_slices_Z": join(classes_3D_folder_name, orthogonal_slices_folder,
+                                                    slices_z)},
+                    'isosurface_images': {
+                        'front_view': join(classes_3D_folder_name, isosurface_images_folder, front_view_img),
+                        'side_view': join(classes_3D_folder_name, isosurface_images_folder, side_view_img),
+                        'top_view': join(classes_3D_folder_name, isosurface_images_folder, top_view_img)
+                    }}
 
-            volumes_list.append(volume)
+                volumes_list.append(volume)
 
         # Creating collage in .jpg with all images ordered in descending order
         images = [Image.open(filename) for filename in img_filenames]
@@ -988,32 +989,13 @@ class ProtOSCEM(EMProtocol):
                       "volumes": volumes_list}
         return classes_3D
 
-    def load_image_path(self, path):
-        ext = os.path.splitext(path)[1].lower()
-        # MRC/MRCS
-        if ext in [".mrc", ".mrcs"]:
-            with mrcfile.open(path, 'r') as mrc:
-                return np.array(mrc.data, dtype=np.float32)
-        # TIFF/TIF
-        elif ext in [".tif", ".tiff"]:
-            img = Image.open(path)
-            arr = np.array(img, dtype=np.float32)
-            return arr
-        # GAIN
-        elif ext == ".gain":
-            G = emlib.Image()
-            G.read(path)
-            data = G.getData()
-            return data
-
     def get_movie_alignment_descriptor(self):
         """
         Function to create the movie alignment descriptor
         """
         ###### MOVIE ALIGNMENT DESCRIPTOR ######
         MovieAlignmentProt = self.movieAlignment.get()
-        prot_name = MovieAlignmentProt.getClassName()
-        movie_align = {'descriptor_name': prot_name}
+        movie_align = {'descriptor_name': MovieAlignmentProt.getClassName()}
         descriptor_thing_dict = {}
         ################################ INPUT #############################################
         input_alignment = MovieAlignmentProt.getObjDict()
@@ -1077,9 +1059,9 @@ class ProtOSCEM(EMProtocol):
         }
         frames_aligned = {key_mapping[key]: input_alignment[key] for key in keys_to_retrieve if
                           key in input_alignment and input_alignment[key] is not None}
-        if 'frameN' in frames_aligned:
-            if frames_aligned['frameN'] == 0:
-                frames_aligned['frameN'] = self.number_movies
+
+        if frames_aligned['frameN'] == 0:
+            frames_aligned['frameN'] = self.number_movies
 
         descriptor_thing_dict['frames_aligned'] = frames_aligned
 
@@ -1094,10 +1076,7 @@ class ProtOSCEM(EMProtocol):
                 attributes_dict = dict(item.getAttributes())
                 shiftX = attributes_dict.get('_xmipp_ShiftX')
                 shiftY = attributes_dict.get('_xmipp_ShiftY')
-                if not shiftX or not shiftY:
-                    alignment = attributes_dict.get('_alignment')
-                    shiftX = getattr(alignment, "_xshifts", None)
-                    shiftY = getattr(alignment, "_yshifts", None)
+
                 norm = np.linalg.norm([shiftX, shiftY], axis=0)
                 avg_shifts.append(np.mean(norm))
                 max_shifts.append(np.max(norm))
@@ -1122,8 +1101,7 @@ class ProtOSCEM(EMProtocol):
         """
         ###### MAX SHIFT DESCRIPTOR######
         MaxShiftProt = self.maxShift.get()
-        prot_name = MaxShiftProt.getClassName()
-        movie_maxshift = {'descriptor_name': prot_name}
+        movie_maxshift = {'descriptor_name': MaxShiftProt.getClassName()}
         descriptor_thing_dict = {}
         ############################### INPUT #############################################
         input_shift = MaxShiftProt.getObjDict()
@@ -1163,10 +1141,6 @@ class ProtOSCEM(EMProtocol):
                     attributes_dict = dict(attributes)
                     shiftX = attributes_dict.get('_xmipp_ShiftX')
                     shiftY = attributes_dict.get('_xmipp_ShiftY')
-                    if not shiftX or not shiftY:
-                        alignment = attributes_dict.get('_alignment')
-                        shiftX = getattr(alignment, "_xshifts", None)
-                        shiftY = getattr(alignment, "_yshifts", None)
                     norm = np.linalg.norm([shiftX, shiftY], axis=0)
                     shift_list.append(norm)
 
@@ -1415,3 +1389,207 @@ class ProtOSCEM(EMProtocol):
                 break
         resolution = below_res - ((threshold - below_fsc) / (above_fsc - below_fsc) * (below_res - above_res))
         return 1 / resolution
+
+    def generatePDFReport(self):
+
+        #DYNAMIC TEMPLATE STARTS
+        fname = "/home/agarcia/Documents/test_DEBUGALBERTO.txt"
+        if os.path.exists(fname):
+            os.remove(fname)
+        fjj = open(fname, "a+")
+        fjj.write('ALBERTO--------->onDebugMode PID {}'.format(os.getpid()))
+        fjj.close()
+        print('ALBERTO--------->onDebugMode PID {}'.format(os.getpid()))
+        import time
+        time.sleep(15)
+        #DYNAMIC TEMPLATE ENDS
+
+        self.info('HOLAAAAAAAAAAAAAAAAAAAAAAAAAAA')
+        metadata_file = self.getOutFile()
+        pdf_file = self._getExtraPath("Processing_report.pdf")
+        extra_dir = self._getExtraPath()
+
+        with open(metadata_file, encoding="utf-8") as f:
+            metadata = yaml.safe_load(f) or {}
+
+        styles = getSampleStyleSheet()
+
+        styles.add(ParagraphStyle(
+            name="ReportTitle",
+            parent=styles["Title"],
+            alignment=TA_CENTER,
+            spaceAfter=20
+        ))
+
+        story = [
+            Paragraph("OSCEM Processing Report", styles["ReportTitle"]),
+            Spacer(1, 0.5 * cm)
+        ]
+
+        image_extensions = {".jpg", ".jpeg", ".png"}
+
+        # --------------------------------------------------
+        # Image helper
+        # --------------------------------------------------
+
+        def add_image(path):
+            if not os.path.isfile(path):
+                print("WARNING: Image not found:", path)
+                return
+
+            img = PDFImage(path)
+
+            max_width = 16 * cm
+            max_height = 12 * cm
+
+            scale = min(
+                max_width / img.imageWidth,
+                max_height / img.imageHeight,
+                1
+            )
+
+            img.drawWidth = img.imageWidth * scale
+            img.drawHeight = img.imageHeight * scale
+
+            story.append(img)
+            story.append(Spacer(1, 0.3 * cm))
+
+        # --------------------------------------------------
+        # Render metadata tables
+        # --------------------------------------------------
+
+        def render_value(value, key=None):
+
+            if isinstance(value, dict):
+
+                story.append(Paragraph(
+                    str(key or "Metadata"),
+                    styles["Heading2"]
+                ))
+
+                rows = [["Field", "Value"]]
+
+                for child_key, child_value in value.items():
+
+                    if isinstance(child_value, (dict, list)):
+                        continue
+
+                    # Do not insert image references in metadata tables.
+                    # Images will be added explicitly in their sections.
+                    if (
+                        isinstance(child_value, str)
+                        and os.path.splitext(child_value)[1].lower()
+                        in image_extensions
+                    ):
+                        continue
+
+                    rows.append([
+                        str(child_key),
+                        str(child_value)
+                    ])
+
+                if len(rows) > 1:
+
+                    table = Table(
+                        rows,
+                        colWidths=[6 * cm, 10 * cm],
+                        repeatRows=1
+                    )
+
+                    table.setStyle(TableStyle([
+                        ("BACKGROUND", (0, 0), (-1, 0),
+                         colors.lightgrey),
+                        ("GRID", (0, 0), (-1, -1),
+                         0.4, colors.grey),
+                        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                        ("WORDWRAP", (0, 0), (-1, -1), True),
+                        ("LEFTPADDING", (0, 0), (-1, -1), 5),
+                        ("RIGHTPADDING", (0, 0), (-1, -1), 5),
+                    ]))
+
+                    story.append(table)
+                    story.append(Spacer(1, 0.3 * cm))
+
+                for child_key, child_value in value.items():
+
+                    if isinstance(child_value, (dict, list)):
+                        render_value(child_value, child_key)
+
+            elif isinstance(value, list):
+
+                for index, item in enumerate(value):
+                    render_value(
+                        item,
+                        f"{key or 'Item'} {index + 1}"
+                    )
+
+        render_value(metadata)
+
+        # --------------------------------------------------
+        # CTF images
+        # --------------------------------------------------
+
+        processing = metadata.get("processing", {})
+        ctf = processing.get("CTFs", {})
+
+        ctf_images = [
+            (
+                "Defocus histogram",
+                ctf.get("defocus", {}).get("defocus_histogram")
+            ),
+            (
+                "Representative micrographs by defocus",
+                ctf.get("defocus", {}).get("defocus_micrograph_examples")
+            ),
+            (
+                "Resolution histogram",
+                ctf.get("resolution", {}).get("resolution_histogram")
+            ),
+            (
+                "Astigmatism histogram",
+                ctf.get("astigmatism", {}).get("astigmatism_histogram")
+            ),
+        ]
+
+        story.append(PageBreak())
+        story.append(Paragraph(
+            "CTF Analysis",
+            styles["Heading1"]
+        ))
+
+        for title, filename in ctf_images:
+
+            if not filename:
+                continue
+
+            image_path = os.path.join(extra_dir, filename)
+
+            if os.path.isfile(image_path):
+
+                story.append(Paragraph(
+                    title,
+                    styles["Heading2"]
+                ))
+
+                add_image(image_path)
+
+            else:
+                print(
+                    "WARNING: CTF image not found:",
+                    image_path
+                )
+
+        # --------------------------------------------------
+        # Generate PDF
+        # --------------------------------------------------
+
+        SimpleDocTemplate(
+            pdf_file,
+            pagesize=A4,
+            rightMargin=2 * cm,
+            leftMargin=2 * cm,
+            topMargin=2 * cm,
+            bottomMargin=2 * cm
+        ).build(story)
+
+        print("PDF report generated:", pdf_file)
