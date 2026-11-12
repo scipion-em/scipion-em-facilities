@@ -34,7 +34,101 @@ from .protocol_monitor import ProtMonitor, Monitor
 
 
 class ProtMonitorMovieGain(ProtMonitor):
-    """ check CPU, mem and IO usage.
+    """
+    Monitors movie gain estimation quality during cryo-EM preprocessing workflows by supervising statistical
+    indicators associated with detector gain normalization. The protocol is designed to help users identify abnormal
+    gain behavior, unstable detector responses, or calibration problems that could compromise downstream image
+    processing and reconstruction quality.
+
+    AI Generated:
+
+    Movie Gain Monitor (ProtMonitorMovieGain) — User Manual
+        Overview
+
+        The Movie Gain Monitor protocol provides continuous supervision of gain estimation results generated during
+        cryo-EM preprocessing workflows. Its primary purpose is to detect abnormal detector behavior and identify
+        problematic gain references before these issues propagate into alignment, CTF estimation, particle extraction,
+        or high-resolution reconstruction stages.
+
+        In cryo-EM data collection, gain normalization is a critical preprocessing operation because it compensates
+        for detector response variations across the camera surface. Errors or instabilities in gain estimation may
+        introduce structured artifacts, increase image noise, or bias quantitative analyses. Monitoring gain quality
+        therefore becomes especially important in automated acquisition environments and high-throughput facilities.
+
+        General Workflow
+
+        The protocol supervises an existing movie gain estimation procedure and periodically evaluates the numerical
+        statistics associated with the generated gain references. During execution, the monitoring system continuously
+        checks whether these statistical indicators remain within biologically and technically acceptable ranges.
+
+        Users typically connect the monitor to an active gain estimation workflow so that supervision occurs in parallel
+        with data processing. This approach allows rapid identification of problems while acquisition or preprocessing
+        is still ongoing.
+
+        Statistical Quality Indicators
+
+        The monitoring process evaluates several complementary statistical measurements that reflect the stability and
+        uniformity of the gain reference. These indicators are designed to reveal excessive variability, abnormal
+        intensity distributions, or extreme outlier behavior.
+
+        One monitored parameter is the residual gain standard deviation. Elevated values may indicate unstable detector
+        calibration, acquisition inconsistencies, or excessive noise in the estimated gain reference. In practical
+        workflows, unusually large deviations can correlate with detector instability or poor normalization quality.
+
+        Additional indicators compare different regions of the intensity distribution to evaluate whether the gain
+        values remain balanced and biologically plausible. Large percentile ratios or strong deviations between extreme
+        values and the main intensity population may reveal detector defects, corrupted normalization patterns, or
+        unstable acquisition conditions.
+
+        Alarm and Warning System
+
+        The protocol supports configurable thresholds for all monitored statistics. When one or more measurements exceed
+        the selected limits, warning notifications are generated automatically. These alerts allow users and facility
+        operators to intervene rapidly before problematic gain references affect large portions of the dataset.
+
+        In automated cryo-EM facilities, this type of supervision is especially valuable during unattended overnight
+        acquisitions or long collection sessions where detector issues might otherwise remain unnoticed for many hours.
+
+        Biological and Practical Relevance
+
+        Although gain monitoring is primarily a technical quality-control procedure, it has direct consequences for
+        biological interpretation. Poor gain normalization can degrade image contrast, reduce alignment accuracy, and
+        limit the achievable resolution of reconstructions. Even subtle detector artifacts may propagate through
+        multiple processing stages and become difficult to correct later.
+
+        From a practical perspective, early detection of detector instability can save substantial microscope time and
+        computational resources. Detecting abnormal gain behavior during acquisition is far more efficient than
+        discovering normalization problems after extensive downstream processing has already been completed.
+
+        Data Visualization and Reporting
+
+        The protocol provides structured monitoring data suitable for both lightweight visualization environments and
+        more advanced dashboard infrastructures. Statistical measurements may be displayed as evolving time series,
+        allowing users to identify gradual deterioration trends, sudden instabilities, or persistent detector anomalies.
+
+        In facility environments, these monitoring outputs can contribute to broader operational supervision systems
+        that combine detector quality metrics with microscope status and computational resource monitoring.
+
+        Practical Recommendations
+
+        In routine cryo-EM workflows, threshold values should initially remain moderately permissive until the normal
+        behavior of the detector is well characterized. Once stable operational ranges are understood, tighter
+        thresholds can improve sensitivity to subtle instabilities.
+
+        Users should pay particular attention to persistent increases in variability or recurring warnings affecting
+        multiple movies. Isolated deviations may occasionally occur during acquisition, but sustained abnormalities
+        often indicate detector calibration issues or environmental instability requiring intervention.
+
+        Gain monitoring is especially recommended for high-throughput acquisition pipelines, remote data collection,
+        and automated facility operation where manual supervision is limited.
+
+        Final Perspective
+
+        For cryo-EM users and facility operators, gain normalization quality is a foundational requirement for reliable
+        image processing and reproducible structural interpretation. Continuous supervision of gain estimation behavior
+        helps ensure detector stability, reduces the risk of hidden preprocessing artifacts, and supports more robust
+        downstream reconstruction workflows. By providing automated quality assessment and early warning capabilities,
+        the protocol contributes to more reliable and efficient cryo-EM data collection operations.
     """
     _label = 'movie gain monitor'
     _version = VERSION_1_1

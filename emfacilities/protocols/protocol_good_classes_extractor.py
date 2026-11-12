@@ -44,7 +44,150 @@ LAST_DONE_FILE = "last_done.txt"
 
 
 class ProtGoodClassesExtractor(EMProtocol, ProtStreamingBase):
-    """ Extracts items from a SetOfClasses based on a list of IDs or a set of given good averages/classes
+    """
+     Extracts particles associated with biologically meaningful or high-quality
+     classes from a continuously updated classification workflow. The protocol
+     separates accepted and discarded particles according to a user-defined
+     selection of good references, allowing downstream cryo-EM processing to
+     focus only on the most reliable structural information.
+
+     AI Generated:
+
+     Good Classes Extractor (ProtGoodClassesExtractor) — User Manual
+         Overview
+
+         The Good Classes Extractor protocol is designed to identify and separate
+         particles belonging to selected classes during 2D classification or
+         averaging workflows. Its primary goal is to help researchers retain
+         particles associated with structurally meaningful classes while removing
+         particles linked to poor-quality, noisy, contaminated, or biologically
+         irrelevant classes.
+
+         In cryo-EM workflows, this protocol is especially useful after iterative
+         2D classification steps where users visually inspect class averages and
+         decide which classes should be preserved for downstream refinement. The
+         protocol automates the extraction process and enables continuous
+         monitoring of streaming classification data, making it suitable for both
+         interactive and high-throughput processing environments.
+
+         Biological Context and Motivation
+
+         During cryo-EM analysis, classification is one of the most important
+         quality-control stages. Good classes usually represent particles with
+         consistent orientations, preserved structural features, and meaningful
+         biological signal. Bad classes often contain damaged particles, ice
+         contamination, aggregation, carbon edges, or alignment artifacts.
+
+         Selecting only high-quality classes substantially improves downstream
+         reconstruction quality. By isolating particles from biologically
+         interpretable classes, researchers can enhance map resolution, reduce
+         heterogeneity, and improve refinement stability. Conversely, retaining
+         poor classes may introduce noise and compromise the interpretation of
+         structural variability.
+
+         The protocol is therefore positioned as a filtering and data curation
+         step that bridges exploratory classification and high-resolution
+         reconstruction.
+
+         Selection Strategies
+
+         The protocol supports two conceptual approaches for defining which
+         classes should be considered good. The first approach uses an external
+         set of accepted classes or averages as references. This is particularly
+         convenient when users have manually curated good 2D classes and want to
+         propagate that selection automatically.
+
+         The second approach uses explicit class identifiers. This method is more
+         suitable for scripted workflows, automated pipelines, or situations
+         where class numbering has already been established during previous
+         analyses.
+
+         From a biological perspective, the most reliable strategy is usually the
+         careful visual inspection of class averages. Classes showing clear
+         secondary-structure features, recognizable particle projections, and
+         homogeneous appearance are typically selected. Classes dominated by
+         noise, distorted projections, or inconsistent shapes are usually
+         rejected.
+
+         Streaming and Continuous Processing
+
+         One of the most important characteristics of this protocol is its
+         compatibility with streaming workflows. Instead of waiting for the full
+         classification process to finish, the protocol continuously monitors the
+         incoming classes and incrementally updates the accepted and discarded
+         particle sets.
+
+         This behavior is particularly valuable in facility-scale cryo-EM data
+         collection, where rapid feedback is essential. Researchers can evaluate
+         particle quality during acquisition and processing, allowing early
+         decisions about microscope performance, sample preparation quality, or
+         processing strategy adjustments.
+
+         Continuous extraction also reduces delays between classification and
+         refinement, helping maintain efficient automated pipelines.
+
+         Outputs and Their Interpretation
+
+         The protocol generates two complementary particle sets. The accepted
+         output contains particles associated with the selected good classes,
+         whereas the discarded output contains particles associated with rejected
+         classes.
+
+         Biologically, the accepted set represents the curated subset expected to
+         contribute positively to downstream reconstructions. These particles are
+         typically used for further 2D classification refinement, initial model
+         generation, 3D reconstruction, or high-resolution refinement.
+
+         The discarded set is equally informative because it provides insight
+         into the proportion and nature of rejected data. Large discarded
+         fractions may indicate problems with sample heterogeneity, particle
+         picking quality, contamination, preferred orientation, or unstable data
+         acquisition conditions.
+
+         Visualization and Quality Monitoring
+
+         The protocol includes graphical summaries that track the balance between
+         accepted and rejected particles over time. These visualizations are
+         particularly useful in streaming environments because they provide an
+         immediate overview of data quality evolution during processing.
+
+         Stable growth of accepted particles usually indicates healthy and
+         consistent classification behavior. In contrast, rapid accumulation of
+         discarded particles may suggest acquisition instability, changes in ice
+         thickness, detector issues, or sample degradation.
+
+         Monitoring these trends can help researchers identify problems early and
+         make informed experimental decisions before extensive computational
+         resources are consumed.
+
+         Practical Recommendations
+
+         In routine cryo-EM processing, it is generally advisable to apply
+         conservative class selection criteria during early stages and gradually
+         refine the selection as classification quality improves. Overly strict
+         filtering at the beginning may remove rare but biologically meaningful
+         conformations, whereas excessively permissive filtering can degrade
+         reconstruction quality.
+
+         When working with heterogeneous samples, users should carefully evaluate
+         whether apparently unusual classes represent artifacts or genuine
+         structural states. Biological interpretation should always accompany
+         visual quality assessment.
+
+         For automated facility workflows, combining this protocol with
+         streaming-enabled classification pipelines can significantly accelerate
+         feedback and improve processing robustness.
+
+         Final Perspective
+
+         The Good Classes Extractor protocol serves as an essential curation step
+         in cryo-EM image processing workflows. By separating biologically useful
+         particles from low-quality or irrelevant data, it helps improve the
+         reliability of downstream structural analysis and supports efficient
+         streaming-oriented cryo-EM processing environments. Careful class
+         selection, continuous monitoring, and thoughtful biological
+         interpretation remain fundamental for obtaining high-quality
+         reconstructions and meaningful structural insights.
     """
 
     _label = "good classes extractor"

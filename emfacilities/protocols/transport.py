@@ -32,16 +32,74 @@ class Connect:
     def __init__(self, host, port, username, password, keyfilepath, keyfiletype,
                  remote_path, projectName):
         """
-        create_sftp_client(host, port, username, password, keyfilepath, keyfiletype) -> SFTPClient
+        Establishes and manages secure remote file transfer sessions through SFTP, allowing projects and
+        associated files to be stored, organized, and synchronized on external systems.
 
-        Creates a SFTP client connected to the supplied host on the supplied
-        port authenticating as the user with supplied username and supplied
-        password or with the private key in a file with the supplied path.
-        If a private key is used for authentication, the type of the keyfile
-        needs to be specified as DSA or RSA.
-        :rtype: SFTPClient object.
+        AI Generated:
 
-        remote_path: all paths are relative to this directory
+        Connect (Connect) — User Manual
+            Overview
+
+            The Connect class provides a secure communication layer for transferring files between a local
+            environment and a remote storage system using the SFTP protocol. Its main objective is to support
+            reliable exchange of project data while maintaining authenticated and encrypted communication with
+            remote servers.
+
+            In practical scientific and computational workflows, remote file transfer becomes essential when
+            processing data across distributed infrastructures, high performance computing facilities, shared
+            servers, or institutional repositories. This component simplifies the management of these remote
+            interactions by handling authentication, connection establishment, directory preparation, and file
+            upload operations within a unified interface.
+
+            Authentication and Secure Access
+
+            The connection mechanism supports multiple authentication strategies in order to adapt to different
+            institutional security requirements. Users may authenticate either with standard credentials or
+            with private key authentication using supported cryptographic key formats.
+
+            Key-based authentication is especially important in automated workflows and cluster environments
+            where secure unattended access is required. This approach improves security while also enabling
+            reproducible and automated data management pipelines without repeated manual intervention.
+
+            Remote Workspace Organization
+
+            Once connected, the class prepares a dedicated project directory within the remote storage
+            location. This ensures that transferred data are grouped consistently according to project identity
+            and remain organized across repeated executions or collaborative workflows.
+
+            Such organization is particularly valuable in scientific environments where multiple experiments,
+            datasets, or processing runs may coexist on the same remote infrastructure. Maintaining isolated
+            project directories reduces confusion and improves traceability of generated results.
+
+            File Transfer Operations
+
+            The primary operational purpose of the class is the transfer of local files into the remote
+            workspace. This capability supports workflows where processed outputs, reports, metadata, or
+            intermediate results must be archived remotely or shared with collaborators and computational
+            facilities.
+
+            In biological and imaging workflows, remote transfers are frequently used for moving microscopy
+            datasets, reconstruction results, or processing outputs between acquisition systems and analysis
+            platforms. Efficient remote synchronization becomes especially important when working with large
+            cryo-EM datasets or distributed computational infrastructures.
+
+            Reliability and Resource Management
+
+            The connection management process includes safeguards to ensure that communication resources are
+            properly released when operations finish or when unexpected situations occur. This minimizes the
+            risk of leaving incomplete sessions active on remote systems and improves the stability of
+            long-running automated workflows.
+
+            By isolating transfer operations within a dedicated communication component, the class also helps
+            maintain cleaner workflow organization and simplifies integration into larger processing systems.
+
+            Final Perspective
+
+            The Connect class serves as a secure bridge between local workflows and remote computational or
+            storage environments. By combining authenticated communication, remote workspace management, and
+            reliable file transfer capabilities, it enables efficient movement of scientific data across
+            distributed infrastructures while supporting reproducibility, collaboration, and organized project
+            management.
         """
         self.sftp = None
         key = None
