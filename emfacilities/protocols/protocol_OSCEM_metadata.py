@@ -306,7 +306,7 @@ class ProtOSCEM(EMProtocol):
     def _insertAllSteps(self):
         self._insertFunctionStep(self.generateMetadata)
         self._insertFunctionStep(self.saveMetadataFile)
-
+        self._insertFunctionStep(self.generatePDFReport)
     # -------------------------- STEPS functions ------------------------------
     def generateMetadata(self):
 
@@ -524,6 +524,13 @@ class ProtOSCEM(EMProtocol):
 
         # Sort the dictionary by defocus values
         sorted_micrographs = sorted(dict_defocus.items(), key=lambda x: x[1]['defocus'])
+        # Extract for pdf report
+        n = len(sorted_micrographs)
+        selected_indices = [ 0, n // 3,(2 * n) // 3,n - 1        ]
+        selected_micrographs = [sorted_micrographs[i] for i in selected_indices   ]
+        selected_micrographs = list({   item[0]: item for item in selected_micrographs}.values())
+
+
         # Extract paths for lowest, medium, and highest defocus values
         medium_defocus_mic = min(sorted_micrographs, key=lambda x: abs(x[1]['defocus'] - avg_defocus))
         lowest_defocus_path = sorted_micrographs[0][1]['path_to_mic']
@@ -532,55 +539,74 @@ class ProtOSCEM(EMProtocol):
         medium_defocus_value = medium_defocus_mic[1]['defocus']
 
         # To draw defocus value on image, we make images smaller and then larger
-        # since the default font cannot be increased in size
-        with mrcfile.open(lowest_defocus_path, permissive=True) as mrc1:
-            data1 = mrc1.data
-            img1 = Image.fromarray(np.uint8(data1 / np.max(data1) * 255))
-            img1 = img1.convert('RGB')
-            img1_resized = self.resize_image(img1, scale=0.05)
-        with mrcfile.open(medium_defocus_path, permissive=True) as mrc2:
-            data2 = mrc2.data
-            img2 = Image.fromarray(np.uint8(data2 / np.max(data2) * 255))
-            img2 = img2.convert('RGB')
-            img2_resized = self.resize_image(img2, scale=0.05)
-        with mrcfile.open(highest_defocus_path, permissive=True) as mrc3:
-            data3 = mrc3.data
-            img3 = Image.fromarray(np.uint8(data3 / np.max(data3) * 255))
-            img3 = img3.convert('RGB')
-            img3_resized = self.resize_image(img3, scale=0.05)
+        # Load representative micrographs
+        with mrcfile.open(lowest_defocus_path, permissive=True) as mrc:
+            data1 = mrc.data
+            img1 = Image.fromarray(
+                np.uint8(data1 / np.max(data1) * 255)
+            ).convert('RGB')
 
+        with mrcfile.open(medium_defocus_path, permissive=True) as mrc:
+            data2 = mrc.data
+            img2 = Image.fromarray(
+                np.uint8(data2 / np.max(data2) * 255)
+            ).convert('RGB')
 
-        font = ImageFont.load_default()
-        # Draw text on images
-        draw1 = ImageDraw.Draw(img1_resized)
-        text1 = f'{round(min_defocus, 1)} A'
-        draw1.text((10, 10), text1, fill='#80FF00', font=font)
+        with mrcfile.open(highest_defocus_path, permissive=True) as mrc:
+            data3 = mrc.data
+            img3 = Image.fromarray(
+                np.uint8(data3 / np.max(data3) * 255)
+            ).convert('RGB')
 
-        draw2 = ImageDraw.Draw(img2_resized)
-        text2 = f'{round(medium_defocus_value, 1)} A'
-        draw2.text((10, 10), text2, fill='#80FF00', font=font)
+        # Draw larger black defocus labels directly on original images
+        font_size = max(24, int(img1.width * 0.015))
 
-        draw3 = ImageDraw.Draw(img3_resized)
-        text3 = f'{round(max_defocus, 1)} A'
-        draw3.text((10, 10), text3, fill='#80FF00', font=font)
+        try:
+            font = ImageFont.truetype(
+                "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+                font_size
+            )
+        except OSError:
+            font = ImageFont.load_default()
 
-        # Define original sizes
-        img1_original_size = img1.size
-        img2_original_size = img2.size
-        img3_original_size = img3.size
-        # Return to original sizes
-        img1_final = self.resize_back(img1_resized, img1_original_size)
-        img2_final = self.resize_back(img2_resized, img2_original_size)
-        img3_final = self.resize_back(img3_resized, img3_original_size)
+        labels = [
+            (img1, f'{round(min_defocus, 1)} A'),
+            (img2, f'{round(medium_defocus_value, 1)} A'),
+            (img3, f'{round(max_defocus, 1)} A')
+        ]
 
-        # Create collage with the 3 images
-        collage_width = img1_final.width + img2_final.width + img3_final.width
-        collage_height = max(img1_final.height, img2_final.height, img3_final.height)
-        collage = Image.new('RGB', (collage_width, collage_height))
-        # Paste images into the collage
-        collage.paste(img1_final, (0, 0))
-        collage.paste(img2_final, (img1_final.width, 0))
-        collage.paste(img3_final, (img1_final.width + img2_final.width, 0))
+        for img, label in labels:
+            draw = ImageDraw.Draw(img)
+            margin = int(img.width * 0.015)
+            draw.text(
+                (margin, margin),
+                label,
+                fill='black',
+                font=font,
+                stroke_width=2,
+                stroke_fill='white'
+            )
+
+        # Create a 2x2 collage instead of placing all images in one row
+        images = [img1, img2, img3]
+
+        cell_width = max(img.width for img in images)
+        cell_height = max(img.height for img in images)
+
+        collage = Image.new(
+            'RGB',
+            (2 * cell_width, 2 * cell_height),
+            color='black'
+        )
+
+        positions = [
+            (0, 0),
+            (cell_width, 0),
+            (0, cell_height)
+        ]
+
+        for img, position in zip(images, positions):
+            collage.paste(img, position)
 
         extra_folder = self._getExtraPath()
         micro_folder_name = 'Micro_examples'
@@ -589,7 +615,7 @@ class ProtOSCEM(EMProtocol):
 
         micro_name = 'micro_defocus.jpg'
         micro_path = join(micro_folder_path, micro_name)
-        collage.save(micro_path)
+        collage.save(micro_path, quality=95)
 
         # Histograms generation
         # DEFOCUS
@@ -1515,3 +1541,204 @@ class ProtOSCEM(EMProtocol):
                 break
         resolution = below_res - ((threshold - below_fsc) / (above_fsc - below_fsc) * (below_res - above_res))
         return 1 / resolution
+
+    def generatePDFReport(self):
+        from reportlab.lib import colors
+        from reportlab.lib.enums import TA_CENTER
+        from reportlab.lib.pagesizes import A4
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from reportlab.lib.units import mm
+        from reportlab.platypus import (
+            SimpleDocTemplate, Paragraph, Spacer,
+            Table, TableStyle, Image as RLImage, PageBreak
+        )
+
+        metadata_file = self.getOutFile()
+        extra_dir = self._getExtraPath()
+        pdf_path = self._getExtraPath("Processing_report.pdf")
+
+        with open(metadata_file, "r") as f:
+            processing = yaml.safe_load(f)
+
+        styles = getSampleStyleSheet()
+        styles.add(ParagraphStyle(
+            name="ReportTitle",
+            parent=styles["Title"],
+            alignment=TA_CENTER,
+            spaceAfter=15
+        ))
+
+        story = []
+
+        story.append(Paragraph("Processing Report", styles["ReportTitle"]))
+        story.append(Spacer(1, 8 * mm))
+
+        # ---------------------------------------------------------
+        # Image helper
+        # ---------------------------------------------------------
+        def add_image(image_path, max_width=170 * mm, max_height=110 * mm):
+            if not image_path or not os.path.isfile(image_path):
+                print("[PDF] Image not found:", image_path)
+                return False
+
+            try:
+                img = RLImage(image_path)
+
+                scale = min(
+                    max_width / img.imageWidth,
+                    max_height / img.imageHeight
+                )
+
+                img.drawWidth = img.imageWidth * scale
+                img.drawHeight = img.imageHeight * scale
+
+                story.append(img)
+                story.append(Spacer(1, 5 * mm))
+
+                print("[PDF] Image added:", image_path)
+                return True
+
+            except Exception as e:
+                print("[PDF] Error loading image:", image_path, e)
+                return False
+
+        # ---------------------------------------------------------
+        # Render metadata tables
+        # ---------------------------------------------------------
+        def render_value(value, key=None):
+
+            if key and key.lower() == "gain_image":
+                return
+
+            if isinstance(value, dict):
+                if key:
+                    story.append(Paragraph(str(key), styles["Heading2"]))
+
+                for subkey, subvalue in value.items():
+                    render_value(subvalue, subkey)
+
+            elif isinstance(value, list):
+                if key:
+                    story.append(Paragraph(str(key), styles["Heading3"]))
+
+                data = [["Index", "Value"]]
+
+                for i, item in enumerate(value):
+                    data.append([str(i), str(item)])
+
+                table = Table(data, colWidths=[25 * mm, 140 * mm])
+                table.setStyle(TableStyle([
+                    ("BACKGROUND", (0, 0), (-1, 0), colors.lightgrey),
+                    ("GRID", (0, 0), (-1, -1), 0.4, colors.grey),
+                    ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                    ("FONTSIZE", (0, 0), (-1, -1), 8),
+                ]))
+
+                story.append(table)
+                story.append(Spacer(1, 4 * mm))
+
+            else:
+                if isinstance(value, str) and value.lower().endswith(
+                    (".jpg", ".jpeg", ".png", ".mrc", ".tif", ".tiff")
+                ):
+                    return
+
+                if key:
+                    data = [[str(key).replace("_", " "), str(value)]]
+
+                    table = Table(data, colWidths=[65 * mm, 100 * mm])
+                    table.setStyle(TableStyle([
+                        ("GRID", (0, 0), (-1, -1), 0.4, colors.grey),
+                        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                        ("FONTSIZE", (0, 0), (-1, -1), 8),
+                    ]))
+
+                    story.append(table)
+                    story.append(Spacer(1, 2 * mm))
+
+        # ---------------------------------------------------------
+        # Main metadata
+        # ---------------------------------------------------------
+        story.append(Paragraph("Processing Metadata", styles["Heading1"]))
+
+        for key, value in processing.items():
+            if key == "CTFs":
+                continue
+
+            render_value(value, key)
+
+        # ---------------------------------------------------------
+        # CTF histograms: one per page
+        # ---------------------------------------------------------
+        ctf_images = [
+            ("Defocus distribution", "defocus_hist.jpg"),
+            ("Resolution distribution", "resolution_hist.jpg"),
+            ("Astigmatism distribution", "astigmatism_hist.jpg"),
+        ]
+
+        for title, filename in ctf_images:
+            image_path = os.path.join(extra_dir, filename)
+
+            story.append(PageBreak())
+            story.append(Paragraph("CTF Analysis", styles["Heading1"]))
+            story.append(Paragraph(title, styles["Heading2"]))
+
+            if not add_image(
+                image_path,
+                max_width=165 * mm,
+                max_height=180 * mm
+            ):
+                story.append(Paragraph(
+                    "Histogram not available: " + filename,
+                    styles["Normal"]
+                ))
+
+        # ---------------------------------------------------------
+        # Representative micrographs
+        # ---------------------------------------------------------
+        story.append(PageBreak())
+        story.append(Paragraph(
+            "Representative Micrographs",
+            styles["Heading1"]
+        ))
+
+        # Filename currently generated by CTF_generation()
+        micrograph_paths = [
+            os.path.join(extra_dir, "Micro_examples", "micro_defocus.jpg"),
+            os.path.join(extra_dir, "Micro_examples", "micro_examples.jpg"),
+            os.path.join(extra_dir, "Micro_examples", "micro_particles.jpg"),
+        ]
+
+        micrograph_added = False
+
+        for micrograph_path in micrograph_paths:
+            if os.path.isfile(micrograph_path):
+                micrograph_added = add_image(
+                    micrograph_path,
+                    max_width=175 * mm,
+                    max_height=220 * mm
+                )
+                if micrograph_added:
+                    break
+
+        if not micrograph_added:
+            story.append(Paragraph(
+                "Representative micrographs not available.",
+                styles["Normal"]
+            ))
+
+        # ---------------------------------------------------------
+        # Build PDF
+        # ---------------------------------------------------------
+        doc = SimpleDocTemplate(
+            pdf_path,
+            pagesize=A4,
+            rightMargin=20 * mm,
+            leftMargin=20 * mm,
+            topMargin=20 * mm,
+            bottomMargin=20 * mm
+        )
+
+        doc.build(story)
+
+        print("[PDF] Report generated:", pdf_path)
