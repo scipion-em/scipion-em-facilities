@@ -17,6 +17,17 @@ import json
 import yaml
 import os
 
+
+from reportlab.lib import colors
+from reportlab.lib.enums import TA_CENTER
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.units import cm
+from reportlab.platypus import (
+    SimpleDocTemplate, Paragraph, Spacer,
+    Table, TableStyle, Image as PDFImage, PageBreak
+)
+
 from pyworkflow import NEW
 from pyworkflow.utils import weakImport, cyanStr
 
@@ -51,144 +62,7 @@ slices_y = "orthogonal_slices_Y.jpg"
 slices_z = "orthogonal_slices_Z.jpg"
 
 class ProtOSCEM(EMProtocol):
-    """
-    Generates a structured OSCEM metadata report from cryo-EM processing workflows,
-    collecting acquisition, preprocessing, reconstruction, and visualization information
-    into a unified format suitable for documentation, quality assessment, and data sharing.
-
-    AI Generated:
-
-    OSCEM Metadata (ProtOSCEM) - User Manual
-        Overview
-
-        The OSCEM Metadata protocol is designed to generate a comprehensive metadata
-        description of a cryo-EM workflow processed within Scipion environments. Its
-        main objective is to organize relevant experimental and processing information
-        into a structured representation that can later be exported, visualized, or
-        incorporated into reporting and archival systems.
-
-        In practical biological workflows, cryo-EM projects often involve a large number
-        of processing stages distributed across movie correction, CTF estimation,
-        particle extraction, classification, and volume reconstruction. This protocol
-        centralizes that information into a coherent metadata package, helping users
-        document the provenance and quality of their reconstructions in a standardized
-        manner.
-
-        The protocol is especially useful for facilities, collaborative projects, and
-        reproducibility-oriented pipelines where maintaining an interpretable summary of
-        processing conditions and reconstruction outputs is essential. By consolidating
-        metadata from multiple workflow stages, it becomes easier to track processing
-        history, compare datasets, and prepare results for dissemination.
-
-        Input Data and Workflow Context
-
-        The protocol supports workflows starting either from movies or from already
-        processed micrographs. This flexibility allows users to generate metadata reports
-        from both complete processing pipelines and partially processed datasets. In a
-        typical cryo-EM experiment, movie-based workflows provide the richest metadata
-        because they include acquisition parameters, motion correction information, and
-        frame statistics. Micrograph-based workflows remain useful when the original
-        movies are unavailable or when processing begins from curated images.
-
-        During execution, the protocol gathers information related to acquisition
-        parameters, particle processing, classifications, and reconstructed volumes.
-        Rather than focusing on a single reconstruction stage, it attempts to provide a
-        global overview of the biological dataset and the associated image-processing
-        strategy.
-
-        Biological and Experimental Metadata
-
-        A central purpose of this protocol is to preserve biologically meaningful
-        contextual information associated with cryo-EM experiments. Parameters such as
-        dose conditions, detector corrections, micrograph statistics, particle counts,
-        and reconstruction descriptors are integrated into the final metadata structure.
-
-        For biological interpretation, these descriptors are important because they
-        provide insight into data quality, sample behavior, and reconstruction reliability.
-        High particle counts, stable alignment behavior, and consistent reconstruction
-        statistics generally correlate with improved map interpretability and downstream
-        structural analysis.
-
-        The protocol also records information related to 2D and 3D classifications,
-        helping users identify whether the reconstruction originated from homogeneous
-        particle populations or from more heterogeneous datasets. This distinction is
-        biologically important because conformational variability, compositional
-        heterogeneity, or preferred orientations can strongly influence the quality and
-        interpretability of the final maps.
-
-        Visualization and Reporting
-
-        Beyond metadata extraction, the protocol generates visual assets intended to
-        facilitate inspection and presentation of cryo-EM results. These include
-        orthogonal slices, image collages, histogram representations, and volume
-        visualizations. Such outputs are particularly useful when preparing reports,
-        validating reconstructions, or communicating results to collaborators who may
-        not directly interact with the original processing workflow.
-
-        Orthogonal slice representations allow users to inspect internal density
-        distributions within reconstructed maps, while generated visual summaries help
-        identify global structural features, noise levels, and reconstruction quality.
-        These visualizations are valuable both for exploratory analysis and for
-        publication-oriented documentation.
-
-        Volume Analysis and Resolution Assessment
-
-        The protocol incorporates utilities for analyzing reconstructed volumes and
-        estimating structural descriptors associated with map quality. In cryo-EM
-        workflows, resolution estimation and density interpretation are central to
-        evaluating the biological reliability of a reconstruction.
-
-        Isosurface generation and orthogonal slicing provide complementary perspectives
-        on the reconstructed density. Isosurfaces emphasize the external morphology and
-        connectivity of molecular assemblies, while internal slices reveal density
-        continuity, local disorder, and potential reconstruction artifacts.
-
-        Resolution-related descriptors help contextualize the level of structural detail
-        that can be interpreted biologically. Users should remember that nominal
-        resolution alone does not fully define map quality; local heterogeneity,
-        flexibility, masking strategies, and reconstruction anisotropy can significantly
-        affect interpretability.
-
-        Metadata Export and Interoperability
-
-        One of the primary strengths of the protocol is its ability to export workflow
-        metadata into structured formats suitable for external systems. This enables
-        interoperability with visualization portals, archival infrastructures, and
-        reproducibility frameworks.
-
-        In collaborative environments, structured metadata improves transparency by
-        allowing researchers to understand how a reconstruction was produced, which
-        processing decisions were applied, and how quality indicators evolved throughout
-        the workflow. Such traceability is increasingly important in modern cryo-EM
-        facilities and data-sharing initiatives.
-
-        Practical Recommendations
-
-        For the most complete metadata reports, users should provide workflows that
-        preserve acquisition and preprocessing information from the earliest stages of
-        the experiment. Whenever possible, workflows starting from movies provide richer
-        contextual information than workflows beginning from curated micrographs alone.
-
-        Users are encouraged to verify that reconstruction outputs, classification
-        stages, and associated metadata remain biologically consistent before generating
-        final reports. Metadata summaries are most valuable when they accurately reflect
-        the true processing history and reconstruction strategy of the dataset.
-
-        Visual outputs should also be interpreted critically. Slice views, histograms,
-        and isosurface representations provide useful guidance, but they do not replace
-        detailed structural validation or expert biological interpretation.
-
-        Final Perspective
-
-        The OSCEM Metadata protocol serves as a bridge between cryo-EM image processing
-        workflows and structured scientific reporting. By organizing experimental,
-        computational, and visualization information into a unified metadata package, it
-        supports reproducibility, transparency, and long-term usability of cryo-EM
-        datasets.
-
-        For biological researchers, the protocol provides a practical way to summarize
-        complex processing histories while preserving the contextual information needed
-        for interpretation, collaboration, and future reanalysis.
+    """ This is the class for generating the OSCEM metadata json file from Scipion workflow
     """
     _label = 'OSCEM Metadata'
     _devStatus = NEW
@@ -287,7 +161,7 @@ class ProtOSCEM(EMProtocol):
                       help="Sharpened volume",
                       allowsNull=True)
 
-        form.addParam('threshold_sharpenedVol', params.FloatParam, default=-1.0,
+        form.addParam('threshold_sharpenedVol', params.IntParam, default=-1,
                       label="Sharpened volume threshold",
                       help=threshold_help)
 
@@ -297,7 +171,7 @@ class ProtOSCEM(EMProtocol):
                       help="Polished volume",
                       allowsNull=True)
 
-        form.addParam('threshold_polishedVol', params.FloatParam, default=-1.0,
+        form.addParam('threshold_polishedVol', params.IntParam, default=-1,
                       label="Polished volume threshold",
                       help=threshold_help)
 
@@ -305,6 +179,7 @@ class ProtOSCEM(EMProtocol):
     def _insertAllSteps(self):
         self._insertFunctionStep(self.generateMetadata)
         self._insertFunctionStep(self.saveMetadataFile)
+        self._insertFunctionStep(self.generatePDFReport)
 
     # -------------------------- STEPS functions ------------------------------
     def generateMetadata(self):
@@ -385,6 +260,9 @@ class ProtOSCEM(EMProtocol):
         metadata_file = self.getOutFile()
         if os.path.exists(metadata_file):
             summary.append(f'OSCEM metadata file successfully saved at: {metadata_file}')
+            pdf_file = self._getExtraPath("Processing_report.pdf")
+        if os.path.exists(pdf_file):
+            summary.append(f"PDF report saved at: {pdf_file}")
         return summary
 
     def _methods(self):
@@ -416,11 +294,14 @@ class ProtOSCEM(EMProtocol):
         file_keys = [_gainFile, _darkFile]
         valid_file_keys = [key for key in file_keys if input_movies[key] is not None]
         for key in valid_file_keys:
-            data = self.load_image_path(input_movies[key])
+            with mrcfile.open(input_movies[key], 'r') as mrc:
+                # Read the data from the MRC file
+                data = mrc.data
 
-            p_low, p_high = np.percentile(data, [1, 99])
-            data_clip = np.clip(data, p_low, p_high)
-            normalized_data = 255 * (data_clip - p_low) / (p_high - p_low)
+            # Normalize the data to 8-bit (0-255) range
+            min_val = np.min(data)
+            max_val = np.max(data)
+            normalized_data = 255 * (data - min_val) / (max_val - min_val)
             normalized_data = normalized_data.astype(np.uint8)
 
             # Apply Histogram Equalization
@@ -526,21 +407,21 @@ class ProtOSCEM(EMProtocol):
 
         # To draw defocus value on image, we make images smaller and then larger
         # since the default font cannot be increased in size
-
-        data1 = self.load_image_path(lowest_defocus_path)
-        img1 = Image.fromarray(np.uint8(data1 / np.max(data1) * 255))
-        img1 = img1.convert('RGB')
-        img1_resized = self.resize_image(img1, scale=0.05)
-
-        data2 = self.load_image_path(medium_defocus_path)
-        img2 = Image.fromarray(np.uint8(data2 / np.max(data2) * 255))
-        img2 = img2.convert('RGB')
-        img2_resized = self.resize_image(img2, scale=0.05)
-
-        data3 = self.load_image_path(highest_defocus_path)
-        img3 = Image.fromarray(np.uint8(data3 / np.max(data3) * 255))
-        img3 = img3.convert('RGB')
-        img3_resized = self.resize_image(img3, scale=0.05)
+        with mrcfile.open(lowest_defocus_path, permissive=True) as mrc1:
+            data1 = mrc1.data
+            img1 = Image.fromarray(np.uint8(data1 / np.max(data1) * 255))
+            img1 = img1.convert('RGB')
+            img1_resized = self.resize_image(img1, scale=0.05)
+        with mrcfile.open(medium_defocus_path, permissive=True) as mrc2:
+            data2 = mrc2.data
+            img2 = Image.fromarray(np.uint8(data2 / np.max(data2) * 255))
+            img2 = img2.convert('RGB')
+            img2_resized = self.resize_image(img2, scale=0.05)
+        with mrcfile.open(highest_defocus_path, permissive=True) as mrc3:
+            data3 = mrc3.data
+            img3 = Image.fromarray(np.uint8(data3 / np.max(data3) * 255))
+            img3 = img3.convert('RGB')
+            img3_resized = self.resize_image(img3, scale=0.05)
 
 
         font = ImageFont.load_default()
@@ -667,37 +548,27 @@ class ProtOSCEM(EMProtocol):
         parts = self.particles.get()
         mic_dict = {}
 
-        # Iterate over particles
         for index, item in enumerate(parts.iterItems()):
             micrograph_num = str(item._micId)
             sampling_rate_part = item._samplingRate.get()
+            sampling_rate_ctf = item._ctfModel._micObj._samplingRate.get()
+            scale = sampling_rate_part/sampling_rate_ctf
 
-            # Try to get CTF sampling rate
-            try:
-                sampling_rate_ctf = item._ctfModel._micObj._samplingRate.get()
-            except:
-                sampling_rate_ctf = None
+            # coordinates scaled
+            coordinates_scaled = [item._coordinate._x.get() * scale, item._coordinate._y.get() * scale]
 
-            scale = sampling_rate_part / sampling_rate_ctf if sampling_rate_ctf else 1.0
-
-            # Coordinates are only used for micrograph examples
-            coordinates_scaled = [item._coordinate._x.get() * scale,
-                                  item._coordinate._y.get() * scale]
-
-            # Store info in mic_dict
+            # Key of dictionary is the micrograph ID
+            # If the key already exists in the dictionary, increment the count
+            # Otherwise, add the key with an initial count of 1
             if micrograph_num in mic_dict:
                 mic_dict[micrograph_num]['particles_num'] += 1
-                mic_dict[micrograph_num].setdefault('coordinates', []).append(coordinates_scaled)
-            else:
-                try:
-                    mic_path = item._ctfModel._micObj._filename.get()
-                except:
-                    mic_path = None
+                mic_dict[micrograph_num]['coordinates'].append(coordinates_scaled)
 
+            else:
                 mic_dict[micrograph_num] = {
                     'particles_num': 1,
                     'coordinates': [coordinates_scaled],
-                    'mic_path': mic_path
+                    'mic_path': item._ctfModel._micObj._filename.get()
                 }
 
         # Calculate the mean particle values
@@ -718,72 +589,65 @@ class ProtOSCEM(EMProtocol):
         particles_hist = self.hist_path(hist_name)
         plt.savefig(particles_hist)
 
-        # Generate micrograph examples ONLY if micrographs exist
-        micrograph_examples_path = None
-        if self.micrographs.get() is not None:
-            try:
-                # Select micrographs for collage
-                mic_closest_to_mean = min(
-                    mic_dict.items(),
-                    key=lambda x: abs(x[1]['particles_num'] - mean_particles_values)
-                )[0]
-                mic_with_lowest_particles = min(mic_dict, key=lambda k: mic_dict[k]['particles_num'])
-                mic_with_highest_particles = max(mic_dict, key=lambda k: mic_dict[k]['particles_num'])
 
-                mic_ids = [int(mic_with_highest_particles), int(mic_closest_to_mean), int(mic_with_lowest_particles)]
-                reduced_mics_dict = {
-                    mic_id: {
-                        "mic_path": mic_dict.get(str(mic_id), {}).get('mic_path'),
-                        "coordinates": mic_dict.get(str(mic_id), {}).get('coordinates', [])
-                    }
-                    for mic_id in mic_ids
-                }
+        # Obtain 3 micrographs with particles drawn on them
+        # Retrieve mic ID of micrograph with higher, medium and lower number of particles:
+        mic_closest_to_mean = min(mic_dict.items(), key=lambda x: abs(x[1]['particles_num']- mean_particles_values))[0]
+        mic_with_lowest_particles = min(mic_dict, key=lambda k: mic_dict[k]['particles_num'])
+        mic_with_highest_particles = max(mic_dict, key=lambda k: mic_dict[k]['particles_num'])
 
-                # Draw particles in images
-                images = [] # List to store the images after drawing particles
-                for micrograph, values in reduced_mics_dict.items():
-                    if not values['mic_path']:
-                        continue
+        mic_ids = [int(mic_with_highest_particles), int(mic_closest_to_mean), int(mic_with_lowest_particles)]
 
-                    mrc_data = self.load_image_path(values['mic_path'])
-                    mrc_normalized = 255 * (mrc_data - np.min(mrc_data)) / (np.max(mrc_data) - np.min(mrc_data))
-                    mrc_normalized = mrc_normalized.astype(np.uint8)
-                    image = Image.fromarray(mrc_normalized).convert('RGB')
+        # Dict to store the path and coordinates of the 3 micrographs keeping mic_ids order
+        reduced_mics_dict = {mic_id: {"mic_path": mic_dict.get(str(mic_id), {}).get('mic_path', 0), #None,
+                                      "coordinates": mic_dict.get(str(mic_id), {}).get('coordinates', 0)
+                             #        "particles_num": mic_dict.get(str(mic_id), {}).get('particles_num', 0)
+                                       }
+                             for mic_id in mic_ids
+                                      }
 
-                    W_jpg, _ = image.size
-                    draw = ImageDraw.Draw(image)
-                    r = W_jpg / 256
+        # Draw particles in images
+        images = [] # List to store the images after drawing particles
+        for micrograph, values in reduced_mics_dict.items():
+            with mrcfile.open(values['mic_path'], permissive=True) as mrc:
+                mrc_data = mrc.data
+            mrc_normalized = 255 * (mrc_data - np.min(mrc_data)) / (np.max(mrc_data) - np.min(mrc_data))
+            mrc_normalized = mrc_normalized.astype(np.uint8)
+            image = Image.fromarray(mrc_normalized).convert('RGB')
 
-                    for coord in values['coordinates']:
-                        x, y = coord
-                        draw.ellipse((x - r, y - r, x + r, y + r), fill=(0, 255, 0))
+            W_jpg, _ = image.size
+            draw = ImageDraw.Draw(image)
+            r = W_jpg / 256
 
-                    images.append(image)
+            for coord in values['coordinates']:
+                x = coord[0]
+                y = coord[1]
+                draw.ellipse((x - r, y - r, x + r, y + r), fill=(0, 255, 0))
 
-                if len(images) > 0:
-                    width, height = images[0].size
-                    collage = Image.new('RGB', (3 * width, height))
-                    for i, img in enumerate(images):
-                        collage.paste(img, (i * width, 0))
+            images.append(image)
 
-                    extra_folder = self._getExtraPath()
-                    micro_folder_name = 'Micro_examples'
-                    micro_folder_path = join(extra_folder, micro_folder_name)
-                    micro_name = 'micro_particles.jpg'
-                    micrograph_examples_path = join(micro_folder_name, micro_name)
-                    collage.save(join(micro_folder_path, micro_name))
-            except:
-                pass  # If anything fails, skip micrograph examples
+        # Create collage
+        width, height = images[0].size
+        collage_width = 3 * width
+        collage_height = height
+        collage = Image.new('RGB', (collage_width, collage_height))
+        # Paste each image into the collage
+        for i, img in enumerate(images):
+            collage.paste(img, (i * width, 0))
 
-        particles = {
-            "number_particles": sum(particle_counts),
-            "particles_per_micrograph": round(mean_particles_values, 1),
-            "particles_histogram": hist_name
-        }
+        extra_folder = self._getExtraPath()
+        micro_folder_name = 'Micro_examples'
+        micro_folder_path = join(extra_folder, micro_folder_name)
 
-        # Include micrograph_examples only if generated
-        if micrograph_examples_path:
-            particles["micrograph_examples"] = micrograph_examples_path
+        micro_name = 'micro_particles.jpg'
+        micro_path = join(micro_folder_path, micro_name)
+        collage.save(micro_path)
+
+        particles = {"number_particles": sum(particle_counts),
+                     "particles_per_micrograph": round(mean_particles_values, 1),
+                     "particles_histogram": hist_name,
+                     "micrograph_examples": join(micro_folder_name, micro_name)
+                     }
 
         return particles
 
@@ -811,38 +675,38 @@ class ProtOSCEM(EMProtocol):
         # Saving images in .jpg, drawing number of particles on them
         particles_list = []
         img_filenames = []
+        with mrcfile.open(img_classes_file, 'r') as mrc:
+            data = mrc.data
+            for i, class_2D in enumerate(sorted_list_classes):
+                particles = class_2D.getSize()
+                particles_list.append(particles)
+                index = class_2D.getRepresentative().getIndex()
 
-        data = self.load_image_path(img_classes_file)
-        for i, class_2D in enumerate(sorted_list_classes):
-            particles = class_2D.getSize()
-            particles_list.append(particles)
-            index = class_2D.getRepresentative().getIndex()
+                img = data[index - 1, :, :]
 
-            img = data[index - 1, :, :]
+                img_normalized = 255 * (img - np.min(img)) / (np.max(img) - np.min(img))
+                img_normalized = img_normalized.astype(np.uint8)
+                image = Image.fromarray(img_normalized)
+                image = image.convert('RGB')
 
-            img_normalized = 255 * (img - np.min(img)) / (np.max(img) - np.min(img))
-            img_normalized = img_normalized.astype(np.uint8)
-            image = Image.fromarray(img_normalized)
-            image = image.convert('RGB')
+                # Draw the number of particles on the images
+                draw = ImageDraw.Draw(image)
+                font = ImageFont.load_default()
+                position = (10, 10)
+                draw.text(position, str(particles), fill='#80FF00', font=font)
 
-            # Draw the number of particles on the images
-            draw = ImageDraw.Draw(image)
-            font = ImageFont.load_default()
-            position = (10, 10)
-            draw.text(position, str(particles), fill='#80FF00', font=font)
+                # Saving images
+                new_img_filename = splitext(img_classes_file)[0] + f'_image_{i}.jpg'
+                image.save(new_img_filename)
+                img_filenames.append(new_img_filename)
 
-            # Saving images
-            new_img_filename = splitext(img_classes_file)[0] + f'_image_{i}.jpg'
-            image.save(new_img_filename)
-            img_filenames.append(new_img_filename)
+            # Creating collage in .jpg with all images ordered in descending order
+            images = [Image.open(filename) for filename in img_filenames]
 
-        # Creating collage in .jpg with all images ordered in descending order
-        images = [Image.open(filename) for filename in img_filenames]
-
-        output_folder = self._getExtraPath()
-        collage_filename = 'classes_2D.jpg'
-        collage_filepath = join(output_folder, collage_filename)
-        self.create_collage(images, collage_filepath)
+            output_folder = self._getExtraPath()
+            collage_filename = 'classes_2D.jpg'
+            collage_filepath = join(output_folder, collage_filename)
+            self.create_collage(images, collage_filepath)
 
         classes_2D = {"particles_per_2Dclass": particles_list,
                       "images_classes_2D": collage_filename}
@@ -1036,83 +900,83 @@ class ProtOSCEM(EMProtocol):
             # Option 2:
             if ':' in file_name:
                 file_name_without_suffix = file_name.split(':')[0]
-                file_name = file_name_without_suffix
 
-            data = self.load_image_path(file_name)
+            with mrcfile.open(file_name_without_suffix, 'r') as mrc:
+                data = mrc.data
 
-            ############################
-            ########## CLASSES #########
-            ############################
+                ############################
+                ########## CLASSES #########
+                ############################
 
-            particles = class_3D.getSize()
-            particles_list.append(particles)
+                particles = class_3D.getSize()
+                particles_list.append(particles)
 
-            mid_index = data.shape[0] // 2
+                mid_index = data.shape[0] // 2
 
-            img = data[mid_index, :, :]
+                img = data[mid_index, :, :]
 
-            img_normalized = 255 * (img - np.min(img)) / (np.max(img) - np.min(img))
-            img_normalized = img_normalized.astype(np.uint8)
-            image = Image.fromarray(img_normalized)
-            image = image.convert('RGB')
+                img_normalized = 255 * (img - np.min(img)) / (np.max(img) - np.min(img))
+                img_normalized = img_normalized.astype(np.uint8)
+                image = Image.fromarray(img_normalized)
+                image = image.convert('RGB')
 
-            # Draw the number of particles on the images
-            draw = ImageDraw.Draw(image)
-            font = ImageFont.load_default()
-            position = (10, 10)
-            draw.text(position, str(particles), fill='#80FF00', font=font)
+                # Draw the number of particles on the images
+                draw = ImageDraw.Draw(image)
+                font = ImageFont.load_default()
+                position = (10, 10)
+                draw.text(position, str(particles), fill='#80FF00', font=font)
 
-            new_img_filename = splitext(file_name)[0] + '.jpg'
-            image.save(new_img_filename)
-            img_filenames.append(new_img_filename)
+                new_img_filename = splitext(file_name)[0] + '.jpg'
+                image.save(new_img_filename)
+                img_filenames.append(new_img_filename)
 
-            #############################
-            ########## VOLUMES ##########
-            #############################
+                #############################
+                ########## VOLUMES ##########
+                #############################
 
-            # Volume size
-            size = data.shape
-            vol_size_list = [int(x) for x in size]
+                # Volume size
+                size = data.shape
+                vol_size_list = [int(x) for x in size]
 
-            # Getting orthogonal slices in X, Y and Z
-            # Folder to store orthogonal slices
-            orthogonal_slices_folder = f'orthogonal_slices_volume{i + 1}'
-            orthogonal_slices_path = join(classes3D_folder_path, orthogonal_slices_folder)
-            os.makedirs(orthogonal_slices_path, exist_ok=True)
+                # Getting orthogonal slices in X, Y and Z
+                # Folder to store orthogonal slices
+                orthogonal_slices_folder = f'orthogonal_slices_volume{i + 1}'
+                orthogonal_slices_path = join(classes3D_folder_path, orthogonal_slices_folder)
+                os.makedirs(orthogonal_slices_path, exist_ok=True)
 
-            self.orthogonalSlices(fnRoot=orthogonal_slices_path, map=data)
+                self.orthogonalSlices(fnRoot=orthogonal_slices_path, map=data)
 
-            # Getting 3 isosurface images
-            # Folder to store isosurface images
-            isosurface_images_folder = f'isosurface_images_volume{i + 1}'
-            isosurface_images_path = join(classes3D_folder_path, isosurface_images_folder)
-            os.makedirs(isosurface_images_path, exist_ok=True)
+                # Getting 3 isosurface images
+                # Folder to store isosurface images
+                isosurface_images_folder = f'isosurface_images_volume{i + 1}'
+                isosurface_images_path = join(classes3D_folder_path, isosurface_images_folder)
+                os.makedirs(isosurface_images_path, exist_ok=True)
 
-            th = int(self.threshold_classes3D.get())
-            volume_file_abspath = abspath(file_name)
-            front_view_img = 'front_view.jpg'
-            side_view_img = 'side_view.jpg'
-            top_view_img = 'top_view.jpg'
-            self.generate_isosurfaces(isosurface_images_path, volume_file_abspath,
-                                      th, front_view_img, side_view_img, top_view_img)
+                th = int(self.threshold_classes3D.get())
+                volume_file_abspath = abspath(file_name_without_suffix)
+                front_view_img = 'front_view.jpg'
+                side_view_img = 'side_view.jpg'
+                top_view_img = 'top_view.jpg'
+                self.generate_isosurfaces(isosurface_images_path, volume_file_abspath,
+                                          th, front_view_img, side_view_img, top_view_img)
 
-            # Dictionary fill in:
-            volume = {
-                "size": vol_size_list,
-                "orthogonal_slices": {
-                    "orthogonal_slices_X": join(classes_3D_folder_name, orthogonal_slices_folder,
-                                                slices_x),
-                    "orthogonal_slices_Y": join(classes_3D_folder_name, orthogonal_slices_folder,
-                                                slices_y),
-                    "orthogonal_slices_Z": join(classes_3D_folder_name, orthogonal_slices_folder,
-                                                slices_z)},
-                'isosurface_images': {
-                    'front_view': join(classes_3D_folder_name, isosurface_images_folder, front_view_img),
-                    'side_view': join(classes_3D_folder_name, isosurface_images_folder, side_view_img),
-                    'top_view': join(classes_3D_folder_name, isosurface_images_folder, top_view_img)
-                }}
+                # Dictionary fill in:
+                volume = {
+                    "size": vol_size_list,
+                    "orthogonal_slices": {
+                        "orthogonal_slices_X": join(classes_3D_folder_name, orthogonal_slices_folder,
+                                                    slices_x),
+                        "orthogonal_slices_Y": join(classes_3D_folder_name, orthogonal_slices_folder,
+                                                    slices_y),
+                        "orthogonal_slices_Z": join(classes_3D_folder_name, orthogonal_slices_folder,
+                                                    slices_z)},
+                    'isosurface_images': {
+                        'front_view': join(classes_3D_folder_name, isosurface_images_folder, front_view_img),
+                        'side_view': join(classes_3D_folder_name, isosurface_images_folder, side_view_img),
+                        'top_view': join(classes_3D_folder_name, isosurface_images_folder, top_view_img)
+                    }}
 
-            volumes_list.append(volume)
+                volumes_list.append(volume)
 
         # Creating collage in .jpg with all images ordered in descending order
         images = [Image.open(filename) for filename in img_filenames]
@@ -1125,32 +989,13 @@ class ProtOSCEM(EMProtocol):
                       "volumes": volumes_list}
         return classes_3D
 
-    def load_image_path(self, path):
-        ext = os.path.splitext(path)[1].lower()
-        # MRC/MRCS
-        if ext in [".mrc", ".mrcs"]:
-            with mrcfile.open(path, 'r') as mrc:
-                return np.array(mrc.data, dtype=np.float32)
-        # TIFF/TIF
-        elif ext in [".tif", ".tiff"]:
-            img = Image.open(path)
-            arr = np.array(img, dtype=np.float32)
-            return arr
-        # GAIN
-        elif ext == ".gain":
-            G = emlib.Image()
-            G.read(path)
-            data = G.getData()
-            return data
-
     def get_movie_alignment_descriptor(self):
         """
         Function to create the movie alignment descriptor
         """
         ###### MOVIE ALIGNMENT DESCRIPTOR ######
         MovieAlignmentProt = self.movieAlignment.get()
-        prot_name = MovieAlignmentProt.getClassName()
-        movie_align = {'descriptor_name': prot_name}
+        movie_align = {'descriptor_name': MovieAlignmentProt.getClassName()}
         descriptor_thing_dict = {}
         ################################ INPUT #############################################
         input_alignment = MovieAlignmentProt.getObjDict()
@@ -1214,9 +1059,9 @@ class ProtOSCEM(EMProtocol):
         }
         frames_aligned = {key_mapping[key]: input_alignment[key] for key in keys_to_retrieve if
                           key in input_alignment and input_alignment[key] is not None}
-        if 'frameN' in frames_aligned:
-            if frames_aligned['frameN'] == 0:
-                frames_aligned['frameN'] = self.number_movies
+
+        if frames_aligned['frameN'] == 0:
+            frames_aligned['frameN'] = self.number_movies
 
         descriptor_thing_dict['frames_aligned'] = frames_aligned
 
@@ -1231,10 +1076,7 @@ class ProtOSCEM(EMProtocol):
                 attributes_dict = dict(item.getAttributes())
                 shiftX = attributes_dict.get('_xmipp_ShiftX')
                 shiftY = attributes_dict.get('_xmipp_ShiftY')
-                if not shiftX or not shiftY:
-                    alignment = attributes_dict.get('_alignment')
-                    shiftX = getattr(alignment, "_xshifts", None)
-                    shiftY = getattr(alignment, "_yshifts", None)
+
                 norm = np.linalg.norm([shiftX, shiftY], axis=0)
                 avg_shifts.append(np.mean(norm))
                 max_shifts.append(np.max(norm))
@@ -1259,8 +1101,7 @@ class ProtOSCEM(EMProtocol):
         """
         ###### MAX SHIFT DESCRIPTOR######
         MaxShiftProt = self.maxShift.get()
-        prot_name = MaxShiftProt.getClassName()
-        movie_maxshift = {'descriptor_name': prot_name}
+        movie_maxshift = {'descriptor_name': MaxShiftProt.getClassName()}
         descriptor_thing_dict = {}
         ############################### INPUT #############################################
         input_shift = MaxShiftProt.getObjDict()
@@ -1300,10 +1141,6 @@ class ProtOSCEM(EMProtocol):
                     attributes_dict = dict(attributes)
                     shiftX = attributes_dict.get('_xmipp_ShiftX')
                     shiftY = attributes_dict.get('_xmipp_ShiftY')
-                    if not shiftX or not shiftY:
-                        alignment = attributes_dict.get('_alignment')
-                        shiftX = getattr(alignment, "_xshifts", None)
-                        shiftY = getattr(alignment, "_yshifts", None)
                     norm = np.linalg.norm([shiftX, shiftY], axis=0)
                     shift_list.append(norm)
 
@@ -1552,3 +1389,150 @@ class ProtOSCEM(EMProtocol):
                 break
         resolution = below_res - ((threshold - below_fsc) / (above_fsc - below_fsc) * (below_res - above_res))
         return 1 / resolution
+
+
+
+    def generatePDFReport(self):
+        metadata_file = self.getOutFile()
+        pdf_file = self._getExtraPath("Processing_report.pdf")
+        extra_dir = self._getExtraPath()
+
+        with open(metadata_file, encoding="utf-8") as f:
+            metadata = yaml.safe_load(f) or {}
+
+        styles = getSampleStyleSheet()
+        styles.add(ParagraphStyle(
+            name="ReportTitle",
+            parent=styles["Title"],
+            alignment=TA_CENTER,
+            spaceAfter=20
+        ))
+
+        story = [
+            Paragraph("OSCEM Processing Report", styles["ReportTitle"]),
+            Spacer(1, 0.5 * cm)
+        ]
+
+        image_extensions = {".jpg", ".jpeg", ".png"}
+
+        def add_image(path):
+            if not os.path.isfile(path):
+                return
+
+            img = PDFImage(path)
+            max_width = 16 * cm
+            max_height = 12 * cm
+            scale = min(
+                max_width / img.imageWidth,
+                max_height / img.imageHeight,
+                1
+            )
+            img.drawWidth = img.imageWidth * scale
+            img.drawHeight = img.imageHeight * scale
+
+            story.append(img)
+            story.append(Spacer(1, 0.3 * cm))
+
+        def render_value(value, key=None):
+            if isinstance(value, dict):
+                story.append(Paragraph(
+                    str(key or "Metadata"),
+                    styles["Heading2"]
+                ))
+
+                rows = [["Field", "Value"]]
+                for child_key, child_value in value.items():
+                    if isinstance(child_value, (dict, list)):
+                        continue
+
+                    # Las referencias a imágenes se insertan como imágenes.
+                    if (
+                            isinstance(child_value, str)
+                            and os.path.splitext(child_value)[1].lower()
+                            in image_extensions
+                    ):
+                        image_path = os.path.join(extra_dir, child_value)
+                        if os.path.isfile(image_path):
+                            story.append(Paragraph(
+                                str(child_key), styles["Heading3"]
+                            ))
+                            add_image(image_path)
+                            continue
+
+                    rows.append([str(child_key), str(child_value)])
+
+                if len(rows) > 1:
+                    table = Table(
+                        rows, colWidths=[6 * cm, 10 * cm],
+                        repeatRows=1
+                    )
+                    table.setStyle(TableStyle([
+                        ("BACKGROUND", (0, 0), (-1, 0),
+                         colors.lightgrey),
+                        ("GRID", (0, 0), (-1, -1), 0.4,
+                         colors.grey),
+                        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                        ("WORDWRAP", (0, 0), (-1, -1), True),
+                        ("LEFTPADDING", (0, 0), (-1, -1), 5),
+                        ("RIGHTPADDING", (0, 0), (-1, -1), 5),
+                    ]))
+                    story.append(table)
+                    story.append(Spacer(1, 0.3 * cm))
+
+                for child_key, child_value in value.items():
+                    if isinstance(child_value, (dict, list)):
+                        render_value(child_value, child_key)
+
+            elif isinstance(value, list):
+                for index, item in enumerate(value):
+                    render_value(item, f"{key or 'Item'} {index + 1}")
+
+        render_value(metadata)
+
+        # Añadir también imágenes que no estén referenciadas en el YAML.
+        # Se excluyen las ya insertadas para evitar duplicados.
+        referenced_images = set()
+
+        def collect_image_refs(value):
+            if isinstance(value, dict):
+                for v in value.values():
+                    collect_image_refs(v)
+            elif isinstance(value, list):
+                for v in value:
+                    collect_image_refs(v)
+            elif isinstance(value, str):
+                if os.path.splitext(value)[1].lower() in image_extensions:
+                    referenced_images.add(os.path.basename(value))
+
+        collect_image_refs(metadata)
+
+        remaining_images = []
+        for root, _, files in os.walk(extra_dir):
+            for filename in files:
+                if os.path.splitext(filename)[
+                    1].lower() not in image_extensions:
+                    continue
+
+                path = os.path.join(root, filename)
+                if filename not in referenced_images:
+                    remaining_images.append(path)
+
+        if remaining_images:
+            story.append(PageBreak())
+            story.append(Paragraph("Additional Images", styles["Heading1"]))
+
+            for path in sorted(remaining_images):
+                story.append(Paragraph(
+                    os.path.relpath(path, extra_dir),
+                    styles["Heading3"]
+                ))
+                #add_image(path)
+
+        SimpleDocTemplate(
+            pdf_file,
+            pagesize=A4,
+            rightMargin=2 * cm,
+            leftMargin=2 * cm,
+            topMargin=2 * cm,
+            bottomMargin=2 * cm
+        ).build(story)

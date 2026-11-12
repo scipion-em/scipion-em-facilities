@@ -49,7 +49,8 @@ class Plugin(pwem.Plugin):
 
     @classmethod
     def defineBinaries(cls, env):
-        cls.installStreamlit(env)
+        pass
+        #cls.installStreamlit(env)
 
     @classmethod
     def installStreamlit(cls, env):
