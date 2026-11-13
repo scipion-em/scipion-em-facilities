@@ -1228,6 +1228,10 @@ class ProtOSCEM(EMProtocol):
                 attributes_dict = dict(item.getAttributes())
                 shiftX = attributes_dict.get('_xmipp_ShiftX')
                 shiftY = attributes_dict.get('_xmipp_ShiftY')
+                print("[OSCEM] Movie index:", index)
+                print("[OSCEM] Movie ID:", item.getObjId())
+                print("[OSCEM] ShiftX:", repr(shiftX), "type:", type(shiftX))
+                print("[OSCEM] ShiftY:", repr(shiftY), "type:", type(shiftY))
 
                 norm = np.linalg.norm([shiftX, shiftY], axis=0)
                 avg_shifts.append(np.mean(norm))
