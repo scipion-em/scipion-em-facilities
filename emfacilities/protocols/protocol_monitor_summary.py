@@ -323,7 +323,7 @@ class ProtMonitorSummary(ProtMonitor):
         monitor.initLoop = initAll
         monitor.step = stepAll
 
-        monitor.loop()
+        monitor.loop(startTime=self.initTime.datetime())
 
     def createReportDir(self):
         self.reportDir = os.path.abspath(self._getExtraPath(self.getProject().getShortName()))

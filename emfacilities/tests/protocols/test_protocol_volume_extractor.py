@@ -20,11 +20,123 @@
 # *  All comments concerning this program package may be sent to the
 # *  e-mail address 'scipion@cnb.csic.es'
 # ***************************************************************************/
+import unittest
 from pyworkflow.tests import BaseTest, setupTestProject, DataSet
 from pwem.protocols.protocol_import import ProtImportParticles
 import pwem.protocols as emprot
 from pyworkflow.object import Pointer
 from emfacilities.protocols.protocol_volume_extractor import ProtVolumeExtractor
+
+
+
+class TestVolumeExtractorInstanceState(unittest.TestCase):
+
+    def testOutputsToDefineAreNotSharedAcrossProtocolInstances(self):
+        class OutputParticles:
+            def write(self):
+                pass
+
+        class OutputVolume:
+            pass
+
+        def newProtocolRecorder():
+            protocol = object.__new__(ProtVolumeExtractor)
+            recordedOutputs = {}
+            object.__setattr__(
+                protocol,
+                "_defineOutputs",
+                lambda **kwargs: recordedOutputs.update(kwargs),
+            )
+            object.__setattr__(
+                protocol,
+                "_store",
+                lambda output: None,
+            )
+            return protocol, recordedOutputs
+
+        ProtVolumeExtractor.outputsToDefine.clear()
+
+        first, firstOutputs = newProtocolRecorder()
+        first.createOutput(OutputParticles(), None)
+
+        second, secondOutputs = newProtocolRecorder()
+        second.createOutput(None, OutputVolume())
+
+        self.assertEqual(
+            set(firstOutputs),
+            {"outputParticles"},
+        )
+        self.assertEqual(
+            set(secondOutputs),
+            {"bestVolume"},
+            "Each protocol instance must define only its own outputs.",
+        )
+
+
+class TestVolumeExtractorValidateRegression(unittest.TestCase):
+    # Regression test: Set.getItem raises rather than returning None for a
+    # row it cannot find. A user-entered volume reference id that does not
+    # exist in the input classes must be caught by _validate() with a clear
+    # message, instead of crashing extractElements() with a confusing raw
+    # exception once the protocol is launched.
+
+    class _Value:
+        def __init__(self, value):
+            self._value = value
+
+        def get(self):
+            return self._value
+
+    class _InputClasses:
+        def __init__(self, ids):
+            self._ids = set(ids)
+
+        def __contains__(self, objId):
+            return objId in self._ids
+
+    def _newProtocol(self, selectBig, selectID, volumeID, inputClasses):
+        protocol = object.__new__(ProtVolumeExtractor)
+        object.__setattr__(protocol, "selectBig", self._Value(selectBig))
+        object.__setattr__(protocol, "selectID", self._Value(selectID))
+        object.__setattr__(protocol, "volumeID", self._Value(volumeID))
+        object.__setattr__(protocol, "inputClasses", self._Value(inputClasses))
+        return protocol
+
+    def testValidateRejectsReferenceIdNotInInputClasses(self):
+        protocol = self._newProtocol(
+            selectBig=False,
+            selectID=True,
+            volumeID=99,
+            inputClasses=self._InputClasses(ids=[1, 2, 3]),
+        )
+
+        errors = protocol._validate()
+
+        self.assertEqual(1, len(errors))
+
+    def testValidateAcceptsReferenceIdPresentInInputClasses(self):
+        protocol = self._newProtocol(
+            selectBig=False,
+            selectID=True,
+            volumeID=2,
+            inputClasses=self._InputClasses(ids=[1, 2, 3]),
+        )
+
+        errors = protocol._validate()
+
+        self.assertEqual([], errors)
+
+    def testValidateSkipsCheckWhenSelectingBiggestClass(self):
+        protocol = self._newProtocol(
+            selectBig=True,
+            selectID=False,
+            volumeID=99,
+            inputClasses=self._InputClasses(ids=[1, 2, 3]),
+        )
+
+        errors = protocol._validate()
+
+        self.assertEqual([], errors)
 
 
 class TestVolumeExtractor(BaseTest):
