@@ -32,7 +32,7 @@ import pwem
 
 from .constants import *
 
-__version__ = "3.3.1"
+__version__ = "3.4.0"
 _logo = "facilityLogo.png"
 _references = ["delaRosaTrevin201693"]
 _url = URL

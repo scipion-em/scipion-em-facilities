@@ -247,6 +247,8 @@ class ReportHtml:
             pathsReady = [exists(join(self.reportDir, self.thumbPaths[k][i])) for k in thumbKeys]
             if all(pathsReady):
                 self.thumbsReady += 1
+            else:
+                break
         return self.thumbsReady
 
     def setUp(self):
@@ -353,9 +355,11 @@ class ReportHtml:
                         return None
 
                 psdPath = getMicPSDPath(mic)
-                psdThumb = None
-                if psdPath is None:
-                    psdThumb = join(PSD_THUMBS, pwutils.replaceExt(basename(str(psdPath)), ext))
+                if psdPath is not None:
+                    psdThumb = join(
+                        PSD_THUMBS,
+                        pwutils.replaceExt(basename(psdPath), ext)
+                    )
                     self.thumbPaths[PSD_THUMBS].append(psdThumb)
                     self.thumbPaths[PSD_PATH].append(psdPath)
                 else:

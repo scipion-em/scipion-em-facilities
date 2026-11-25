@@ -22,60 +22,278 @@
 # ***************************************************************************/
 
 import os.path
+import tempfile
 
 import pyworkflow.tests as pwtests
 import pyworkflow.utils as pwutils
 
 import pwem.protocols as emprot
 import emfacilities.protocols as monitorsProt
+from emfacilities.protocols.protocol_monitor_system import MonitorSystem
 
 
-class TestStress(pwtests.BaseTest):
-    @classmethod
-    def setUpClass(cls):
-        pwtests.setupTestProject(cls)
+class TestSystemMonitorResume(pwtests.BaseTest):
 
-    def test_pattern(self):
-        """ Import several Particles from a given pattern.
-        """
+    def testInfluxReadFailureDoesNotReuseCursorResults(self):
+        class FailingCursor:
+            def __init__(self):
+                self.fetchallCalled = False
 
-        # Check stress-ng is installed
-        self.assertTrue(pwutils.commandExists(emprot.STRESS_NG),
-                        "This test requires to have %s installed" % emprot.STRESS_NG)
+            def execute(self, command):
+                raise RuntimeError("simulated sqlite read failure")
 
-        kwargs = {'noCpu': 2,
-                  'noMem': 0,
-                  'amountMem': 256,
-                  'timeout': 10,
-                  'delay': 1}
+            def fetchall(self):
+                self.fetchallCalled = True
+                return [
+                    {
+                        "id": 99,
+                        "timestamp": "2026-09-20 10:00:00",
+                        "cpu": 10.0,
+                    }
+                ]
 
-        # put some stress on the system
-        prot1 = self.newProtocol(emprot.ProtStress, **kwargs)
-        prot1.setObjLabel('stress')
-        self.proj.launchProtocol(prot1, wait=False)
+        monitor = object.__new__(MonitorSystem)
+        monitor._tableName = "log"
+        monitor.workingDir = "/tmp"
+        monitor._dataBase = "system_log.sqlite"
+        monitor.timeZone = "UTC"
+        monitor.timeDelta = 0
+        monitor.cur = FailingCursor()
 
-        # TODO fill protol pointer
-        kwargs = {
-            "samplingInterval": 2,
-            "cpuAlert": 101.0,
-            "memAlert": 101.0,
-            "swapAlert": 101.0,
-            "monitorTime": 300.0,
-            "doMail": True,
-            "emailFrom": "from@from.fakeadress.com",
-            "emailTo": "to@to.fakeadress.com",
-            "smtp": "smtp.fakeadress.com",
-            "doGpu": False,
-            "gpusToUse": "0",
-            "doNetwork": True,
-            "netInterfaces": 1,
-            "doDiskIO": True}
+        result = monitor.getDataInflux(lastId=7)
 
-        prot2 = self.newProtocol(monitorsProt.ProtMonitorSystem, **kwargs)
-        prot2.inputProtocols.append(prot1)
-        self.launchProtocol(prot2)
+        self.assertEqual(
+            result,
+            [],
+            "A failed system query must not return stale cursor rows.",
+        )
+        self.assertFalse(
+            monitor.cur.fetchallCalled,
+            "fetchall() must not run after the SELECT failed.",
+        )
 
-        baseFn = prot2._getPath(monitorsProt.SYSTEM_LOG_SQLITE)
 
-        # not sure what to test here
-        self.assertTrue(os.path.isfile(baseFn))
+    def testInitLoopRestoresAlertThresholdsFromExistingDatabase(self):
+        with tempfile.TemporaryDirectory() as tmpDir:
+            monitor = MonitorSystem(
+                [],
+                workingDir=tmpDir,
+                samplingInterval=1,
+                monitorTime=1,
+                cpuAlert=50,
+                memAlert=60,
+                swapAlert=70,
+                doGpu=False,
+                doNetwork=False,
+                doDiskIO=False,
+                gpusToUse="0",
+                nif=None,
+            )
+            monitor.initLoop()
+            monitor.cur.execute(
+                "INSERT INTO log (cpu, mem, swap) VALUES (?, ?, ?)",
+                (65, 75, 72),
+            )
+            monitor.cur.execute(
+                "INSERT INTO log (cpu, mem, swap) VALUES (?, ?, ?)",
+                (80, 70, 90),
+            )
+            monitor.conn.close()
+
+            resumed = MonitorSystem(
+                [],
+                workingDir=tmpDir,
+                samplingInterval=1,
+                monitorTime=1,
+                cpuAlert=50,
+                memAlert=60,
+                swapAlert=70,
+                doGpu=False,
+                doNetwork=False,
+                doDiskIO=False,
+                gpusToUse="0",
+                nif=None,
+            )
+            resumed.initLoop()
+
+            try:
+                self.assertEqual(resumed.cpuAlert, 80)
+                self.assertEqual(resumed.memAlert, 75)
+                self.assertEqual(resumed.swapAlert, 90)
+            finally:
+                resumed.conn.close()
+
+
+class TestSystemMonitorSamplingFailureRegression(pwtests.BaseTest):
+    def testNetworkSamplingFailureDoesNotCrashMonitor(self):
+        from unittest.mock import patch
+
+        class Memory:
+            percent = 20.0
+
+        with tempfile.TemporaryDirectory() as tmpDir:
+            monitor = MonitorSystem(
+                [],
+                workingDir=tmpDir,
+                samplingInterval=1,
+                monitorTime=1,
+                cpuAlert=101,
+                memAlert=101,
+                swapAlert=101,
+                doGpu=False,
+                doNetwork=True,
+                doDiskIO=False,
+                gpusToUse="0",
+                nif="eth0",
+            )
+
+            try:
+                with patch(
+                    "emfacilities.protocols.protocol_monitor_system."
+                    "psutil.cpu_percent",
+                    return_value=10.0,
+                ), patch(
+                    "emfacilities.protocols.protocol_monitor_system."
+                    "psutil.virtual_memory",
+                    return_value=Memory(),
+                ), patch(
+                    "emfacilities.protocols.protocol_monitor_system."
+                    "psutil.swap_memory",
+                    return_value=Memory(),
+                ), patch(
+                    "emfacilities.protocols.protocol_monitor_system."
+                    "psutil.net_io_counters",
+                    side_effect=KeyError("eth0"),
+                ):
+                    monitor.initLoop()
+                    finished = monitor.step()
+
+                self.assertTrue(finished)
+
+                monitor.cur.execute(
+                    "SELECT cpu, mem, swap, eth0_send, eth0_recv FROM log"
+                )
+                rows = monitor.cur.fetchall()
+
+                self.assertEqual(len(rows), 1)
+                self.assertEqual(rows[0][0:3], (10.0, 20.0, 20.0))
+                self.assertEqual(rows[0][3:5], (0.0, 0.0))
+            finally:
+                monitor.conn.close()
+
+class TestSystemMonitorDiskSamplingFailureRegression(pwtests.BaseTest):
+    def testDiskSamplingFailureDoesNotCrashMonitor(self):
+        from unittest.mock import patch
+
+        class Memory:
+            percent = 20.0
+
+        with tempfile.TemporaryDirectory() as tmpDir:
+            monitor = MonitorSystem(
+                [],
+                workingDir=tmpDir,
+                samplingInterval=1,
+                monitorTime=1,
+                cpuAlert=101,
+                memAlert=101,
+                swapAlert=101,
+                doGpu=False,
+                doNetwork=False,
+                doDiskIO=True,
+                gpusToUse="0",
+                nif=None,
+            )
+
+            try:
+                with patch(
+                    "emfacilities.protocols.protocol_monitor_system."
+                    "psutil.cpu_percent",
+                    return_value=10.0,
+                ), patch(
+                    "emfacilities.protocols.protocol_monitor_system."
+                    "psutil.virtual_memory",
+                    return_value=Memory(),
+                ), patch(
+                    "emfacilities.protocols.protocol_monitor_system."
+                    "psutil.swap_memory",
+                    return_value=Memory(),
+                ), patch(
+                    "emfacilities.protocols.protocol_monitor_system."
+                    "psutil.disk_io_counters",
+                    side_effect=RuntimeError("disk counters unavailable"),
+                ):
+                    monitor.initLoop()
+                    finished = monitor.step()
+
+                self.assertTrue(finished)
+
+                monitor.cur.execute(
+                    "SELECT cpu, mem, swap, disk_read, disk_write FROM log"
+                )
+                rows = monitor.cur.fetchall()
+
+                self.assertEqual(len(rows), 1)
+                self.assertEqual(rows[0][0:3], (10.0, 20.0, 20.0))
+                self.assertEqual(rows[0][3:5], (0.0, 0.0))
+            finally:
+                monitor.conn.close()
+
+
+class TestSystemMonitorLifecycleRegression(pwtests.BaseTest):
+    def testScheduledProducerKeepsSystemMonitorAlive(self):
+        from unittest.mock import patch
+        from pyworkflow.protocol.constants import STATUS_SCHEDULED
+
+        class ScheduledProtocol:
+            def getStatus(self):
+                return STATUS_SCHEDULED
+
+        class Memory:
+            percent = 20.0
+
+        protocol = ScheduledProtocol()
+
+        with tempfile.TemporaryDirectory() as tmpDir:
+            monitor = MonitorSystem(
+                [protocol],
+                workingDir=tmpDir,
+                samplingInterval=1,
+                monitorTime=1,
+                cpuAlert=101,
+                memAlert=101,
+                swapAlert=101,
+                doGpu=False,
+                doNetwork=False,
+                doDiskIO=False,
+                gpusToUse="0",
+                nif=None,
+            )
+
+            try:
+                with patch(
+                    "emfacilities.protocols.protocol_monitor_system."
+                    "getUpdatedProtocol",
+                    return_value=protocol,
+                ), patch(
+                    "emfacilities.protocols.protocol_monitor_system."
+                    "psutil.cpu_percent",
+                    return_value=10.0,
+                ), patch(
+                    "emfacilities.protocols.protocol_monitor_system."
+                    "psutil.virtual_memory",
+                    return_value=Memory(),
+                ), patch(
+                    "emfacilities.protocols.protocol_monitor_system."
+                    "psutil.swap_memory",
+                    return_value=Memory(),
+                ):
+                    monitor.initLoop()
+                    finished = monitor.step()
+
+                self.assertFalse(
+                    finished,
+                    "A scheduled producer is active and must keep the "
+                    "system monitor alive.",
+                )
+            finally:
+                monitor.conn.close()

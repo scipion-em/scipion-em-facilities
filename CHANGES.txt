@@ -1,10 +1,17 @@
-v3.4.0 (not published)
+V3.4.0
 - OSCEM protocol: Updated the threshold for volumes to be a float instead of integer
 - OSCEM protocol: Create a function to open images that detects if it comes from a .mr, .tif or .gain file
 - OSCEM protocol: If not having micrographs, not creating the micrographs example thumbail
 - OSCEM protocol: Updated the way shifts in x and y where retrieved in the movie alingment and maxh shift protocols to adjust to different plugins (xmipp, motioncorr and relion)
+- OSCEM protocol: volume metadata no longer depends on SQLite
 - Help documentation enhances
-- Enhances the streaming on several protocols 
+- Streaming protocols (data counter, data sampler, good classes extractor, 2D streamer, volume extractor, monitors) resume where they stopped: Continue/Resume restores their state, counters and timers without hanging, losing or repeating items
+- Streaming protocols no longer lose particles silently, publish the same image twice, or wait forever for items that never arrive
+- CTF and movie gain monitors read only what is new at each poll; monitor alert thresholds survive a resume
+- HTML report: PSD and thumbnail fixes; Influx report keeps its state on resume and consistent measurement names
+- Data counter: fixed the timer across resumes and the day timeout conversion
+- Developers: shared streaming base (ProtFacilitiesStreamingBase); streaming no longer depends on the database backend
+- Old tests deleted
 
 V3.3.1
 - Fixing the test for OSCEM protocol

@@ -21,9 +21,15 @@
 # *  e-mail address 'scipion@cnb.csic.es'
 # ***************************************************************************/
 from pyworkflow.tests import BaseTest, setupTestProject, DataSet
+from datetime import datetime
+import os
+import threading
+import unittest
+from unittest.mock import patch
 from pwem.protocols.protocol_import import ProtImportParticles
 import pwem.protocols as emprot
 from pyworkflow.object import Pointer
+from pyworkflow.object import Set
 from emfacilities.protocols.protocol_good_classes_extractor import ProtGoodClassesExtractor
 
 
@@ -72,6 +78,102 @@ class TestGoodClassesExtractor(BaseTest):
         cls.launchProtocol(cls.classSelector)
 
 
+
+
+
+    def testDetectsNewParticlesWhenInputMtimeDoesNotChange(self):
+        class Particle:
+            def getObjId(self):
+                return 101
+
+        class InputClass:
+            def getObjId(self):
+                return 1
+
+            def iterItems(self, **kwargs):
+                return iter((Particle(),))
+
+        class InputSet:
+            def __init__(self):
+                self.closed = False
+
+            def getFileName(self):
+                return "classes.sqlite"
+
+            def getStreamState(self):
+                return Set.STREAM_OPEN
+
+            def iterItems(self, **kwargs):
+                return iter((InputClass(),))
+
+            def close(self):
+                self.closed = True
+
+        class InputPointer:
+            def __init__(self, value):
+                self.value = value
+
+            def get(self):
+                return self.value
+
+        inputSet = InputSet()
+
+        prot = self.newProtocol(ProtGoodClassesExtractor)
+        prot.inputClasses = InputPointer(inputSet)
+        prot.dictsTimes = {"1": "2026-09-19 08:00:00"}
+        prot.isStreamClosed = Set.STREAM_OPEN
+        prot.lastCheck = datetime.now()
+        prot._loadInputClassesSet = lambda: inputSet
+
+        hasNewParticles = prot._newParticlesToProcess()
+
+        self.assertTrue(
+            hasNewParticles,
+            "Logical Set contents must be checked independently of backing-file mtime.",
+        )
+        self.assertTrue(inputSet.closed)
+
+
+    def testContinueDetectsClosedStreamWithoutNewParticles(self):
+        class ClosedInputSet:
+            def __init__(self):
+                self.closed = False
+
+            def getFileName(self):
+                return "classes.sqlite"
+
+            def getStreamState(self):
+                return Set.STREAM_CLOSED
+
+            def iterItems(self, **kwargs):
+                return iter(())
+
+            def close(self):
+                self.closed = True
+
+        class InputPointer:
+            def __init__(self, value):
+                self.value = value
+
+            def get(self):
+                return self.value
+
+        inputSet = ClosedInputSet()
+
+        prot = self.newProtocol(ProtGoodClassesExtractor)
+        prot.inputClasses = InputPointer(inputSet)
+        prot.dictsTimes = {"1": "2026-09-19 08:00:00"}
+        prot.isStreamClosed = Set.STREAM_OPEN
+        prot.lastCheck = datetime.now()
+        prot._loadInputClassesSet = lambda: inputSet
+
+        hasNewParticles = prot._newParticlesToProcess()
+
+        self.assertFalse(hasNewParticles)
+        self.assertEqual(prot.isStreamClosed, Set.STREAM_CLOSED)
+        self.assertTrue(inputSet.closed)
+
+
     def testGoodClassesSelectorAvgs(self):
         prot = self._runGoodClassesSelectorAverages("Select good particles from averages")
         self.assertSetSize(prot.outputParticles, size=4165)
@@ -103,3 +205,420 @@ class TestGoodClassesExtractor(BaseTest):
         cls.launchProtocol(protGoodClassSelectorIds)
 
         return protGoodClassSelectorIds
+    def testContinueRestoresParticleCountersFromOutputs(self):
+        class OutputSet:
+            def __init__(self, ids):
+                self._ids = set(ids)
+                self.loaded = False
+
+            def loadAllProperties(self):
+                self.loaded = True
+
+            def getIdSet(self):
+                if not self.loaded:
+                    raise AssertionError("Persisted outputs must be refreshed before reading their ids.")
+                return set(self._ids)
+
+        prot = self.newProtocol(ProtGoodClassesExtractor)
+        prot.isContinued = lambda: True
+        prot.outputParticles = OutputSet({1, 2, 3})
+        prot.outputParticlesDiscarded = OutputSet({4, 5})
+        prot._rebuildClassCreationTimes = lambda persistedIds: {}
+
+        prot.initialStep()
+
+        self.assertEqual(set(prot.goodParticles), {1, 2, 3})
+        self.assertEqual(set(prot.badParticles), {4, 5})
+        self.assertTrue(prot.outputParticles.loaded)
+        self.assertTrue(prot.outputParticlesDiscarded.loaded)
+        self.assertEqual(prot.particlesDistribution, {"good": [3], "bad": [2]})
+
+
+    def testContinueClassWithoutNewParticlesKeepsCheckpoint(self):
+        class EmptyOutput:
+            def __len__(self):
+                return 0
+
+            def getIdSet(self):
+                return set()
+
+            def append(self, item):
+                raise AssertionError("No particle should be appended")
+
+        class EmptyClass:
+            def getObjId(self):
+                return 1
+
+            def iterItems(self, **kwargs):
+                return iter(())
+
+        class InputClasses:
+            def iterItems(self, **kwargs):
+                return iter((EmptyClass(),))
+
+        prot = self.newProtocol(ProtGoodClassesExtractor)
+        previousTime = "2026-09-19 08:00:00"
+        prot.dictsTimes = {"1": previousTime}
+        prot.goodClassesIDs = [1]
+        prot.goodParticles = []
+        prot.badParticles = []
+        prot.particlesDistribution = {"good": [], "bad": []}
+        prot.isStreamClosed = Set.STREAM_OPEN
+
+        prot._loadOutputSet = lambda *args: EmptyOutput()
+        prot._updateOutputSet = lambda *args, **kwargs: None
+        prot._writeLastDone = lambda value: None
+        prot._createPlots = lambda: None
+
+        prot.extractElements(InputClasses())
+
+        self.assertEqual(prot.dictsTimes["1"], previousTime)
+        self.assertEqual(prot.goodParticles, [])
+        self.assertEqual(prot.badParticles, [])
+
+
+    def testContinueSkipsPersistedParticlesWhenCheckpointLagsOutput(self):
+        class Particle:
+            def __init__(self, objId, creation):
+                self._objId = objId
+                self._creation = creation
+
+            def getObjId(self):
+                return self._objId
+
+            def getObjCreation(self):
+                return self._creation
+
+            def clone(self):
+                return Particle(self._objId, self._creation)
+
+        class OutputSet:
+            def __init__(self, ids):
+                self.ids = set(ids)
+                self.appended = []
+
+            def getIdSet(self):
+                return set(self.ids)
+
+            def append(self, item):
+                self.appended.append(item.getObjId())
+                self.ids.add(item.getObjId())
+
+            def __len__(self):
+                return len(self.ids)
+
+        class InputClass:
+            def getObjId(self):
+                return 1
+
+            def iterItems(self, **kwargs):
+                return iter((
+                    Particle(101, "2026-09-19 08:05:00"),
+                    Particle(102, "2026-09-19 08:10:00"),
+                ))
+
+        class InputClasses:
+            def iterItems(self, **kwargs):
+                return iter((InputClass(),))
+
+        goodOutput = OutputSet({101})
+        discardedOutput = OutputSet(set())
+
+        prot = self.newProtocol(ProtGoodClassesExtractor)
+        prot.outputParticles = goodOutput
+        prot.outputParticlesDiscarded = discardedOutput
+        prot.dictsTimes = {"1": "2026-09-19 08:00:00"}
+        prot.goodClassesIDs = [1]
+        prot.goodParticles = [101]
+        prot.badParticles = []
+        prot.particlesDistribution = {"good": [1], "bad": [0]}
+        prot.isStreamClosed = Set.STREAM_OPEN
+
+        def loadOutput(outputName, suffix):
+            if outputName == "outputParticles":
+                return goodOutput
+            return discardedOutput
+
+        prot._loadOutputSet = loadOutput
+        prot._updateOutputSet = lambda *args, **kwargs: None
+        prot._writeLastDone = lambda value: None
+        prot._createPlots = lambda: None
+
+        prot.extractElements(InputClasses())
+
+        self.assertEqual(goodOutput.appended, [102])
+        self.assertEqual(prot.goodParticles, [101, 102])
+        self.assertEqual(prot.dictsTimes["1"], "2026-09-19 08:10:00")
+
+
+class TestGoodClassesExtractorLockScope(unittest.TestCase):
+    """Lightweight regression tests that need no real project/dataset."""
+
+    def testLoadOutputSetIsCalledUnderTheProtocolLock(self):
+        # Regression test: this protocol runs under STEPS_PARALLEL with
+        # independent extractElements steps (no dependency between them
+        # beyond the shared selectStep), so several can run concurrently.
+        # _loadOutputSet decides whether to reuse the existing output or
+        # create a fresh one; if that decision happens outside the
+        # protocol lock, two concurrent steps could both see no output
+        # yet, each create their own fresh Set, and whichever publishes
+        # last would silently discard the other's already-appended
+        # particles.
+        prot = ProtGoodClassesExtractor()
+        prot._lock = threading.Lock()
+        prot.dictsTimes = {}
+        prot.goodClassesIDs = []
+        prot.goodParticles = []
+        prot.badParticles = []
+        prot.isStreamClosed = Set.STREAM_OPEN
+
+        lockHeldDuringLoad = []
+
+        class _FakeOutputSet:
+            def getIdSet(self):
+                return set()
+
+            def __len__(self):
+                return 0
+
+        def fakeLoadOutputSet(outputName, suffix):
+            lockHeldDuringLoad.append(prot._lock.locked())
+            return _FakeOutputSet()
+
+        class _EmptyClasses:
+            def iterItems(self, orderBy=None, direction=None):
+                return iter([])
+
+        prot._loadOutputSet = fakeLoadOutputSet
+        prot._updateOutputSet = lambda *args, **kwargs: None
+        prot._writeLastDone = lambda value: None
+        prot._createPlots = lambda: None
+
+        prot.extractElements(_EmptyClasses())
+
+        self.assertEqual(2, len(lockHeldDuringLoad),
+                         "_loadOutputSet must be called exactly twice "
+                         "(accepted + discarded outputs).")
+        self.assertTrue(
+            all(lockHeldDuringLoad),
+            "_loadOutputSet must run while the protocol lock is held, "
+            "otherwise concurrent extraction steps can each create "
+            "their own fresh output Set and silently drop one "
+            "another's results.",
+        )
+
+class TestGoodClassesExtractorStreamingArchitecture(unittest.TestCase):
+    def testUsesFacilitiesStreamingBaseAndCoreGeneratorInsertion(self):
+        from pyworkflow.protocol import ProtStreamingBase, STEPS_PARALLEL
+        from emfacilities.protocols.protocol_streaming_base import (
+            ProtFacilitiesStreamingBase,
+        )
+
+        self.assertTrue(
+            issubclass(
+                ProtGoodClassesExtractor,
+                ProtFacilitiesStreamingBase,
+            )
+        )
+        self.assertTrue(
+            issubclass(
+                ProtFacilitiesStreamingBase,
+                ProtStreamingBase,
+            )
+        )
+        self.assertIs(
+            ProtGoodClassesExtractor._insertAllSteps,
+            ProtStreamingBase._insertAllSteps,
+        )
+        self.assertEqual(
+            STEPS_PARALLEL,
+            ProtGoodClassesExtractor.stepsExecutionMode,
+        )
+
+    def testKeepsCreationTimestampWatermarkInsteadOfIdCursor(self):
+        class _Particle:
+            def getObjId(self):
+                return 101
+
+        class _Class:
+            def __init__(self):
+                self.whereCalls = []
+
+            def getObjId(self):
+                return 7
+
+            def iterItems(
+                    self,
+                    orderBy=None,
+                    direction=None,
+                    where=None,
+            ):
+                self.whereCalls.append(
+                    (orderBy, direction, where)
+                )
+                return iter((_Particle(),))
+
+        class _ClassSet:
+            def __init__(self):
+                self.clazz = _Class()
+                self.closed = False
+
+            def getStreamState(self):
+                return Set.STREAM_OPEN
+
+            def iterItems(self, **kwargs):
+                return iter((self.clazz,))
+
+            def close(self):
+                self.closed = True
+
+        classSet = _ClassSet()
+
+        class _Harness:
+            dictsTimes = {
+                "7": "2026-09-19 08:00:00",
+            }
+            isStreamClosed = Set.STREAM_OPEN
+            _processedParticleIds = set()
+
+            def _loadInputClassesSet(self):
+                return classSet
+
+            def _discoverIdsAfter(self, *args, **kwargs):
+                raise AssertionError(
+                    "GoodClassesExtractor must keep its per-class "
+                    "creation timestamp cursor; an ID watermark is not "
+                    "valid for particles appended to an existing class."
+                )
+
+        protocol = _Harness()
+
+        hasNew = ProtGoodClassesExtractor._newParticlesToProcess(
+            protocol
+        )
+
+        self.assertTrue(hasNew)
+        self.assertEqual(
+            [
+                (
+                    "creation",
+                    "ASC",
+                    # Inclusive: creation stamps carry no microseconds, so
+                    # the boundary second can still be gaining particles.
+                    'creation>="2026-09-19 08:00:00"',
+                )
+            ],
+            classSet.clazz.whereCalls,
+        )
+        self.assertTrue(classSet.closed)
+
+
+class TestGoodClassesExtractorLogicalResumeRegression(unittest.TestCase):
+    def testContinueRebuildsClassWatermarksFromPersistedOutputsWithoutCheckpointFile(self):
+        class _Particle:
+            def __init__(self, objId, creation):
+                self._objId = objId
+                self._creation = creation
+
+            def getObjId(self):
+                return self._objId
+
+            def getObjCreation(self):
+                return self._creation
+
+        class _Class:
+            def getObjId(self):
+                return 7
+
+            def iterItems(self, orderBy=None, direction=None, where=None):
+                self.assertedOrder = (orderBy, direction, where)
+                return iter((
+                    _Particle(101, "2026-09-19 08:00:00"),
+                    _Particle(102, "2026-09-19 08:05:00"),
+                    _Particle(103, "2026-09-19 08:10:00"),
+                ))
+
+        class _ClassSet:
+            def __init__(self):
+                self.closed = False
+
+            def iterItems(self, **kwargs):
+                return iter((_Class(),))
+
+            def close(self):
+                self.closed = True
+
+        class _OutputSet:
+            def __init__(self, ids):
+                self._ids = set(ids)
+                self.loaded = False
+
+            def loadAllProperties(self):
+                self.loaded = True
+
+            def getIdSet(self):
+                if not self.loaded:
+                    raise AssertionError("Persisted outputs must be refreshed before rebuilding resume state.")
+                return set(self._ids)
+
+        class _Harness:
+            def __init__(self):
+                self.outputParticles = _OutputSet({101, 103})
+                self.outputParticlesDiscarded = _OutputSet(set())
+                self.classSet = _ClassSet()
+                self.messages = []
+
+            def isContinued(self):
+                return True
+
+            def _getLastDone(self):
+                raise AssertionError("Continue must not depend on last_done.txt.")
+
+            def _loadInputClassesSet(self):
+                return self.classSet
+
+            def _rebuildClassCreationTimes(self, persistedIds):
+                return ProtGoodClassesExtractor._rebuildClassCreationTimes(self, persistedIds)
+
+            def info(self, message):
+                self.messages.append(message)
+
+        protocol = _Harness()
+
+        ProtGoodClassesExtractor.initialStep(protocol)
+
+        self.assertEqual({"7": "2026-09-19 08:00:00"}, protocol.dictsTimes)
+        self.assertTrue(protocol.outputParticles.loaded)
+        self.assertTrue(protocol.outputParticlesDiscarded.loaded)
+        self.assertTrue(protocol.classSet.closed)
+        self.assertEqual({101, 103}, set(protocol.goodParticles))
+        self.assertEqual([], protocol.badParticles)
+
+
+class TestGoodClassesExtractorPersistedOutputRefresh(unittest.TestCase):
+    def testLoadOutputSetRefreshesExistingLogicalOutputBeforeAppend(self):
+        class ExistingOutput:
+            def __init__(self):
+                self.loaded = False
+                self.appendEnabled = False
+
+            def loadAllProperties(self):
+                self.loaded = True
+
+            def enableAppend(self):
+                if not self.loaded:
+                    raise AssertionError("Persisted output must be refreshed before enableAppend().")
+                self.appendEnabled = True
+
+        existing = ExistingOutput()
+
+        class Harness:
+            def __init__(self):
+                self.outputParticles = existing
+
+        protocol = Harness()
+        outputSet = ProtGoodClassesExtractor._loadOutputSet(protocol, "outputParticles", "_accepted")
+
+        self.assertIs(existing, outputSet)
+        self.assertTrue(existing.loaded)
+        self.assertTrue(existing.appendEnabled)

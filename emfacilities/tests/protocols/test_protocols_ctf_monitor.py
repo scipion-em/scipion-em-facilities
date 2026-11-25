@@ -22,6 +22,7 @@
 # ***************************************************************************/
 
 import os
+import tempfile
 
 
 import pyworkflow.tests as pwtests
@@ -37,6 +38,450 @@ MICS = os.environ.get('SCIPION_TEST_MICS', 3)
 
 
 class TestCtfStream(pwtests.BaseTest):
+
+    def testInfluxReadFailureDoesNotReuseCursorResults(self):
+        class FailingCursor:
+            def __init__(self):
+                self.fetchallCalled = False
+
+            def execute(self, command):
+                raise RuntimeError("simulated sqlite read failure")
+
+            def fetchall(self):
+                self.fetchallCalled = True
+                return [
+                    {
+                        "id": 99,
+                        "timestamp": "2026-09-20 10:00:00",
+                    }
+                ]
+
+        monitor = object.__new__(monitorsProt.MonitorCTF)
+        monitor._tableName = "log"
+        monitor.workingDir = "/tmp"
+        monitor._dataBase = "ctf_log.sqlite"
+        monitor.timeZone = "UTC"
+        monitor.timeDelta = 0
+        monitor.cur = FailingCursor()
+
+        result = monitor.getDataInflux(lastId=7)
+
+        self.assertEqual(
+            result,
+            [],
+            "A failed CTF query must not return stale cursor rows.",
+        )
+        self.assertFalse(
+            monitor.cur.fetchallCalled,
+            "fetchall() must not run after the SELECT failed.",
+        )
+
+
+
+    def testFailedCtfInsertIsRetriedInsteadOfMarkedAsRead(self):
+        from unittest.mock import patch
+
+        class DummyMicrograph:
+            def getFileName(self):
+                return "/tmp/mic.mrc"
+
+        class DummyCtf:
+            def getDefocusU(self):
+                return 2000.0
+
+            def getDefocusV(self):
+                return 1500.0
+
+            def getDefocusAngle(self):
+                return 0.0
+
+            def getResolution(self):
+                return 3.0
+
+            def getFitQuality(self):
+                return 1.0
+
+            def hasPhaseShift(self):
+                return False
+
+            def getPsdFile(self):
+                return "/tmp/psd.psd"
+
+            def getMicrograph(self):
+                return DummyMicrograph()
+
+            def getObjCreation(self):
+                return "2026-09-20 10:00:00"
+
+        class DummyCtfSet:
+            def getUniqueValues(self, field, where=None):
+                if field != "id":
+                    raise AssertionError(
+                        "Unexpected field requested from CTF fixture."
+                    )
+
+                if where is None:
+                    return [7]
+
+                lastId = int(where.split(">")[1].strip())
+                return [7] if 7 > lastId else []
+
+            def __getitem__(self, objId):
+                return DummyCtf()
+
+        class DummyProtocol:
+            outputCTF = DummyCtfSet()
+
+            def getStatus(self):
+                return 0
+
+        class FailingCursor:
+            def execute(self, sql):
+                raise RuntimeError("simulated sqlite failure")
+
+        with tempfile.TemporaryDirectory() as tmpDir:
+            monitor = monitorsProt.MonitorCTF(
+                DummyProtocol(),
+                workingDir=tmpDir,
+                samplingInterval=1,
+                monitorTime=1,
+                minDefocus=1000,
+                maxDefocus=40000,
+                astigmatism=2000,
+            )
+            monitor.initLoop()
+            monitor.cur = FailingCursor()
+
+            try:
+                with patch(
+                    "emfacilities.protocols.protocol_monitor_ctf.getUpdatedProtocol",
+                    return_value=DummyProtocol(),
+                ):
+                    monitor.step()
+
+                self.assertNotIn(
+                    7,
+                    monitor.readCTFs,
+                    "A CTF whose log insert failed must remain pending for retry.",
+                )
+            finally:
+                monitor.conn.close()
+
+
+
+    def testInitLoopRestoresReadCtfIdsFromExistingDatabase(self):
+        class DummyProtocol:
+            pass
+
+        with tempfile.TemporaryDirectory() as tmpDir:
+            monitor = monitorsProt.MonitorCTF(
+                DummyProtocol(),
+                workingDir=tmpDir,
+                samplingInterval=1,
+                monitorTime=1,
+                minDefocus=1000,
+                maxDefocus=40000,
+                astigmatism=2000,
+            )
+            monitor.initLoop()
+            monitor.cur.execute(
+                "INSERT INTO log (ctfID) VALUES (?)",
+                (7,),
+            )
+            monitor.conn.close()
+
+            resumed = monitorsProt.MonitorCTF(
+                DummyProtocol(),
+                workingDir=tmpDir,
+                samplingInterval=1,
+                monitorTime=1,
+                minDefocus=1000,
+                maxDefocus=40000,
+                astigmatism=2000,
+            )
+            resumed.initLoop()
+
+            try:
+                self.assertEqual(resumed.readCTFs, {7})
+            finally:
+                resumed.conn.close()
+
+
+
+    def testInitLoopRestoresDefocusAlertThresholdsFromExistingDatabase(self):
+        class DummyProtocol:
+            pass
+
+        with tempfile.TemporaryDirectory() as tmpDir:
+            monitor = monitorsProt.MonitorCTF(
+                DummyProtocol(),
+                workingDir=tmpDir,
+                samplingInterval=1,
+                monitorTime=1,
+                minDefocus=1000,
+                maxDefocus=40000,
+                astigmatism=2000,
+            )
+            monitor.initLoop()
+            monitor.cur.execute(
+                "INSERT INTO log (ctfID, defocusU, defocusV) VALUES (?, ?, ?)",
+                (7, 45000, 900),
+            )
+            monitor.cur.execute(
+                "INSERT INTO log (ctfID, defocusU, defocusV) VALUES (?, ?, ?)",
+                (8, 47000, 850),
+            )
+            monitor.conn.close()
+
+            resumed = monitorsProt.MonitorCTF(
+                DummyProtocol(),
+                workingDir=tmpDir,
+                samplingInterval=1,
+                monitorTime=1,
+                minDefocus=1000,
+                maxDefocus=40000,
+                astigmatism=2000,
+            )
+            resumed.initLoop()
+
+            try:
+                self.assertEqual(resumed.maxDefocus, 47000)
+                self.assertEqual(resumed.minDefocus, 850)
+            finally:
+                resumed.conn.close()
+
+
+    def testStepUsesIncrementalDiscoveryAfterInitialReconciliation(self):
+        from unittest.mock import patch
+        from pyworkflow.protocol.constants import STATUS_RUNNING
+
+        class DummyMicrograph:
+            def getFileName(self):
+                return "/tmp/mic.mrc"
+
+        class DummyCtf:
+            def __init__(self, objId):
+                self._objId = objId
+
+            def getDefocusU(self):
+                return 2000.0
+
+            def getDefocusV(self):
+                return 1500.0
+
+            def getDefocusAngle(self):
+                return 0.0
+
+            def getResolution(self):
+                return 3.0
+
+            def getFitQuality(self):
+                return 1.0
+
+            def hasPhaseShift(self):
+                return False
+
+            def getPsdFile(self):
+                return "/tmp/psd.psd"
+
+            def getMicrograph(self):
+                return DummyMicrograph()
+
+            def getObjCreation(self):
+                return "2026-09-27 18:00:00"
+
+        class DummyCtfSet:
+            def __init__(self):
+                self.ids = [1, 2]
+                self.queries = []
+
+            def getIdSet(self):
+                raise AssertionError(
+                    "CTF monitor must not rescan the full output ID set "
+                    "on every poll."
+                )
+
+            def getUniqueValues(self, field, where=None):
+                self.queries.append((field, where))
+                if where is None:
+                    return list(self.ids)
+
+                lastId = int(where.split(">")[1].strip())
+                return [
+                    objId
+                    for objId in self.ids
+                    if objId > lastId
+                ]
+
+            def __getitem__(self, objId):
+                return DummyCtf(objId)
+
+        class DummyProtocol:
+            def __init__(self, output):
+                self.outputCTF = output
+
+            def getStatus(self):
+                return STATUS_RUNNING
+
+        with tempfile.TemporaryDirectory() as tmpDir:
+            output = DummyCtfSet()
+            protocol = DummyProtocol(output)
+
+            monitor = monitorsProt.MonitorCTF(
+                protocol,
+                workingDir=tmpDir,
+                samplingInterval=1,
+                monitorTime=1,
+                minDefocus=1000,
+                maxDefocus=40000,
+                astigmatism=2000,
+            )
+            monitor.initLoop()
+
+            try:
+                with patch(
+                    "emfacilities.protocols.protocol_monitor_ctf."
+                    "getUpdatedProtocol",
+                    return_value=protocol,
+                ):
+                    monitor.step()
+
+                    output.ids.append(3)
+                    monitor.step()
+
+                self.assertEqual(
+                    output.queries,
+                    [
+                        ("id", None),
+                        ("id", "id > 2"),
+                    ],
+                )
+                self.assertEqual(
+                    monitor.readCTFs,
+                    {1, 2, 3},
+                )
+            finally:
+                monitor.conn.close()
+
+
+    def testFinishedProducerReconcilesIdsBelowDiscoveryWatermark(self):
+        from unittest.mock import patch
+        from pyworkflow.protocol.constants import STATUS_RUNNING
+
+        class DummyMicrograph:
+            def getFileName(self):
+                return "/tmp/mic.mrc"
+
+        class DummyCtf:
+            def getDefocusU(self):
+                return 2000.0
+
+            def getDefocusV(self):
+                return 1500.0
+
+            def getDefocusAngle(self):
+                return 0.0
+
+            def getResolution(self):
+                return 3.0
+
+            def getFitQuality(self):
+                return 1.0
+
+            def hasPhaseShift(self):
+                return False
+
+            def getPsdFile(self):
+                return "/tmp/psd.psd"
+
+            def getMicrograph(self):
+                return DummyMicrograph()
+
+            def getObjCreation(self):
+                return "2026-10-05 10:00:00"
+
+        class DummyCtfSet:
+            def __init__(self):
+                self.ids = [10, 30]
+
+            def getUniqueValues(self, field, where=None):
+                if field != "id":
+                    raise AssertionError("Unexpected field requested from CTF fixture.")
+                if where is None:
+                    return list(self.ids)
+                lastId = int(where.split(">")[1].strip())
+                return [objId for objId in self.ids if objId > lastId]
+
+            def __getitem__(self, objId):
+                return DummyCtf()
+
+        class DummyProtocol:
+            def __init__(self, output):
+                self.outputCTF = output
+                self.status = STATUS_RUNNING
+
+            def getStatus(self):
+                return self.status
+
+        with tempfile.TemporaryDirectory() as tmpDir:
+            output = DummyCtfSet()
+            protocol = DummyProtocol(output)
+            monitor = monitorsProt.MonitorCTF(
+                protocol,
+                workingDir=tmpDir,
+                samplingInterval=1,
+                monitorTime=1,
+                minDefocus=1000,
+                maxDefocus=40000,
+                astigmatism=2000,
+            )
+            monitor.initLoop()
+
+            try:
+                with patch(
+                    "emfacilities.protocols.protocol_monitor_ctf.getUpdatedProtocol",
+                    return_value=protocol,
+                ):
+                    self.assertFalse(monitor.step())
+                    self.assertEqual(monitor.readCTFs, {10, 30})
+
+                    output.ids = [10, 20, 30]
+                    protocol.status = 999999
+                    self.assertTrue(monitor.step())
+
+                self.assertEqual(
+                    monitor.readCTFs,
+                    {10, 20, 30},
+                    "The final poll must reconcile the whole logical CTF output "
+                    "before the monitor stops, including IDs below the discovery watermark.",
+                )
+            finally:
+                monitor.conn.close()
+
+    def testScheduledProducerWithoutOutputKeepsMonitorAlive(self):
+        from unittest.mock import patch
+        from pyworkflow.protocol.constants import STATUS_SCHEDULED
+
+        class ScheduledProtocol:
+            def getStatus(self):
+                return STATUS_SCHEDULED
+
+        protocol = ScheduledProtocol()
+        monitor = object.__new__(monitorsProt.MonitorCTF)
+        monitor.protocol = protocol
+
+        with patch(
+            "emfacilities.protocols.protocol_monitor_ctf.getUpdatedProtocol",
+            return_value=protocol,
+        ):
+            finished = monitor.step()
+
+        self.assertFalse(
+            finished,
+            "A scheduled CTF producer is still active and must not stop "
+            "its monitor before it starts running.",
+        )
+
     @classmethod
     def setUpClass(cls):
         pwtests.setupTestProject(cls)
@@ -50,53 +495,26 @@ class TestCtfStream(pwtests.BaseTest):
         prot2.closeMappers()
         return prot2
 
-    def test_pattern(self):
-        """ Import several Particles from a given pattern.
-        """
-        kwargs = {'xDim': 4096,
-                  'yDim': 4096,
-                  'nDim': MICS,
-                  'samplingRate': 1.25,
-                  'creationInterval': 5,
-                  'delay': 0,
-                  'setof': emprot.SET_OF_RANDOM_MICROGRAPHS  # SetOfMicrographs
-                  }
 
-        # put some stress on the system
-        protStream = self.newProtocol(emprot.ProtCreateStreamData, **kwargs)
-        protStream.setObjLabel('create Stream Mic')
-        self.proj.launchProtocol(protStream, wait=False)
+    def testFinishedProducerWithoutOutputStopsMonitor(self):
+        from unittest.mock import patch
 
-        self._waitOutput(protStream, 'outputMicrographs')
+        class FinishedProtocol:
+            def getStatus(self):
+                return 999999
 
-        # then introduce monitor, checking all the time ctf and saving to
-        # database
-        kwargs = {
-            'useCtffind4': True,
-            'ctfDownFactor': 2,
-            'numberOfThreads': 4
-        }
-        from pwem import Domain
+        protocol = FinishedProtocol()
+        monitor = object.__new__(monitorsProt.MonitorCTF)
+        monitor.protocol = protocol
 
-        ProtCTFFind = Domain.importFromPlugin('cistem.protocols',
-                                              'CistemProtCTFFind', doRaise=True)
-        protCTF = self.newProtocol(ProtCTFFind, **kwargs)
-        protCTF.inputMicrographs.set(protStream.outputMicrographs)
-        self.proj.launchProtocol(protCTF, wait=False)
+        with patch(
+            "emfacilities.protocols.protocol_monitor_ctf.getUpdatedProtocol",
+            return_value=protocol,
+        ):
+            finished = monitor.step()
 
-        self._waitOutput(protCTF, 'outputCTF')
-
-        kwargs = {'samplingInterval': 10,
-                  'interval': 300,
-                  'maxDefocus': 40000,
-                  'minDefocus': 1000,
-                  'astigmatism': 0.2,
-                  'monitorTime': 5
-                  }
-
-        protMonitor = self.newProtocol(monitorsProt.ProtMonitorCTF, **kwargs)
-        protMonitor.inputProtocol.set(protCTF)
-        self.launchProtocol(protMonitor)
-
-        baseFn = protMonitor._getPath(monitorsProt.CTF_LOG_SQLITE)
-        self.assertTrue(os.path.isfile(baseFn))
+        self.assertTrue(
+            finished,
+            "A monitor must stop when its producer has already finished, "
+            "even if outputCTF was never created.",
+        )
