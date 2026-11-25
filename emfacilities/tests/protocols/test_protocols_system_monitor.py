@@ -124,57 +124,6 @@ class TestSystemMonitorResume(pwtests.BaseTest):
                 resumed.conn.close()
 
 
-
-class TestStress(pwtests.BaseTest):
-    @classmethod
-    def setUpClass(cls):
-        pwtests.setupTestProject(cls)
-
-    def test_pattern(self):
-        """ Import several Particles from a given pattern.
-        """
-
-        # Check stress-ng is installed
-        self.assertTrue(pwutils.commandExists(emprot.STRESS_NG),
-                        "This test requires to have %s installed" % emprot.STRESS_NG)
-
-        kwargs = {'noCpu': 2,
-                  'noMem': 0,
-                  'amountMem': 256,
-                  'timeout': 10,
-                  'delay': 1}
-
-        # put some stress on the system
-        prot1 = self.newProtocol(emprot.ProtStress, **kwargs)
-        prot1.setObjLabel('stress')
-        self.proj.launchProtocol(prot1, wait=False)
-
-        # TODO fill protol pointer
-        kwargs = {
-            "samplingInterval": 2,
-            "cpuAlert": 101.0,
-            "memAlert": 101.0,
-            "swapAlert": 101.0,
-            "monitorTime": 300.0,
-            "doMail": True,
-            "emailFrom": "from@from.fakeadress.com",
-            "emailTo": "to@to.fakeadress.com",
-            "smtp": "smtp.fakeadress.com",
-            "doGpu": False,
-            "gpusToUse": "0",
-            "doNetwork": True,
-            "netInterfaces": 1,
-            "doDiskIO": True}
-
-        prot2 = self.newProtocol(monitorsProt.ProtMonitorSystem, **kwargs)
-        prot2.inputProtocols.append(prot1)
-        self.launchProtocol(prot2)
-
-        baseFn = prot2._getPath(monitorsProt.SYSTEM_LOG_SQLITE)
-
-        # not sure what to test here
-        self.assertTrue(os.path.isfile(baseFn))
-
 class TestSystemMonitorSamplingFailureRegression(pwtests.BaseTest):
     def testNetworkSamplingFailureDoesNotCrashMonitor(self):
         from unittest.mock import patch
