@@ -11,6 +11,7 @@ V3.4.0
 - HTML report: PSD and thumbnail fixes; Influx report keeps its state on resume and consistent measurement names
 - Data counter: fixed the timer across resumes and the day timeout conversion
 - Developers: shared streaming base (ProtFacilitiesStreamingBase); streaming no longer depends on the database backend
+- Old tests deleted
 
 V3.3.1
 - Fixing the test for OSCEM protocol
